@@ -1,0 +1,25 @@
+# Build outputs
+out/
+dist/
+*.vsix
+
+# Dependencies
+node_modules/
+
+# IDE
+.vscode-test/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Temporary files
+*.tmp
+*.temp
+/.vs
+/.vscode
