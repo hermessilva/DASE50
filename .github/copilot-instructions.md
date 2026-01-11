@@ -45,16 +45,13 @@ Padrões para orientar a escrita de código C# (.NET9 / C#13) e TypeScript neste
  - Ex.: `pUserID`, `pOptions`, `pToken`.
 - Variáveis locais: mnemônicas, abreviadas, tudo em minúsculo.
  - Ex.: `lstua` (lista de usuários ativos), `frsrt` (first read table).
-- Quando o nome original é abreviado, comp CEP, CPF, ID, URL, HTTP, JSON, XML, SQL, DB, UI, UX, deve manter caixa alta
- - Ex.: `pUserID`, `GetByURL`, `LoadFromDB`.
-- Siglas devem estar todas as letras em maiúsculas.
- - Ex.: `ORM=Object-Relational Mapping`, `TCP=transmission control protocol` 
+- Quando o nome original é abreviado ou siglas, comp CEP, CPF, ID, URL, HTTP, JSON, XML, SQL, DB, UI, UX, deve manter caixa alta
+ - Ex.: `pUserID`, `GetByURL`, `LoadFromDB`,`ORM=Object-Relational Mapping`, `TCP=transmission control protocol`.
 
 - Nomes sempre em inglês para tipos, membros e arquivos.
 Esta é uma ampliação das suas instruções, focada em C# (.NET 8+), para que o Copilot (e qualquer desenvolvedor) siga padrões **extremamente rigorosos** de qualidade, performance, segurança, coerência e elegância.
 
 As novas seções estão marcadas e o conteúdo existente foi integrado e reforçado.
-
 
 
 ## 1. Convenções de Nomenclatura (C#)

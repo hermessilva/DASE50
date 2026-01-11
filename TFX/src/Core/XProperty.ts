@@ -1,0 +1,653 @@
+import { XGuid } from "./XGuid.js";
+import { XEvent } from "./XEvent.js";
+import { XDispatcher } from "./XDispatcher.js";
+import { XConstraintType, XPropertyGroup } from "./XEnums.js";
+import type {
+    XTypeInfo,
+    XPropertySelector,
+    XPropertySetter,
+    XRegisterPropertyLink,
+    XExternalType,
+    XPropertyDefaultChanged
+} from "./XTypes.js";
+
+function HashToHex12(pText: string): string
+{
+    let hash = 2166136261;
+    for (let i = 0; i < pText.length; i++)
+    {
+        hash ^= pText.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+    }
+
+    const unsigned = hash >>> 0;
+    return unsigned.toString(16).padStart(8, "0") + "0000";
+}
+
+function GetCtorTypeInfo(pCtor: unknown): XTypeInfo
+{
+    if (!pCtor || typeof pCtor !== "function")
+        return { Name: "Unknown" };
+
+    const ctor = pCtor as { name?: string; Guid?: string };
+    const name = ctor.name ?? "Unknown";
+    const guid = ctor.Guid;
+    return { Name: name, Guid: guid };
+}
+
+function GetTypeGuid(pCtor: unknown): string
+{
+    const info = GetCtorTypeInfo(pCtor);
+    if (info.Guid && !XGuid.IsEmptyValue(info.Guid))
+        return info.Guid;
+
+    return `00000000-0000-0000-0000-${HashToHex12(info.Name)}`;
+}
+
+function GetBaseCtor(pCtor: unknown): unknown
+{
+    if (!pCtor || typeof pCtor !== "function")
+        return null;
+
+    const proto = Object.getPrototypeOf((pCtor as { prototype: unknown }).prototype);
+    if (!proto)
+        return null;
+
+    const baseCtor = (proto as { constructor: unknown }).constructor;
+    if (!baseCtor || baseCtor === Object)
+        return null;
+
+    return baseCtor;
+}
+
+function CreateSelectorProbe(): { Proxy: unknown; ReadKeys: string[] }
+{
+    const keys: string[] = [];
+    const proxy = new globalThis.Proxy(
+        {},
+        {
+            get(_pTarget: unknown, pProp: string | symbol): undefined
+            {
+                if (typeof pProp === "string")
+                    keys.push(pProp);
+                return undefined;
+            }
+        }
+    );
+
+    return { Proxy: proxy, ReadKeys: keys };
+}
+
+function TryExtractPropertyKey<T, TType>(pSelector: XPropertySelector<T, TType> | null | undefined): string | null
+{
+    if (!pSelector)
+        return null;
+
+    const probe = CreateSelectorProbe();
+    try
+    {
+        pSelector(probe.Proxy as T);
+        if (probe.ReadKeys.length === 0)
+            return null;
+        return probe.ReadKeys[0] ?? null;
+    }
+    catch
+    {
+        return null;
+    }
+}
+
+function InferTypeInfoFromValue(pValue: unknown): XTypeInfo | null
+{
+    if (pValue === null || pValue === undefined)
+        return null;
+
+    const tp = typeof pValue;
+
+    if (tp === "string")
+        return { Name: "String" };
+
+    if (tp === "number")
+        return { Name: "Number" };
+
+    if (tp === "boolean")
+        return { Name: "Boolean" };
+
+    if (Array.isArray(pValue))
+        return { Name: "Array" };
+
+    if (tp === "object")
+    {
+        const ctor = (pValue as { constructor?: { name?: string } }).constructor;
+        return { Name: ctor?.name ?? "Object" };
+    }
+
+    return { Name: "Unknown" };
+}
+
+export abstract class XPersistableElementBase
+{
+    public abstract ID: string;
+    public abstract Name: string;
+    public abstract IsLoaded: boolean;
+    public abstract GetValue(pProperty: XProperty): unknown;
+    public abstract SetValue(pProperty: XProperty, pValue: unknown): void;
+    public GetValueByKey?(_pKey: string): unknown { return undefined; }
+    public SetValueByKey?(_pKey: string, _pValue: unknown): void { }
+}
+
+export class XPropertyDefault
+{
+    public readonly Owner: XProperty;
+    public readonly DefaultChanged: XEvent<XPropertyDefaultChanged> = new XEvent<XPropertyDefaultChanged>();
+
+    private _DefaultValue: unknown;
+    private _EditType: XTypeInfo | null = null;
+    private _Type: XTypeInfo = { Name: "Unknown" };
+    private _IsEditable: boolean = true;
+    private _IsVisible: boolean = true;
+    private _IsReadOnly: boolean = false;
+    private _IsRequired: boolean = false;
+
+    public Name: string;
+    public Title: string = "";
+    public Order: number = 0;
+    public Scale: number = 2;
+    public MaxLength: number = 0;
+    public MinValue: number | null = null;
+    public ValueCount: number = 0;
+    public Group: XPropertyGroup = XPropertyGroup.None;
+    public Titles: string[] = [];
+
+    public CultureSensitive: boolean = false;
+    public IsLinked: boolean = false;
+    public IsPersistable: boolean = true;
+    public HasHistory: boolean = true;
+    public HasError: boolean = false;
+    public PreventInheritance: boolean = false;
+    public IsFormat: boolean = false;
+    public SkipUndo: boolean = false;
+    public IsData: boolean = false;
+    public IsLayout: boolean = false;
+    public AsAttribute: boolean = false;
+    public ViewAsList: boolean = false;
+    public SuppressLink: boolean = false;
+    public IsAutoFlush: boolean = false;
+    public AutoGeneratedValue: boolean = false;
+    public OnlyCode: boolean = false;
+    public OverrideVisibility: boolean = false;
+
+    public SubEditorID: string = XGuid.EmptyValue;
+    public DefaultEditorID: string = XGuid.EmptyValue;
+    public EditorOption: unknown = null;
+    public SearchBoxType: XTypeInfo | null = null;
+    public InitialData: unknown = null;
+    public Visibility: boolean[] = [];
+    public ExternalType: XExternalType | null = null;
+
+    public constructor(pProperty: XProperty)
+    {
+        this.Owner = pProperty;
+        this.Name = pProperty.Name;
+    }
+
+    public get ID(): string
+    {
+        return this.Owner.ID;
+    }
+
+    public get Type(): XTypeInfo
+    {
+        if (this.ExternalType)
+        {
+            const tp = this.ExternalType();
+            if (tp)
+                return tp;
+        }
+        return this._Type;
+    }
+
+    public set Type(pValue: XTypeInfo)
+    {
+        this._Type = pValue;
+    }
+
+    public get EditType(): XTypeInfo
+    {
+        return this._EditType ?? this.Type;
+    }
+
+    public set EditType(pValue: XTypeInfo)
+    {
+        this._EditType = pValue;
+    }
+
+    public get DefaultValue(): unknown
+    {
+        return this._DefaultValue;
+    }
+
+    public set DefaultValue(pValue: unknown)
+    {
+        this._DefaultValue = pValue;
+    }
+
+    public get IsReadOnly(): boolean
+    {
+        return this._IsReadOnly;
+    }
+
+    public set IsReadOnly(pValue: boolean)
+    {
+        this._IsReadOnly = pValue;
+    }
+
+    public get IsEditable(): boolean
+    {
+        return this._IsEditable || this.OverrideVisibility;
+    }
+
+    public set IsEditable(pValue: boolean)
+    {
+        this._IsEditable = pValue;
+    }
+
+    public get IsRequired(): boolean
+    {
+        return this._IsRequired && this.IsVisible;
+    }
+
+    public set IsRequired(pValue: boolean)
+    {
+        this._IsRequired = pValue;
+    }
+
+    public get IsVisible(): boolean
+    {
+        return this._IsVisible || this.OverrideVisibility;
+    }
+
+    public set IsVisible(pValue: boolean)
+    {
+        this._IsVisible = pValue;
+    }
+
+    public SetVisible(pValue: boolean, _pSender: XPersistableElementBase): void
+    {
+        this.IsVisible = pValue;
+    }
+
+    public DoChanged(pName: string): void
+    {
+        if (!this.DefaultChanged.HasHandlers)
+            return;
+
+        XDispatcher.Execute(() => this.DefaultChanged.Invoke(pName, this));
+    }
+
+    public Equals(pOther: XPersistableElementBase | null | undefined): boolean
+    {
+        if (!pOther)
+            return false;
+        return this.Name === pOther.Name;
+    }
+
+    public GetHashCode(): number
+    {
+        if (!this.Name)
+            return 0;
+
+        let hash = 0;
+        for (let i = 0; i < this.Name.length; i++)
+            hash = ((hash << 5) - hash) + this.Name.charCodeAt(i) | 0;
+
+        return hash;
+    }
+}
+
+export class XProperty
+{
+    private static readonly _Properties: Map<string, XProperty[]> = new Map<string, XProperty[]>();
+    private static readonly _AllProperties: Map<string, XProperty> = new Map<string, XProperty>();
+    private static readonly _AllPropertiesByKey: Map<string, XProperty> = new Map<string, XProperty>();
+    private static readonly _RegisterPropertyLink: XEvent<XRegisterPropertyLink> = new XEvent<XRegisterPropertyLink>();
+
+    public readonly ID: string;
+    public readonly Default: XPropertyDefault;
+    public readonly PropertyKey: string | null;
+    public readonly ConstraintType: XConstraintType | null;
+
+    private readonly _ConstraintSet: XPropertySetter<unknown> | null;
+
+    public Name: string;
+    public OwnerCID: string = XGuid.EmptyValue;
+    public DeclaringType: unknown = null;
+
+    public constructor(
+        pPropertyKey: string | null,
+        pID: string,
+        pName: string,
+        pTitle: string,
+        pType: XTypeInfo,
+        pDefaultValue: unknown = null,
+        pIsRequired: boolean = false,
+        pCultureSensitive: boolean = false,
+        pConstraintType: XConstraintType | null = null,
+        pConstraintSet: XPropertySetter<unknown> | null = null,
+        pDeclaringType: unknown = null
+    )
+    {
+        this.PropertyKey = pPropertyKey;
+        this.Name = pName;
+        this.ID = pID;
+        this.ConstraintType = pConstraintType;
+        this._ConstraintSet = pConstraintSet;
+        this.DeclaringType = pDeclaringType;
+
+        this.Default = new XPropertyDefault(this);
+        this.Default.CultureSensitive = pCultureSensitive;
+        this.Default.DefaultValue = pDefaultValue;
+        this.Default.Title = pTitle;
+        this.Default.IsRequired = pIsRequired;
+        this.Default.Type = pType;
+
+        XProperty._AllProperties.set(pID, this);
+
+        if (pPropertyKey)
+            XProperty._AllPropertiesByKey.set(pPropertyKey, this);
+    }
+
+    public static get RegisterPropertyLink(): XEvent<XRegisterPropertyLink>
+    {
+        return XProperty._RegisterPropertyLink;
+    }
+
+    public static Register<T, TType>(
+        pSelector: XPropertySelector<T, TType>,
+        pID: string,
+        pName: string,
+        pTitle: string,
+        pDefaultValue: TType | null = null,
+        pIsRequired: boolean = false,
+        pCultureSensitive: boolean = false
+    ): XProperty
+    {
+        return XProperty.InternalRegister<T, TType>(
+            pSelector,
+            pID,
+            pName,
+            pTitle,
+            null,
+            null,
+            pDefaultValue,
+            pIsRequired,
+            pCultureSensitive,
+            false
+        );
+    }
+
+    public static RegisterLink<T>(
+        pSelector: XPropertySelector<T, string>,
+        pID: string,
+        pName: string,
+        pTitle: string,
+        pDefaultValue: string = XGuid.EmptyValue,
+        pIsRequired: boolean = false,
+        pCultureSensitive: boolean = false
+    ): XProperty
+    {
+        XProperty._RegisterPropertyLink.Invoke(pID);
+        return XProperty.InternalRegister<T, string>(
+            pSelector,
+            pID,
+            pName,
+            pTitle,
+            null,
+            null,
+            pDefaultValue,
+            pIsRequired,
+            pCultureSensitive,
+            true
+        );
+    }
+
+    public static RegisterLinkArray<T>(
+        pSelector: XPropertySelector<T, string[]>,
+        pID: string,
+        pName: string,
+        pTitle: string,
+        pDefaultValue: string[] = [],
+        pIsRequired: boolean = false,
+        pCultureSensitive: boolean = false
+    ): XProperty
+    {
+        XProperty._RegisterPropertyLink.Invoke(pID);
+        return XProperty.InternalRegister<T, string[]>(
+            pSelector,
+            pID,
+            pName,
+            pTitle,
+            null,
+            null,
+            pDefaultValue,
+            pIsRequired,
+            pCultureSensitive,
+            true
+        );
+    }
+
+    public static RegisterConstraint<T, TType>(
+        pSelector: XPropertySelector<T, TType>,
+        pSetMethod: XPropertySetter<T> | null,
+        pConstraintType: XConstraintType,
+        pID: string,
+        pName: string,
+        pTitle: string,
+        pDefaultValue: TType | null = null,
+        pIsRequired: boolean = false,
+        pCultureSensitive: boolean = false
+    ): XProperty
+    {
+        return XProperty.InternalRegister<T, TType>(
+            pSelector,
+            pID,
+            pName,
+            pTitle,
+            pConstraintType,
+            pSetMethod as XPropertySetter<unknown>,
+            pDefaultValue,
+            pIsRequired,
+            pCultureSensitive,
+            false
+        );
+    }
+
+    public static Get(pID: string): XProperty
+    {
+        const p = XProperty._AllProperties.get(pID);
+        if (!p)
+            throw new Error(`XProperty.Get: property not found: ${pID}`);
+        return p;
+    }
+
+    public static TryGet(pID: string): XProperty | null
+    {
+        return XProperty._AllProperties.get(pID) ?? null;
+    }
+
+    public static GetByKey(pPropertyKey: string): XProperty
+    {
+        const p = XProperty._AllPropertiesByKey.get(pPropertyKey);
+        if (!p)
+            throw new Error(`XProperty.GetByKey: property not found: ${pPropertyKey}`);
+        return p;
+    }
+
+    public static TryGetByKey(pPropertyKey: string): XProperty | null
+    {
+        return XProperty._AllPropertiesByKey.get(pPropertyKey) ?? null;
+    }
+
+    public static GetByType(pTypeGuid: string): XProperty[]
+    {
+        return XProperty._Properties.get(pTypeGuid) ?? [];
+    }
+
+    public static GetAll(): IterableIterator<XProperty>
+    {
+        return XProperty._AllProperties.values();
+    }
+
+    public static Has(pID: string): boolean
+    {
+        return XProperty._AllProperties.has(pID);
+    }
+
+    public static LoadProperties(pElement: XPersistableElementBase, pProperties: Map<string, XProperty>): void
+    {
+        let tp: unknown = (pElement as { constructor?: unknown })?.constructor ?? null;
+
+        while (tp)
+        {
+            for (const prop of XProperty._AllProperties.values())
+            {
+                if (prop.DeclaringType === tp)
+                    pProperties.set(prop.ID, prop);
+            }
+
+            const base = GetBaseCtor(tp);
+            if (!base)
+                break;
+
+            tp = base;
+        }
+    }
+
+    public GetValue(pObject: XPersistableElementBase): unknown
+    {
+        if (this.PropertyKey)
+        {
+            const obj = pObject as unknown as Record<string, unknown>;
+            if (this.PropertyKey in obj)
+                return obj[this.PropertyKey];
+
+            if (pObject.GetValueByKey)
+                return pObject.GetValueByKey(this.PropertyKey);
+        }
+
+        return pObject.GetValue(this);
+    }
+
+    public SetValue(pObject: XPersistableElementBase, pValue: unknown): void
+    {
+        if (this.PropertyKey)
+        {
+            const obj = pObject as unknown as Record<string, unknown>;
+            if (this.PropertyKey in obj)
+            {
+                obj[this.PropertyKey] = pValue;
+                return;
+            }
+
+            if (pObject.SetValueByKey)
+            {
+                pObject.SetValueByKey(this.PropertyKey, pValue);
+                return;
+            }
+        }
+
+        pObject.SetValue(this, pValue);
+    }
+
+    public InvokeConstraintSet(pForceSet: boolean, pObject: XPersistableElementBase, _pOldValue: unknown, pNewValue: unknown): void
+    {
+        if (!this._ConstraintSet)
+            return;
+
+        if (!this.ConstraintType)
+            return;
+
+        if (!pForceSet && !pObject.IsLoaded)
+            return;
+
+        this._ConstraintSet(pObject, pNewValue);
+    }
+
+    public Equals(pOther: XProperty | null | undefined): boolean
+    {
+        if (!pOther)
+            return false;
+        return this.ID === pOther.ID;
+    }
+
+    public GetHashCode(): number
+    {
+        let hash = 0;
+        for (let i = 0; i < this.ID.length; i++)
+            hash = ((hash << 5) - hash) + this.ID.charCodeAt(i) | 0;
+        return hash;
+    }
+
+    public ToString(): string
+    {
+        const typeName = this.Default.Type?.Name ?? "Unknown";
+        return `${this.Name} (${typeName})`;
+    }
+
+    private static InternalRegister<T, TType>(
+        pSelector: XPropertySelector<T, TType> | null,
+        pID: string,
+        pName: string,
+        pTitle: string,
+        pConstraintType: XConstraintType | null,
+        pSetMethod: XPropertySetter<unknown> | null,
+        pDefaultValue: TType | null,
+        pIsRequired: boolean,
+        pCultureSensitive: boolean,
+        pIsLinked: boolean
+    ): XProperty
+    {
+        const existing = XProperty._AllProperties.get(pID);
+        if (existing)
+            return existing;
+
+        const propertyName = TryExtractPropertyKey(pSelector);
+        const declaringType = pSelector ? (pSelector as unknown as { DeclaringType?: unknown }).DeclaringType ?? null : null;
+        const declInfo = declaringType ? GetCtorTypeInfo(declaringType) : { Name: "Unknown" };
+        const ownerCID = declaringType ? GetTypeGuid(declaringType) : XGuid.EmptyValue;
+
+        const typeInfo = InferTypeInfoFromValue(pDefaultValue) ?? { Name: "Unknown" };
+        const key = propertyName ? `${declInfo.Name}.${propertyName}` : null;
+
+        const prop = new XProperty(
+            key,
+            pID,
+            pName,
+            pTitle,
+            typeInfo,
+            pDefaultValue,
+            pIsRequired,
+            pCultureSensitive,
+            pConstraintType,
+            pSetMethod,
+            declaringType
+        );
+
+        prop.OwnerCID = ownerCID;
+        prop.Default.IsLinked = pIsLinked;
+
+        let list = XProperty._Properties.get(ownerCID);
+        if (!list)
+        {
+            list = [];
+            XProperty._Properties.set(ownerCID, list);
+        }
+
+        const duplicate = list.some(p => p.ID === prop.ID);
+        if (duplicate)
+            throw new Error(`Property [${pName}] with duplicate ID.`);
+
+        list.push(prop);
+        return prop;
+    }
+}
