@@ -176,6 +176,14 @@ export abstract class XPersistableElement extends XElement
         XGuid.EmptyValue
     );
 
+    public static readonly DescriptionProp = XProperty.Register<XPersistableElement, string>(
+        (p: XPersistableElement) => p.Description,
+        "00000001-0001-0001-0001-00000000000D",
+        "Description",
+        "Description",
+        ""
+    );
+
     private _Values: XValues | null = null;
     private _Document: XDesignerDocument | null = null;
     private _PropertyBindingList: XPropertyBindingList | null = null;
@@ -327,6 +335,16 @@ export abstract class XPersistableElement extends XElement
     public set ParentID(pValue: string)
     {
         this.SetValue(XPersistableElement.ParentIDProp, pValue);
+    }
+
+    public get Description(): string
+    {
+        return this.GetValue(XPersistableElement.DescriptionProp) as string;
+    }
+
+    public set Description(pValue: string)
+    {
+        this.SetValue(XPersistableElement.DescriptionProp, pValue);
     }
 
     public get Document(): XDesignerDocument | null
@@ -693,6 +711,17 @@ export abstract class XPersistableElement extends XElement
     public Initialize(): void
     {
         this._IsLoaded = true;
+    }
+
+    public GetChildrenOfType<T>(pType: new () => T): T[]
+    {
+        const result: T[] = [];
+        for (const child of this.ChildNodes)
+        {
+            if (child instanceof pType)
+                result.push(child as T);
+        }
+        return result;
     }
 
     public Clone<T extends XPersistableElement>(): T

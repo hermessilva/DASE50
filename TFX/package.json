@@ -1,20 +1,22 @@
-{
+﻿{
     "name": "@tootega/tfx",
     "version": "1.0.0",
     "description": "TFX Core Library for VS Code Extensions",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
-    "type": "module",
     "exports": {
         ".": {
+            "require": "./dist/index.js",
             "import": "./dist/index.js",
             "types": "./dist/index.d.ts"
         },
         "./Core": {
+            "require": "./dist/Core/index.js",
             "import": "./dist/Core/index.js",
             "types": "./dist/Core/index.d.ts"
         },
         "./Design": {
+            "require": "./dist/Design/index.js",
             "import": "./dist/Design/index.js",
             "types": "./dist/Design/index.d.ts"
         }

@@ -18,7 +18,8 @@ export type { XElementCtor, XElementPredicate } from "./XElement.js";
 export { XProperty, XPropertyDefault, XPersistableElementBase } from "./XProperty.js";
 
 // XValidation - Validation system
-export { XConcurrentBag, XDataValidateError, XDesignerErrorSeverity, XValidatableElement } from "./XValidation.js";
+export { XConcurrentBag, XDataValidateError, XDesignerErrorSeverity, XValidatableElement, XValidator } from "./XValidation.js";
+export type { XIValidationIssue } from "./XValidation.js";
 
 // XModelValue - Model values
 export { XModelValue, XModelValueElement } from "./XModelValue.js";

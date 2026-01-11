@@ -1,0 +1,143 @@
+{
+    "name": "dase",
+    "displayName": "DASE - Design-Aided Software Engineering",
+    "description": "Visual design environment for multi-tier, multi-platform web applications",
+    "version": "1.0.0",
+    "publisher": "tootega",
+    "engines": {
+        "vscode": "^1.85.0"
+    },
+    "categories": [
+        "Other",
+        "Visualization"
+    ],
+    "activationEvents": [
+        "onLanguage:json",
+        "workspaceContains:**/*.daseorm.json"
+    ],
+    "main": "./out/ExtensionMain.js",
+    "contributes": {
+        "commands": [
+            {
+                "command": "Dase.NewORMDesigner",
+                "title": "New ORM Designer",
+                "category": "DASE"
+            },
+            {
+                "command": "Dase.OpenORMDesigner",
+                "title": "Open ORM Designer",
+                "category": "DASE"
+            },
+            {
+                "command": "Dase.ValidateORMModel",
+                "title": "Validate ORM Model",
+                "category": "DASE"
+            },
+            {
+                "command": "Dase.DeleteSelected",
+                "title": "Delete Selected",
+                "category": "DASE"
+            },
+            {
+                "command": "Dase.RenameSelected",
+                "title": "Rename Selected",
+                "category": "DASE"
+            },
+            {
+                "command": "Dase.AddTable",
+                "title": "Add Table",
+                "category": "DASE"
+            }
+        ],
+        "customEditors": [
+            {
+                "viewType": "Dase.ORMDesigner",
+                "displayName": "ORM Designer",
+                "selector": [
+                    {
+                        "filenamePattern": "*.daseorm.json"
+                    }
+                ],
+                "priority": "default"
+            }
+        ],
+        "viewsContainers": {
+            "panel": [
+                {
+                    "id": "dasePanel",
+                    "title": "DASE",
+                    "icon": "$(database)"
+                }
+            ]
+        },
+        "views": {
+            "dasePanel": [
+                {
+                    "type": "webview",
+                    "id": "Dase.Issues",
+                    "name": "DASE Issues"
+                },
+                {
+                    "type": "webview",
+                    "id": "Dase.Properties",
+                    "name": "DASE Properties"
+                }
+            ]
+        },
+        "menus": {
+            "explorer/context": [
+                {
+                    "when": "resourceExtname == .json && resourceFilename =~ /\\.daseorm\\.json$/",
+                    "command": "Dase.OpenORMDesigner",
+                    "group": "dase@1"
+                },
+                {
+                    "when": "resourceExtname == .json && resourceFilename =~ /\\.daseorm\\.json$/",
+                    "command": "Dase.ValidateORMModel",
+                    "group": "dase@2"
+                }
+            ],
+            "webview/context": [
+                {
+                    "when": "webviewId == 'Dase.ORMDesigner'",
+                    "command": "Dase.AddTable",
+                    "group": "dase@0"
+                },
+                {
+                    "when": "webviewId == 'Dase.ORMDesigner'",
+                    "command": "Dase.DeleteSelected",
+                    "group": "dase@1"
+                },
+                {
+                    "when": "webviewId == 'Dase.ORMDesigner'",
+                    "command": "Dase.RenameSelected",
+                    "group": "dase@2"
+                },
+                {
+                    "when": "webviewId == 'Dase.ORMDesigner'",
+                    "command": "Dase.ValidateORMModel",
+                    "group": "dase@3"
+                }
+            ]
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "pretest": "npm run compile",
+        "build:webview": "tsc -p ./media/tsconfig.json",
+        "lint": "eslint src --ext ts",
+        "test": "node ./out/test/runTest.js",
+        "package": "vsce package",
+        "publish": "vsce publish"
+    },
+    "dependencies": {
+        "@tootega/tfx": "file:../TFX"
+    },
+    "devDependencies": {
+        "@types/node": "^20.10.0",
+        "@types/vscode": "^1.85.0",
+        "typescript": "^5.3.0"
+    }
+}

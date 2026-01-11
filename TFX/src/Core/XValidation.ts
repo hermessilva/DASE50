@@ -75,3 +75,100 @@ export class XDataValidateError
         );
     }
 }
+
+export interface XIValidationIssue
+{
+    readonly ElementID: string;
+    readonly ElementName: string;
+    readonly Severity: XDesignerErrorSeverity;
+    readonly Message: string;
+    readonly PropertyID?: string;
+}
+
+export abstract class XValidator<TDocument, TDesign>
+{
+    protected readonly _Errors: XConcurrentBag<XIValidationIssue> = new XConcurrentBag<XIValidationIssue>();
+
+    public Validate(pDocument: TDocument): XIValidationIssue[]
+    {
+        this._Errors.Clear();
+
+        if (pDocument === null)
+        {
+            this._Errors.Add({
+                ElementID: "",
+                ElementName: "",
+                Severity: XDesignerErrorSeverity.Error,
+                Message: "Document is null."
+            });
+            return this._Errors.ToArray();
+        }
+
+        const design = this.GetDesign(pDocument);
+        if (design === null)
+        {
+            this._Errors.Add({
+                ElementID: this.GetDocumentID(pDocument),
+                ElementName: this.GetDocumentName(pDocument),
+                Severity: XDesignerErrorSeverity.Error,
+                Message: "Document has no design."
+            });
+            return this._Errors.ToArray();
+        }
+
+        this.ValidateDocument(pDocument);
+        this.ValidateDesign(design);
+        this.ValidateElements(design);
+
+        return this._Errors.ToArray();
+    }
+
+    protected abstract GetDesign(pDocument: TDocument): TDesign | null;
+    protected abstract GetDocumentID(pDocument: TDocument): string;
+    protected abstract GetDocumentName(pDocument: TDocument): string;
+
+    protected ValidateDocument(_pDocument: TDocument): void
+    {
+    }
+
+    protected ValidateDesign(_pDesign: TDesign): void
+    {
+    }
+
+    protected ValidateElements(_pDesign: TDesign): void
+    {
+    }
+
+    protected AddError(pElementID: string, pElementName: string, pMessage: string, pPropertyID?: string): void
+    {
+        this._Errors.Add({
+            ElementID: pElementID,
+            ElementName: pElementName,
+            Severity: XDesignerErrorSeverity.Error,
+            Message: pMessage,
+            PropertyID: pPropertyID
+        });
+    }
+
+    protected AddWarning(pElementID: string, pElementName: string, pMessage: string, pPropertyID?: string): void
+    {
+        this._Errors.Add({
+            ElementID: pElementID,
+            ElementName: pElementName,
+            Severity: XDesignerErrorSeverity.Warning,
+            Message: pMessage,
+            PropertyID: pPropertyID
+        });
+    }
+
+    protected AddIssue(pElementID: string, pElementName: string, pSeverity: XDesignerErrorSeverity, pMessage: string, pPropertyID?: string): void
+    {
+        this._Errors.Add({
+            ElementID: pElementID,
+            ElementName: pElementName,
+            Severity: pSeverity,
+            Message: pMessage,
+            PropertyID: pPropertyID
+        });
+    }
+}

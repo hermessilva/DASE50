@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Checkout TFX dependency
+        uses: actions/checkout@v4
+        with:
+          repository: tootega/tfx
+          path: TFX
+          token: ${{ secrets.TFX_ACCESS_TOKEN }}
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: DASE/package-lock.json
+
+      - name: Build TFX
+        working-directory: TFX
+        run: |
+          npm ci
+          npm run build
+
+      - name: Install DASE dependencies
+        working-directory: DASE
+        run: npm ci
+
+      - name: Compile DASE
+        working-directory: DASE
+        run: npm run compile
+
+      - name: Lint
+        working-directory: DASE
+        run: npm run lint --if-present
+
+      - name: Run tests
+        working-directory: DASE
+        run: npm test --if-present
+
+  package:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Checkout TFX dependency
+        uses: actions/checkout@v4
+        with:
+          repository: tootega/tfx
+          path: TFX
+          token: ${{ secrets.TFX_ACCESS_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+          cache-dependency-path: DASE/package-lock.json
+
+      - name: Build TFX
+        working-directory: TFX
+        run: |
+          npm ci
+          npm run build
+
+      - name: Install DASE dependencies
+        working-directory: DASE
+        run: npm ci
+
+      - name: Install vsce
+        run: npm install -g @vscode/vsce
+
+      - name: Package extension
+        working-directory: DASE
+        run: vsce package --out dase.vsix
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dase-vsix
+          path: DASE/dase.vsix
+          retention-days: 30

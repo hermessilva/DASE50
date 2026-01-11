@@ -2,7 +2,7 @@
 
 [![TFX CI](https://github.com/Tootega/DASE50/actions/workflows/tfx-ci.yml/badge.svg)](https://github.com/Tootega/DASE50/actions/workflows/tfx-ci.yml)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
-![Tests](https://img.shields.io/badge/tests-837%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/tests-978%20passed-brightgreen)
 ![Node.js Version](https://img.shields.io/badge/node-%3E%3D%2020-blue.svg)
 ![Vitest](https://img.shields.io/badge/tested%20with-vitest-663399?logo=vitest)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-3178C6?logo=typescript&logoColor=white)
@@ -28,8 +28,8 @@ The goal is to explore:
 
 - [Project Overview](#-project-overview)
 - [Repository Structure](#-repository-structure)
-- [TFX — Tootega Framework X](#-tfx--tootega-framework-x)
 - [DASE — VS Code Extension](#-dase--vs-code-extension)
+- [TFX — Tootega Framework X](#-tfx--tootega-framework-x)
 - [Code Quality Standards](#-code-quality-standards)
 - [Development Guide](#-development-guide)
 - [CI/CD Pipeline](#-cicd-pipeline)
@@ -70,7 +70,7 @@ DASE50/
 │   │   ├── Data/                  # Serialization engine
 │   │   ├── Design/                # Visual design elements
 │   │   └── Designers/             # Domain-specific designers
-│   └── tests/                     # Unit tests (837+ tests)
+│   └── tests/                     # Unit tests (978 tests)
 ├── DASE/                          # VS Code Extension
 │   ├── src/
 │   │   ├── Commands/              # Extension commands
@@ -84,7 +84,99 @@ DASE50/
 
 ---
 
-# 📦 TFX — Tootega Framework X
+# � DASE — VS Code Extension
+
+**DASE** (Design-Aided Software Engineering) is a VS Code extension that provides visual designers for software modeling. The initial focus is an **ORM Designer** for database schema modeling.
+
+## Vision
+
+DASE aims to be a comprehensive visual design environment supporting:
+- 📊 **ORM Designer** — Database schema modeling (current phase)
+- 📐 **UI Designer** — User interface layouts (planned)
+- 🔄 **Flow Designer** — Business process workflows (planned)
+- 📡 **API Designer** — REST/GraphQL endpoint modeling (planned)
+
+## Current Phase: ORM Designer
+
+### Features
+
+| Feature | Description | Status |
+|---------|-------------|--------|
+| Custom Editor | Opens `.daseorm.json` files in visual designer | ✅ Implemented |
+| Tables | Visual table representation with columns | ✅ Implemented |
+| Relations | Visual relationship lines between tables | ✅ Implemented |
+| Properties Panel | Edit selected element properties | ✅ Implemented |
+| Issues Panel | Validation errors and warnings | ✅ Implemented |
+| Context Menus | All actions via right-click menus | ✅ Implemented |
+| TFX Integration | Bridge to TFX framework for model management | ✅ Implemented |
+
+### Architecture
+
+```
+DASE/src/
+├── ExtensionMain.ts                  # Extension entry point
+├── Commands/
+│   ├── OpenORMDesignerCommand.ts     # Open designer command
+│   ├── ValidateORMModelCommand.ts    # Validation command
+│   ├── DeleteSelectedCommand.ts      # Delete elements command
+│   └── RenameSelectedCommand.ts      # Rename element command
+├── Views/
+│   ├── IssuesViewProvider.ts         # Issues panel
+│   └── PropertiesViewProvider.ts     # Properties panel
+├── Designer/
+│   ├── ORMDesignerEditorProvider.ts  # Custom editor provider
+│   ├── ORMDesignerMessages.ts        # Message protocol types
+│   └── ORMDesignerState.ts           # In-memory state management
+├── Services/
+│   ├── IssueService.ts               # Issue management
+│   ├── SelectionService.ts           # Selection state
+│   └── TFXBridge.ts                  # TFX framework integration
+└── Models/
+    ├── DesignerSelection.ts          # Selection data structures
+    ├── IssueItem.ts                  # Issue representation
+    └── PropertyItem.ts               # Property representation
+```
+
+### Message Protocol
+
+The designer uses a typed message protocol for webview communication:
+
+| Message Type | Direction | Purpose |
+|--------------|-----------|---------|
+| `DesignerReady` | Webview → Extension | Webview initialization complete |
+| `LoadModel` | Extension → Webview | Send model data to render |
+| `ModelLoaded` | Webview → Extension | Confirm model loaded |
+| `SaveModel` | Webview → Extension | Request model persistence |
+| `SelectElement` | Webview → Extension | User selected an element |
+| `SelectionChanged` | Extension → Webview | Selection state updated |
+| `UpdateProperty` | Extension → Webview | Property value changed |
+| `PropertiesChanged` | Webview → Extension | Properties need refresh |
+| `ValidateModel` | Either | Trigger validation |
+| `IssuesChanged` | Extension → Webview | Validation results updated |
+
+### Context Menu Commands
+
+**Designer Canvas:**
+- `Dase.AddTable` — Add a new table to the model
+- `Dase.AddRelation` — Add a relationship between tables
+- `Dase.DeleteSelected` — Delete selected elements
+- `Dase.RenameSelected` — Rename selected element
+
+**Explorer (.daseorm.json files):**
+- `Dase.OpenORMDesigner` — Open file in visual designer
+- `Dase.ValidateORMModel` — Validate model and populate Issues
+
+### Validation Rules
+
+The ORM validator (using `XValidator<XORMDocument, XORMDesign>`) enforces:
+- ❌ **Error:** Table name cannot be empty
+- ❌ **Error:** Duplicate table names not allowed
+- ❌ **Error:** Relation references non-existent table
+- ⚠️ **Warning:** Table has no columns defined
+
+---
+
+# �📦 TFX — Tootega Framework X
 
 **TFX** is the core library that powers the DASE extension. It provides a robust, type-safe foundation for building VS Code extensions with complex visual designers.
 
@@ -215,96 +307,6 @@ doc.Design?.AppendChild(table);
 const engine = XSerializationEngine.Instance;
 const result = engine.Serialize(doc);
 ```
-
----
-
-# 🔌 DASE — VS Code Extension
-
-**DASE** (Design-Aided Software Engineering) is a VS Code extension that provides visual designers for software modeling. The initial focus is an **ORM Designer** for database schema modeling.
-
-## Vision
-
-DASE aims to be a comprehensive visual design environment supporting:
-- 📊 **ORM Designer** — Database schema modeling (current phase)
-- 📐 **UI Designer** — User interface layouts (planned)
-- 🔄 **Flow Designer** — Business process workflows (planned)
-- 📡 **API Designer** — REST/GraphQL endpoint modeling (planned)
-
-## Current Phase: ORM Designer
-
-### Features
-
-| Feature | Description | Status |
-|---------|-------------|--------|
-| Custom Editor | Opens `.daseorm.json` files in visual designer | 🎯 Target |
-| Tables | Visual table representation with columns | 🎯 Target |
-| Relations | Visual relationship lines between tables | 🎯 Target |
-| Properties Panel | Edit selected element properties | 🎯 Target |
-| Issues Panel | Validation errors and warnings | 🎯 Target |
-| Context Menus | All actions via right-click menus | 🎯 Target |
-
-### Architecture
-
-```
-DASE/src/
-├── ExtensionMain.ts              # Extension entry point
-├── Commands/
-│   ├── OpenOrmDesignerCommand.ts # Open designer command
-│   └── ValidateOrmModelCommand.ts# Validation command
-├── Views/
-│   ├── IssuesViewProvider.ts     # Issues panel
-│   └── PropertiesViewProvider.ts # Properties panel
-├── Designer/
-│   ├── OrmDesignerEditorProvider.ts  # Custom editor
-│   ├── OrmDesignerMessages.ts    # Message protocol
-│   └── OrmDesignerState.ts       # In-memory state
-├── Services/
-│   ├── IssueService.ts           # Issue management
-│   ├── SelectionService.ts       # Selection state
-│   ├── OrmValidationService.ts   # Model validation
-│   └── TfxBridge.ts              # TFX integration
-└── Models/
-    ├── OrmModel.ts               # ORM data structures
-    ├── IssueItem.ts              # Issue representation
-    └── PropertyItem.ts           # Property representation
-```
-
-### Message Protocol
-
-The designer uses a typed message protocol for webview communication:
-
-| Message Type | Direction | Purpose |
-|--------------|-----------|---------|
-| `DesignerReady` | Webview → Extension | Webview initialization complete |
-| `LoadModel` | Extension → Webview | Send model data to render |
-| `ModelLoaded` | Webview → Extension | Confirm model loaded |
-| `SaveModel` | Webview → Extension | Request model persistence |
-| `SelectElement` | Webview → Extension | User selected an element |
-| `SelectionChanged` | Extension → Webview | Selection state updated |
-| `UpdateProperty` | Extension → Webview | Property value changed |
-| `PropertiesChanged` | Webview → Extension | Properties need refresh |
-| `ValidateModel` | Either | Trigger validation |
-| `IssuesChanged` | Extension → Webview | Validation results updated |
-
-### Context Menu Commands
-
-**Designer Canvas:**
-- `Dase.AddTable` — Add a new table to the model
-- `Dase.AddRelation` — Add a relationship between tables
-- `Dase.DeleteSelected` — Delete selected elements
-- `Dase.RenameSelected` — Rename selected element
-
-**Explorer (.daseorm.json files):**
-- `Dase.OpenOrmDesigner` — Open file in visual designer
-- `Dase.ValidateOrmModel` — Validate model and populate Issues
-
-### Validation Rules
-
-The ORM validator enforces:
-- ❌ **Error:** Table name cannot be empty
-- ❌ **Error:** Duplicate table names not allowed
-- ❌ **Error:** Relation references non-existent table
-- ⚠️ **Warning:** Table has no columns defined
 
 ---
 
