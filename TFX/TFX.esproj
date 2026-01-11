@@ -4,4 +4,10 @@
     <InstallCommand>
     </InstallCommand>
   </PropertyGroup>
+  <ItemGroup>
+    <None Remove="coverage\**" />
+    <None Remove="dist\**" />
+    <TypeScriptConfiguration Remove="coverage\**" />
+    <TypeScriptConfiguration Remove="dist\**" />
+  </ItemGroup>
 </Project>

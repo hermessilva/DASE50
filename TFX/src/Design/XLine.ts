@@ -2,7 +2,7 @@ import { XDesignElement } from "./XDesignElement.js";
 import { XProperty } from "../Core/XProperty.js";
 import { XColor, XPoint } from "../Core/XGeometry.js";
 
-export class XLine extends XDesignElement
+export abstract class XLine extends XDesignElement
 {
     public static readonly PointsProp = XProperty.Register<XLine, XPoint[]>(
         (p: XLine) => p.Points,

@@ -1,6 +1,6 @@
 import { XRectangle } from "./XRectangle.js";
 
-export class XField extends XRectangle
+export abstract class XField extends XRectangle
 {
     public constructor()
     {

@@ -1,6 +1,6 @@
 import { XPersistableElement } from "../Core/XPersistableElement.js";
 
-export class XDesignElement extends XPersistableElement
+export abstract class XDesignElement extends XPersistableElement
 {
     public constructor()
     {

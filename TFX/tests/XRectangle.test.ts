@@ -2,9 +2,11 @@ import { describe, it, expect } from "vitest";
 import { XRectangle, XLineCap, XLineJoin, XCursor } from "../src/Design/XRectangle.js";
 import { XRect, XColor, XThickness, XBorderColor, XAlignment, XPoint } from "../src/Core/XGeometry.js";
 
+class XMockRectangle extends XRectangle { }
+
 describe("XRectangle", () => {
     it("should have default property values", () => {
-        const rect = new XRectangle();
+        const rect = new XMockRectangle();
         expect(rect.Bounds).toEqual(new XRect(0, 0, 0, 0));
         expect(rect.MinWidth).toBe(0);
         expect(rect.MinHeight).toBe(0);
@@ -49,7 +51,7 @@ describe("XRectangle", () => {
     });
 
     it("should allow getting and setting all properties", () => {
-        const rect = new XRectangle();
+        const rect = new XMockRectangle();
         
         rect.Bounds = new XRect(10, 20, 30, 40);
         expect(rect.Bounds).toEqual(new XRect(10, 20, 30, 40));
@@ -184,7 +186,7 @@ describe("XRectangle", () => {
     });
 
     it("should calculate Center correctly", () => {
-        const rect = new XRectangle();
+        const rect = new XMockRectangle();
         rect.Bounds = new XRect(10, 10, 100, 200);
         const center = rect.Center;
         expect(center.X).toBe(60);
@@ -192,7 +194,7 @@ describe("XRectangle", () => {
     });
 
     it("should provide helper getters", () => {
-        const rect = new XRectangle();
+        const rect = new XMockRectangle();
         rect.Bounds = new XRect(10, 20, 100, 50);
         
         // HasShadow cases
@@ -235,7 +237,7 @@ describe("XRectangle", () => {
     });
 
     it("should test ContainsPoint", () => {
-        const rect = new XRectangle();
+        const rect = new XMockRectangle();
         rect.Bounds = new XRect(10, 10, 100, 100);
         expect(rect.ContainsPoint(new XPoint(50, 50))).toBe(true);
         expect(rect.ContainsPoint(new XPoint(10, 10))).toBe(true);
@@ -245,14 +247,14 @@ describe("XRectangle", () => {
     });
 
     it("should test IntersectsWith", () => {
-        const rect = new XRectangle();
+        const rect = new XMockRectangle();
         rect.Bounds = new XRect(10, 10, 100, 100);
         expect(rect.IntersectsWith(new XRect(50, 50, 100, 100))).toBe(true);
         expect(rect.IntersectsWith(new XRect(120, 120, 50, 50))).toBe(false);
     });
 
     it("should test MoveTo and MoveBy", () => {
-        const rect = new XRectangle();
+        const rect = new XMockRectangle();
         rect.Bounds = new XRect(10, 10, 100, 100);
         rect.MoveTo(50, 60);
         expect(rect.Left).toBe(50);
@@ -265,7 +267,7 @@ describe("XRectangle", () => {
     });
 
     it("should test ResizeTo and respect constraints", () => {
-        const rect = new XRectangle();
+        const rect = new XMockRectangle();
         rect.Bounds = new XRect(0, 0, 100, 100);
         rect.MinWidth = 50;
         rect.MinHeight = 50;
@@ -286,7 +288,7 @@ describe("XRectangle", () => {
     });
 
     it("should test SetUniformRadius and SetUniformScale", () => {
-        const rect = new XRectangle();
+        const rect = new XMockRectangle();
         rect.SetUniformRadius(10);
         expect(rect.RadiusX).toBe(10);
         expect(rect.RadiusY).toBe(10);

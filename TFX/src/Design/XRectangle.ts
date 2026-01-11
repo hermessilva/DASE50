@@ -34,7 +34,7 @@ export enum XCursor
     Grabbing = 13
 }
 
-export class XRectangle extends XDesignElement
+export abstract class XRectangle extends XDesignElement
 {
     public static readonly BoundsProp = XProperty.Register<XRectangle, XRect>(
         (p: XRectangle) => p.Bounds,
