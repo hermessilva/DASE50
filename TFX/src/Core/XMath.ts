@@ -4,11 +4,8 @@
  * @module Designers/ORM/Routing/XMath
  */
 
-import { XPoint, XRect } from "./XRouterTypes";
-
-/**
- * Classe utilitária com funções matemáticas para geometria 2D
- */
+import { XRect, XPoint } from "./XGeometry.js";
+        
 export class XMath {
     /**
      * Arredonda um valor para um número específico de casas decimais
@@ -28,15 +25,12 @@ export class XMath {
      * @returns Novo retângulo com valores arredondados
      */
     static RoundRect(rect: XRect, decimals: number): XRect {
-        return {
-            Left: XMath.Round(rect.Left, decimals),
-            Top: XMath.Round(rect.Top, decimals),
-            Width: XMath.Round(rect.Width, decimals),
-            Height: XMath.Round(rect.Height, decimals),
-            Right: XMath.Round(rect.Left + rect.Width, decimals),
-            Bottom: XMath.Round(rect.Top + rect.Height, decimals),
-            IsEmpty: rect.Width === 0 && rect.Height === 0
-        };
+        return new XRect(
+            XMath.Round(rect.Left, decimals),
+            XMath.Round(rect.Top, decimals),
+            XMath.Round(rect.Width, decimals),
+            XMath.Round(rect.Height, decimals)
+        );
     }
 
     /**
@@ -45,10 +39,10 @@ export class XMath {
      * @returns Ponto central
      */
     static Center(rect: XRect): XPoint {
-        return {
-            X: rect.Left + rect.Width / 2,
-            Y: rect.Top + rect.Height / 2
-        };
+        return new XPoint(
+            rect.Left + (rect.Width / 2),
+            rect.Top + (rect.Height / 2)
+        );
     }
 
     /**
@@ -82,10 +76,10 @@ export class XMath {
      * @returns Novo ponto deslocado
      */
     static MovePoint(point: XPoint, size: { Width: number; Height: number }): XPoint {
-        return {
-            X: point.X + size.Width,
-            Y: point.Y + size.Height
-        };
+        return new XPoint(
+            point.X + size.Width,
+            point.Y + size.Height
+        );
     }
 
     /**
@@ -105,7 +99,7 @@ export class XMath {
         const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
         
         if (Math.abs(denom) < 1e-10) {
-            return { X: NaN, Y: NaN };
+            return new XPoint(NaN, NaN);
         }
 
         const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
@@ -113,13 +107,13 @@ export class XMath {
 
         // Verifica se a interseção está dentro de ambos os segmentos
         if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
-            return {
-                X: x1 + t * (x2 - x1),
-                Y: y1 + t * (y2 - y1)
-            };
+            return new XPoint(
+                x1 + t * (x2 - x1),
+                y1 + t * (y2 - y1)
+            );
         }
 
-        return { X: NaN, Y: NaN };
+        return new XPoint(NaN, NaN);
     }
 
     /**
@@ -137,10 +131,10 @@ export class XMath {
         const bottom = rect.Top + rect.Height;
 
         // Verifica interseção com cada lado do retângulo
-        const topLeft: XPoint = { X: left, Y: top };
-        const topRight: XPoint = { X: right, Y: top };
-        const bottomLeft: XPoint = { X: left, Y: bottom };
-        const bottomRight: XPoint = { X: right, Y: bottom };
+        const topLeft = new XPoint(left, top);
+        const topRight = new XPoint(right, top);
+        const bottomLeft = new XPoint(left, bottom);
+        const bottomRight = new XPoint(right, bottom);
 
         // Verifica se algum endpoint está dentro do retângulo
         if (XMath.PointInRect(rect, p1) || XMath.PointInRect(rect, p2)) {
@@ -178,20 +172,20 @@ export class XMath {
      */
     static ToPolygonEx(rect: XRect, pInflateLine: number = 0): XPoint[][] {
         const left = rect.Left;
-        const right = rect.Right ?? rect.Left + rect.Width;
+        const right = rect.Right;
         const top = rect.Top;
-        const bottom = rect.Bottom ?? rect.Top + rect.Height;
+        const bottom = rect.Bottom;
 
         // Seguindo exatamente a lógica do C# original
         return [
             // Linha superior (horizontal) - estendida horizontalmente
-            [{ X: left - pInflateLine, Y: top }, { X: right + pInflateLine, Y: top }],
+            [new XPoint(left - pInflateLine, top), new XPoint(right + pInflateLine, top)],
             // Linha direita (vertical) - estendida verticalmente
-            [{ X: right, Y: top - pInflateLine }, { X: right, Y: bottom + pInflateLine }],
+            [new XPoint(right, top - pInflateLine), new XPoint(right, bottom + pInflateLine)],
             // Linha inferior (horizontal) - estendida horizontalmente, direção inversa
-            [{ X: right + pInflateLine, Y: bottom }, { X: left - pInflateLine, Y: bottom }],
+            [new XPoint(right + pInflateLine, bottom), new XPoint(left - pInflateLine, bottom)],
             // Linha esquerda (vertical) - estendida verticalmente, direção inversa
-            [{ X: left, Y: bottom + pInflateLine }, { X: left, Y: top - pInflateLine }]
+            [new XPoint(left, bottom + pInflateLine), new XPoint(left, top - pInflateLine)]
         ];
     }
 
@@ -208,15 +202,15 @@ export class XMath {
         
         const halfSize = size / 2;
         
-        const p1: XPoint = {
-            X: tip.X - halfSize * Math.cos(angle - arrowAngle),
-            Y: tip.Y - halfSize * Math.sin(angle - arrowAngle)
-        };
+        const p1 = new XPoint(
+            tip.X - halfSize * Math.cos(angle - arrowAngle),
+            tip.Y - halfSize * Math.sin(angle - arrowAngle)
+        );
         
-        const p2: XPoint = {
-            X: tip.X - halfSize * Math.cos(angle + arrowAngle),
-            Y: tip.Y - halfSize * Math.sin(angle + arrowAngle)
-        };
+        const p2 = new XPoint(
+            tip.X - halfSize * Math.cos(angle + arrowAngle),
+            tip.Y - halfSize * Math.sin(angle + arrowAngle)
+        );
         
         return [p1, tip, p2];
     }
@@ -229,15 +223,12 @@ export class XMath {
      * @returns Novo retângulo inflado
      */
     static InflateRect(rect: XRect, dx: number, dy: number): XRect {
-        return {
-            Left: rect.Left - dx,
-            Top: rect.Top - dy,
-            Width: rect.Width + 2 * dx,
-            Height: rect.Height + 2 * dy,
-            Right: rect.Left + rect.Width + dx,
-            Bottom: rect.Top + rect.Height + dy,
-            IsEmpty: false
-        };
+        return new XRect(
+            rect.Left - dx,
+            rect.Top - dy,
+            rect.Width + (2 * dx),
+            rect.Height + (2 * dy)
+        );
     }
 
     /**
@@ -255,15 +246,12 @@ export class XMath {
         const right = Math.max(rect1.Right ?? rect1.Left + rect1.Width, rect2.Right ?? rect2.Left + rect2.Width);
         const bottom = Math.max(rect1.Bottom ?? rect1.Top + rect1.Height, rect2.Bottom ?? rect2.Top + rect2.Height);
 
-        return {
-            Left: left,
-            Top: top,
-            Width: right - left,
-            Height: bottom - top,
-            Right: right,
-            Bottom: bottom,
-            IsEmpty: false
-        };
+        return new XRect(
+            left,
+            top,
+            right - left,
+            bottom - top
+        );
     }
 
     /**
@@ -271,15 +259,7 @@ export class XMath {
      * @returns Retângulo vazio
      */
     static EmptyRect(): XRect {
-        return {
-            Left: 0,
-            Top: 0,
-            Width: 0,
-            Height: 0,
-            Right: 0,
-            Bottom: 0,
-            IsEmpty: true
-        };
+        return new XRect(0, 0, 0, 0);
     }
 
     /**
@@ -294,15 +274,12 @@ export class XMath {
         const right = Math.max(p1.X, p2.X);
         const bottom = Math.max(p1.Y, p2.Y);
 
-        return {
-            Left: left,
-            Top: top,
-            Width: right - left,
-            Height: bottom - top,
-            Right: right,
-            Bottom: bottom,
-            IsEmpty: false
-        };
+        return new XRect(
+            left,
+            top,
+            right - left,
+            bottom - top
+        );
     }
 
     /**
@@ -364,10 +341,10 @@ export class XMath {
      * @returns Ponto interpolado
      */
     static LerpPoint(p1: XPoint, p2: XPoint, t: number): XPoint {
-        return {
-            X: XMath.Lerp(p1.X, p2.X, t),
-            Y: XMath.Lerp(p1.Y, p2.Y, t)
-        };
+        return new XPoint(
+            XMath.Lerp(p1.X, p2.X, t),
+            XMath.Lerp(p1.Y, p2.Y, t)
+        );
     }
 
     // ==================== Funções adicionais do C# original ====================
@@ -381,8 +358,7 @@ export class XMath {
     static AngleInDegree(pFirst: XPoint, pSecond: XPoint): number {
         const rad = Math.atan2(pFirst.Y - pSecond.Y, pFirst.X - pSecond.X);
         const pi2 = 2 * Math.PI;
-        let result = (pi2 + rad + Math.PI / 2) % pi2;
-        if (result < 0) result += pi2;
+        const result = (pi2 + rad + Math.PI / 2) % pi2;
         return result * 360 / pi2;
     }
 
@@ -413,10 +389,10 @@ export class XMath {
      * @returns Ponto central
      */
     static CenterLine(pFirst: XPoint, pSecond: XPoint): XPoint {
-        return {
-            X: pFirst.X - ((pFirst.X - pSecond.X) / 2),
-            Y: pFirst.Y - ((pFirst.Y - pSecond.Y) / 2)
-        };
+        return new XPoint(
+            pFirst.X - ((pFirst.X - pSecond.X) / 2),
+            pFirst.Y - ((pFirst.Y - pSecond.Y) / 2)
+        );
     }
 
     /**
@@ -429,10 +405,10 @@ export class XMath {
     static RotatePoint(pCenter: XPoint, pPoint: XPoint, pDegree: number): XPoint {
         const length = XMath.Distance2Points(pPoint, pCenter);
         const degree = XMath.AngleInRad(pPoint, pCenter) + ((pDegree * Math.PI) / 180.0);
-        return {
-            X: pCenter.X - (length * Math.sin(degree)),
-            Y: pCenter.Y - (length * Math.cos(degree))
-        };
+        return new XPoint(
+            pCenter.X - (length * Math.sin(degree)),
+            pCenter.Y - (length * Math.cos(degree))
+        );
     }
 
     /**
@@ -458,7 +434,7 @@ export class XMath {
         const dy = pSecond.Y - pFirst.Y;
 
         if (dx === 0 && dy === 0) {
-            return { X: pFirst.X, Y: pFirst.Y };
+            return new XPoint(pFirst.X, pFirst.Y);
         }
 
         const t = (((pPoint.X - pFirst.X) * dx) + ((pPoint.Y - pFirst.Y) * dy)) / ((dx * dx) + (dy * dy));
@@ -469,10 +445,10 @@ export class XMath {
             return pSecond;
         }
         
-        return {
-            X: pFirst.X + (t * dx),
-            Y: pFirst.Y + (t * dy)
-        };
+        return new XPoint(
+            pFirst.X + (t * dx),
+            pFirst.Y + (t * dy)
+        );
     }
 
     /**
@@ -499,10 +475,10 @@ export class XMath {
         if (pPolygon.length < 3) return false;
 
         let inside = false;
-        let pt: XPoint = { X: pPolygon[pPolygon.length - 1].X, Y: pPolygon[pPolygon.length - 1].Y };
+        let pt = new XPoint(pPolygon[pPolygon.length - 1].X, pPolygon[pPolygon.length - 1].Y);
 
         for (let i = 0; i < pPolygon.length; i++) {
-            const newPoint: XPoint = { X: pPolygon[i].X, Y: pPolygon[i].Y };
+            const newPoint = new XPoint(pPolygon[i].X, pPolygon[i].Y);
             let p1: XPoint, p2: XPoint;
 
             if (newPoint.X > pt.X) {
@@ -531,7 +507,7 @@ export class XMath {
      * @returns Objeto com ponto de interseção e índice do segmento
      */
     static CrossLineInPolygon(pPolygon: XPoint[], pP1: XPoint, pP2: XPoint): { point: XPoint; index: number } {
-        const nanPoint: XPoint = { X: NaN, Y: NaN };
+        const nanPoint = new XPoint(NaN, NaN);
         
         if (!XMath.PointInPolygon(pPolygon, pP1)) {
             return { point: nanPoint, index: -1 };
@@ -573,13 +549,13 @@ export class XMath {
 
         if (det === 0) {
             const t = -B / (2 * A);
-            return [{ X: pPoint1.X + t * dx, Y: pPoint1.Y + t * dy }];
+            return [new XPoint(pPoint1.X + t * dx, pPoint1.Y + t * dy)];
         } else {
             const t1 = (-B + Math.sqrt(det)) / (2 * A);
             const t2 = (-B - Math.sqrt(det)) / (2 * A);
             return [
-                { X: pPoint1.X + t1 * dx, Y: pPoint1.Y + t1 * dy },
-                { X: pPoint1.X + t2 * dx, Y: pPoint1.Y + t2 * dy }
+                new XPoint(pPoint1.X + t1 * dx, pPoint1.Y + t1 * dy),
+                new XPoint(pPoint1.X + t2 * dx, pPoint1.Y + t2 * dy)
             ];
         }
     }
@@ -595,10 +571,10 @@ export class XMath {
     static PointCircle(pCenter: XPoint, pPoint: XPoint, pRadiusX: number, pRadiusY: number = -1): XPoint {
         if (pRadiusY === -1) pRadiusY = pRadiusX;
         const dg = XMath.AngleInRad(pCenter, pPoint) + Math.PI;
-        return {
-            X: pCenter.X - (pRadiusX * Math.sin(dg)),
-            Y: pCenter.Y - (pRadiusY * Math.cos(dg))
-        };
+        return new XPoint(
+            pCenter.X - (pRadiusX * Math.sin(dg)),
+            pCenter.Y - (pRadiusY * Math.cos(dg))
+        );
     }
 
     /**
@@ -607,14 +583,14 @@ export class XMath {
      * @returns Array de pontos formando o polígono
      */
     static ToPolygon(pRect: XRect): XPoint[] {
-        const right = pRect.Right ?? pRect.Left + pRect.Width;
-        const bottom = pRect.Bottom ?? pRect.Top + pRect.Height;
+        const right = pRect.Right;
+        const bottom = pRect.Bottom;
         return [
-            { X: pRect.Left, Y: pRect.Top },
-            { X: right, Y: pRect.Top },
-            { X: right, Y: bottom },
-            { X: pRect.Left, Y: bottom },
-            { X: pRect.Left, Y: pRect.Top }  // Fecha o polígono
+            new XPoint(pRect.Left, pRect.Top),
+            new XPoint(right, pRect.Top),
+            new XPoint(right, bottom),
+            new XPoint(pRect.Left, bottom),
+            new XPoint(pRect.Left, pRect.Top)  // Fecha o polígono
         ];
     }
 
@@ -633,15 +609,12 @@ export class XMath {
         const maxX = Math.max(...pPoints.map(p => p.X));
         const maxY = Math.max(...pPoints.map(p => p.Y));
 
-        return {
-            Left: minX,
-            Top: minY,
-            Width: maxX - minX,
-            Height: maxY - minY,
-            Right: maxX,
-            Bottom: maxY,
-            IsEmpty: false
-        };
+        return new XRect(
+            minX,
+            minY,
+            maxX - minX,
+            maxY - minY
+        );
     }
 
     /**
@@ -651,10 +624,10 @@ export class XMath {
      * @returns Ponto arredondado
      */
     static RoundPoint(pPoint: XPoint, pFactor: number): XPoint {
-        return {
-            X: XMath.RoundToFactor(pPoint.X, pFactor),
-            Y: XMath.RoundToFactor(pPoint.Y, pFactor)
-        };
+        return new XPoint(
+            XMath.RoundToFactor(pPoint.X, pFactor),
+            XMath.RoundToFactor(pPoint.Y, pFactor)
+        );
     }
 
     /**
@@ -688,10 +661,10 @@ export class XMath {
      */
     static ToGrid(pPoint: XPoint, pGridLen: number): XPoint {
         if (pGridLen <= 0) return pPoint;
-        return {
-            X: Math.round(pPoint.X / pGridLen) * pGridLen,
-            Y: Math.round(pPoint.Y / pGridLen) * pGridLen
-        };
+        return new XPoint(
+            Math.round(pPoint.X / pGridLen) * pGridLen,
+            Math.round(pPoint.Y / pGridLen) * pGridLen
+        );
     }
 
     /**
@@ -702,17 +675,14 @@ export class XMath {
      */
     static RectToGrid(pRect: XRect, pGridLen: number): XRect {
         if (pGridLen <= 0) return pRect;
-        const topLeft = XMath.ToGrid({ X: pRect.Left, Y: pRect.Top }, pGridLen);
+        const topLeft = XMath.ToGrid(new XPoint(pRect.Left, pRect.Top), pGridLen);
         const size = XMath.SizeToGrid({ Width: pRect.Width, Height: pRect.Height }, pGridLen);
-        return {
-            Left: topLeft.X,
-            Top: topLeft.Y,
-            Width: size.Width,
-            Height: size.Height,
-            Right: topLeft.X + size.Width,
-            Bottom: topLeft.Y + size.Height,
-            IsEmpty: false
-        };
+        return new XRect(
+            topLeft.X,
+            topLeft.Y,
+            size.Width,
+            size.Height
+        );
     }
 
     /**
@@ -802,15 +772,12 @@ export class XMath {
      * @returns Retângulo com dimensões máximas
      */
     static MaxRect(pRect: XRect, pSize: { Width: number; Height: number }): XRect {
-        return {
-            Left: pRect.Left,
-            Top: pRect.Top,
-            Width: Math.max(pSize.Width, pRect.Width),
-            Height: Math.max(pSize.Height, pRect.Height),
-            Right: pRect.Left + Math.max(pSize.Width, pRect.Width),
-            Bottom: pRect.Top + Math.max(pSize.Height, pRect.Height),
-            IsEmpty: false
-        };
+        return new XRect(
+            pRect.Left,
+            pRect.Top,
+            Math.max(pSize.Width, pRect.Width),
+            Math.max(pSize.Height, pRect.Height)
+        );
     }
 
     /**
@@ -820,15 +787,12 @@ export class XMath {
      * @returns Retângulo centrado
      */
     static CreateRect(pPoint: XPoint, pSize: number): XRect {
-        return {
-            Left: pPoint.X - (pSize / 2.0),
-            Top: pPoint.Y - (pSize / 2.0),
-            Width: pSize,
-            Height: pSize,
-            Right: pPoint.X + (pSize / 2.0),
-            Bottom: pPoint.Y + (pSize / 2.0),
-            IsEmpty: false
-        };
+        return new XRect(
+            pPoint.X - (pSize / 2.0),
+            pPoint.Y - (pSize / 2.0),
+            pSize,
+            pSize
+        );
     }
 
     /**

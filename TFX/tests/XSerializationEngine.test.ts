@@ -260,6 +260,14 @@ describe("XTypeConverter", () =>
             expect(parsed.Width).toBe(100);
             expect(parsed.Height).toBe(50);
         });
+
+        it("should fallback to 0 when size values are not numbers", () =>
+        {
+            // This covers the || 0 branch in Size FromString
+            const parsed = XTypeConverter.FromString<XISize>("{Width=abc;Height=def}", "Size");
+            expect(parsed.Width).toBe(0);
+            expect(parsed.Height).toBe(0);
+        });
     });
 
     describe("Rect conversion", () =>
@@ -275,6 +283,16 @@ describe("XTypeConverter", () =>
             expect(parsed.Y).toBe(20);
             expect(parsed.Width).toBe(100);
             expect(parsed.Height).toBe(50);
+        });
+
+        it("should fallback to 0 when rect values are not numbers", () =>
+        {
+            // This covers the || 0 branch in Rect FromString
+            const parsed = XTypeConverter.FromString<XIRect>("{X=a;Y=b;Width=c;Height=d}", "Rect");
+            expect(parsed.X).toBe(0);
+            expect(parsed.Y).toBe(0);
+            expect(parsed.Width).toBe(0);
+            expect(parsed.Height).toBe(0);
         });
     });
 
@@ -322,6 +340,14 @@ describe("XTypeConverter", () =>
             expect(parsed.X).toBe(25);
             expect(parsed.Y).toBe(75);
         });
+
+        it("should fallback to 0 when point values are not numbers", () =>
+        {
+            // This covers the || 0 branch in Point FromString
+            const parsed = XTypeConverter.FromString<XIPoint>("{X=abc;Y=def}", "Point");
+            expect(parsed.X).toBe(0);
+            expect(parsed.Y).toBe(0);
+        });
     });
 
     describe("Point array conversion", () =>
@@ -342,6 +368,15 @@ describe("XTypeConverter", () =>
         {
             expect(XTypeConverter.FromString<XIPoint[]>(null as unknown as string, "Point[]")).toEqual([]);
             expect(XTypeConverter.FromString<XIPoint[]>("", "Point[]")).toEqual([]);
+        });
+
+        it("should fallback to 0 when point array values are not numbers", () =>
+        {
+            // This covers the || 0 branch in Point[] FromString
+            const parsed = XTypeConverter.FromString<XIPoint[]>("{X=abc;Y=def}", "Point[]");
+            expect(parsed.length).toBe(1);
+            expect(parsed[0].X).toBe(0);
+            expect(parsed[0].Y).toBe(0);
         });
     });
 

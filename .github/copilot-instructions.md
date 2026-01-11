@@ -1,5 +1,33 @@
 # TFX Coding Standards
 
+## 🚨 Repository Context: TFX vs DASE (Read First)
+
+**Absolute rule:** this repository contains **two different projects** that must never be confused:
+
+- **TFX** = the **framework/library** (shared core). Folder: `/TFX/`
+- **DASE** = the **VS Code Extension**. Folder: `/DASE/`  
+  **DASE depends on TFX** (dependency direction is **DASE → TFX**, never the opposite).
+
+They live in the **same repository**, but they are **not** the same codebase, not the same scope, and not the same responsibility.
+
+### Context Validation Checklist (must be done before any change)
+
+1. **Locate the file path** you are editing and decide the context:
+   - Path under `/TFX/` → you are working on the **TFX framework**
+   - Path under `/DASE/` → you are working on the **DASE Extension**
+2. **State the context explicitly** in your answer and in your plan:
+   - “Change targets: TFX …” or “Change targets: DASE …”
+3. **Validate the dependency direction**:
+   - DASE may reference TFX APIs/packages
+   - TFX must **not** import/reference DASE (avoid circular dependencies)
+4. **Never infer structure**:
+   - If something is unclear, search within the repository for the symbol/usages and follow the existing patterns.
+5. **When you mention an API/class/module**, always clarify which side it belongs to:
+   - “(TFX) …” or “(DASE) …”
+6. **When changing behavior**, ensure you are not silently applying a DASE requirement inside TFX (or vice versa).
+
+> If you are unsure which project a change belongs to, stop and determine it from the folder path and existing references before writing code.
+
 ## 🎯 Primary Goal
 
 These rules are **not suggestions**. They are **mandatory directives**. Work is only considered complete when it complies with them.

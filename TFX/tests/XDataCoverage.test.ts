@@ -3,6 +3,7 @@ import { XGuid } from "../src/Core/XGuid.js";
 import { XProperty } from "../src/Core/XProperty.js";
 import { XPropertyGroup } from "../src/Core/XEnums.js";
 import { XPersistableElement } from "../src/Core/XPersistableElement.js";
+import { XElement } from "../src/Core/XElement.js";
 import { XSerializationContext, XSerializationDirection, XSerializationPhase } from "../src/Data/XSerializationContext.js";
 import { XElementRegistry, RegisterElement, RegisterChildElement } from "../src/Data/XElementRegistry.js";
 import { XTypeConverter } from "../src/Data/XTypeConverter.js";
@@ -1504,5 +1505,32 @@ describe("Final Coverage Gaps", () => {
         const output = writer.GetOutput();
         // With IncludeDefaultValues=true, default value should be included
         expect(output).toContain("IncValue");
+    });
+
+    it("XSerializationEngine: SerializeDocumentContent with non-XPersistableElement child (Line 390)", () => {
+        // Create a child that is XElement but not XPersistableElement
+        class XNonPersistableChild extends XElement {}
+        
+        class XParentWithNonPersistable extends XPersistableElement {
+            public constructor() {
+                super();
+                // Add a child that is not XPersistableElement
+                const nonPersistable = new XNonPersistableChild();
+                this.AppendChild(nonPersistable);
+            }
+        }
+        
+        XElementRegistry.Instance.Register({
+            TagName: "XParentWithNonPersistable",
+            Constructor: XParentWithNonPersistable
+        });
+        
+        const elem = new XParentWithNonPersistable();
+        elem.ID = XGuid.NewValue();
+        
+        const engine = XSerializationEngine.Instance;
+        const res = engine.SerializeToDocument(elem, "ParentDoc", XGuid.NewValue());
+        // Serialization should succeed, but non-persistable child is skipped
+        expect(res.Success).toBe(true);
     });
 });

@@ -328,10 +328,10 @@ export class XTypeConverter
                     return { A: 255, R: 0, G: 0, B: 0 };
                 
                 return {
-                    A: parseInt(match[1], 10) || 255,
-                    R: parseInt(match[2], 10) || 0,
-                    G: parseInt(match[3], 10) || 0,
-                    B: parseInt(match[4], 10) || 0
+                    A: parseInt(match[1], 10),
+                    R: parseInt(match[2], 10),
+                    G: parseInt(match[3], 10),
+                    B: parseInt(match[4], 10)
                 };
                 
             },
@@ -359,10 +359,10 @@ export class XTypeConverter
                     return { Left: 0, Top: 0, Right: 0, Bottom: 0 };
                 
                 return {
-                    Left: parseFloat(match[1]) || 0,
-                    Top: parseFloat(match[2]) || 0,
-                    Right: parseFloat(match[3]) || 0,
-                    Bottom: parseFloat(match[4]) || 0
+                    Left: parseFloat(match[1]),
+                    Top: parseFloat(match[2]),
+                    Right: parseFloat(match[3]),
+                    Bottom: parseFloat(match[4])
                 };
                 
             },

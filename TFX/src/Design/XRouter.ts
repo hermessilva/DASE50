@@ -8,21 +8,18 @@
  * @module Designers/ORM/Routing/XRouter
  */
 
-import { XMath } from "./XMath";
+import { XRect, XPoint } from "../Core/XGeometry.js";
+import { XMath } from "../Core/XMath.js";
 import {
-    XPoint,
-    XRect,
-    XSize,
     XRouterLine,
     XRouterShape,
     XRouterDirection,
-    createRouterLine,
     emptyRouterLine,
-    clonePoints,
-    isEmptyRect,
+    createRouterLine,
     normalizeRect,
-    generateGuid
-} from "./XRouterTypes";
+    isEmptyRect,
+    clonePoints
+} from "./XRouterTypes.js";
 
 /**
  * Opções de configuração do router
@@ -105,20 +102,20 @@ export class XRouter {
     public BestLine: XRouterLine = emptyRouterLine();
     
     /** Retângulo principal (área de trabalho) */
-    public MainRect: XRect = { Left: 0, Top: 0, Width: 0, Height: 0, IsEmpty: true };
+    public MainRect: XRect = new XRect(0, 0, 0, 0);
     
     /** Retângulo direito (destino) */
-    public RightRect: XRect = { Left: 0, Top: 0, Width: 0, Height: 0, IsEmpty: true };
+    public RightRect: XRect = new XRect(0, 0, 0, 0);
     
     /** Retângulo esquerdo (origem) */
-    public LeftRect: XRect = { Left: 0, Top: 0, Width: 0, Height: 0, IsEmpty: true };
+    public LeftRect: XRect = new XRect(0, 0, 0, 0);
     
     /** Contador de passos de cálculo */
     public Steps: number = 0;
 
     // Variáveis internas
-    private _LR: XRect = { Left: 0, Top: 0, Width: 0, Height: 0 };
-    private _RR: XRect = { Left: 0, Top: 0, Width: 0, Height: 0 };
+    private _LR: XRect = new XRect(0, 0, 0, 0);
+    private _RR: XRect = new XRect(0, 0, 0, 0);
     private _MaxIterations: number = 1000; // Limite de segurança para evitar loops infinitos
 
     /**
@@ -277,36 +274,36 @@ export class XRouter {
             ) + vy / 2;
             
             this.AllLines.push(createRouterLine([
-                { X: xPos, Y: outr.Top },
-                { X: xPos, Y: outr.Bottom ?? outr.Top + outr.Height }
+                new XPoint(xPos, outr.Top),
+                new XPoint(xPos, outr.Bottom)
             ]));
         }
 
         // Adiciona linhas horizontais de conexão se houver espaço
         const vx = Math.max(this._LR.Top, this._RR.Top) - Math.min(
-            this._LR.Bottom ?? this._LR.Top + this._LR.Height, 
-            this._RR.Bottom ?? this._RR.Top + this._RR.Height
+            this._LR.Bottom, 
+            this._RR.Bottom
         );
         
         if (vx > 2 * this.Gap) {
             const yPos = Math.min(
-                this._LR.Bottom ?? this._LR.Top + this._LR.Height, 
-                this._RR.Bottom ?? this._RR.Top + this._RR.Height
+                this._LR.Bottom, 
+                this._RR.Bottom
             ) + vx / 2;
             
             this.AllLines.push(createRouterLine([
-                { X: outr.Left, Y: yPos },
-                { X: outr.Right ?? outr.Left + outr.Width, Y: yPos }
+                new XPoint(outr.Left, yPos),
+                new XPoint(outr.Right, yPos)
             ]));
         }
 
         // Cria linhas de saída/entrada se necessário
         if (pCreateLeft || this.LeftLines.length === 0) {
-            this.LeftLines = this.addShapeLines(pLeft, lct, outr, -1);
+            this.LeftLines = this.addShapeLines(pLeft, lct, outr);
         }
         
         if (pCreateRight || this.RightLines.length === 0) {
-            this.RightLines = this.addShapeLines(pRight, rct, outr, -1);
+            this.RightLines = this.addShapeLines(pRight, rct, outr);
         }
 
         // Adiciona as linhas do polígono externo
@@ -416,73 +413,73 @@ export class XRouter {
         pShape: XRect, 
         pOuterRect: XRect
     ): XPoint[] {
-        let pt1 = { ...pPoint };
-        let pt2 = { ...pPoint };
+        let pt1 = new XPoint(pPoint.X, pPoint.Y);
+        let pt2 = new XPoint(pPoint.X, pPoint.Y);
 
-        const shapeRight = pShape.Right ?? pShape.Left + pShape.Width;
-        const shapeBottom = pShape.Bottom ?? pShape.Top + pShape.Height;
-        const outerRight = pOuterRect.Right ?? pOuterRect.Left + pOuterRect.Width;
-        const outerBottom = pOuterRect.Bottom ?? pOuterRect.Top + pOuterRect.Height;
+        const shapeRight = pShape.Right;
+        const shapeBottom = pShape.Bottom;
+        const outerRight = pOuterRect.Right;
+        const outerBottom = pOuterRect.Bottom;
 
         switch (pDegree) {
             case XRouterDirection.North: // 0 - Norte (saída pelo topo)
                 if (isNaN(pPoint.X) && isNaN(pPoint.Y)) {
-                    pt1 = { X: pCenter.X, Y: pShape.Top };
-                    pt2 = { X: pCenter.X, Y: pOuterRect.Top };
+                    pt1 = new XPoint(pCenter.X, pShape.Top);
+                    pt2 = new XPoint(pCenter.X, pOuterRect.Top);
                 } else if (isNaN(pPoint.Y)) {
-                    pt1 = { X: pPoint.X, Y: pShape.Top };
-                    pt2 = { X: pPoint.X, Y: pOuterRect.Top };
+                    pt1 = new XPoint(pPoint.X, pShape.Top);
+                    pt2 = new XPoint(pPoint.X, pOuterRect.Top);
                 } else if (isNaN(pPoint.X)) {
-                    pt1 = { X: pCenter.X, Y: pPoint.Y };
-                    pt2 = { X: pCenter.X, Y: pOuterRect.Top };
+                    pt1 = new XPoint(pCenter.X, pPoint.Y);
+                    pt2 = new XPoint(pCenter.X, pOuterRect.Top);
                 } else {
-                    pt2 = { X: pPoint.X, Y: pOuterRect.Top };
+                    pt2 = new XPoint(pPoint.X, pOuterRect.Top);
                 }
                 break;
 
             case XRouterDirection.East: // 90 - Leste (saída pela direita)
                 if (isNaN(pPoint.X) && isNaN(pPoint.Y)) {
-                    pt1 = { X: shapeRight, Y: pCenter.Y };
-                    pt2 = { X: outerRight, Y: pCenter.Y };
+                    pt1 = new XPoint(shapeRight, pCenter.Y);
+                    pt2 = new XPoint(outerRight, pCenter.Y);
                 } else if (isNaN(pPoint.Y)) {
-                    pt1 = { X: pPoint.X, Y: pCenter.Y };
-                    pt2 = { X: outerRight, Y: pCenter.Y };
+                    pt1 = new XPoint(pPoint.X, pCenter.Y);
+                    pt2 = new XPoint(outerRight, pCenter.Y);
                 } else if (isNaN(pPoint.X)) {
-                    pt1 = { X: shapeRight, Y: pPoint.Y };
-                    pt2 = { X: outerRight, Y: pPoint.Y };
+                    pt1 = new XPoint(shapeRight, pPoint.Y);
+                    pt2 = new XPoint(outerRight, pPoint.Y);
                 } else {
-                    pt2 = { X: outerRight, Y: pPoint.Y };
+                    pt2 = new XPoint(outerRight, pPoint.Y);
                 }
                 break;
 
             case XRouterDirection.South: // 180 - Sul (saída pelo fundo)
                 if (isNaN(pPoint.X) && isNaN(pPoint.Y)) {
-                    pt1 = { X: pCenter.X, Y: shapeBottom };
-                    pt2 = { X: pCenter.X, Y: outerBottom };
+                    pt1 = new XPoint(pCenter.X, shapeBottom);
+                    pt2 = new XPoint(pCenter.X, outerBottom);
                 } else if (isNaN(pPoint.Y)) {
-                    pt1 = { X: pPoint.X, Y: shapeBottom };
-                    pt2 = { X: pPoint.X, Y: outerBottom };
+                    pt1 = new XPoint(pPoint.X, shapeBottom);
+                    pt2 = new XPoint(pPoint.X, outerBottom);
                 } else if (isNaN(pPoint.X)) {
-                    pt1 = { X: pCenter.X, Y: pPoint.Y };
-                    pt2 = { X: pCenter.X, Y: outerBottom };
+                    pt1 = new XPoint(pCenter.X, pPoint.Y);
+                    pt2 = new XPoint(pCenter.X, outerBottom);
                 } else {
-                    pt2 = { X: pPoint.X, Y: outerBottom };
+                    pt2 = new XPoint(pPoint.X, outerBottom);
                 }
                 break;
 
             case XRouterDirection.West: // 270 - Oeste (saída pela esquerda)
                 if (isNaN(pPoint.X) && isNaN(pPoint.Y)) {
-                    pt1 = { X: pShape.Left, Y: pCenter.Y };
-                    pt2 = { X: pOuterRect.Left, Y: pCenter.Y };
+                    pt1 = new XPoint(pShape.Left, pCenter.Y);
+                    pt2 = new XPoint(pOuterRect.Left, pCenter.Y);
                 } else if (isNaN(pPoint.Y)) {
-                    pt1 = { X: pPoint.X, Y: pCenter.Y };
-                    pt2 = { X: pOuterRect.Left, Y: pCenter.Y };
+                    pt1 = new XPoint(pPoint.X, pCenter.Y);
+                    pt2 = new XPoint(pOuterRect.Left, pCenter.Y);
                 } else if (isNaN(pPoint.X)) {
-                    pt1 = { X: pShape.Left, Y: pPoint.Y };
-                    pt2 = { X: pOuterRect.Left, Y: pPoint.Y };
+                    pt1 = new XPoint(pShape.Left, pPoint.Y);
+                    pt2 = new XPoint(pOuterRect.Left, pPoint.Y);
                 } else {
                     pt1 = pPoint;
-                    pt2 = { X: pOuterRect.Left, Y: pPoint.Y };
+                    pt2 = new XPoint(pOuterRect.Left, pPoint.Y);
                 }
                 break;
         }
@@ -495,20 +492,16 @@ export class XRouter {
      * @param pShape - Forma de roteamento
      * @param pCenter - Centro da forma
      * @param pOuterRect - Retângulo externo
-     * @param pSuppress - Direção a suprimir (-1 para nenhuma)
      * @returns Lista de linhas de saída
      */
     private addShapeLines(
         pShape: XRouterShape, 
         pCenter: XPoint, 
-        pOuterRect: XRect, 
-        pSuppress: number
+        pOuterRect: XRect
     ): XRouterLine[] {
         const lines: XRouterLine[] = [];
 
         for (const dg of pShape.DesiredDegree) {
-            if (pSuppress === dg) continue;
-
             const points = this.getStartPoint(dg, pShape.StartPoint, pCenter, pShape.Rect, pOuterRect);
             lines.push(createRouterLine(points, dg, dg));
         }
