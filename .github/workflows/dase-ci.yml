@@ -130,7 +130,7 @@ jobs:
 
       - name: Package extension
         working-directory: DASE
-        run: vsce package --out dase-${{ github.sha }}.vsix
+        run: vsce package --no-dependencies --out dase-${{ github.sha }}.vsix
 
       - name: Upload VSIX artifact
         uses: actions/upload-artifact@v4
