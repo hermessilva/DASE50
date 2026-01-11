@@ -929,4 +929,81 @@ describe("XPersistableElement.ts", () =>
             expect(elem2.GetLinkedElement<TestElement>(TestElementWithProps.LinkedProp)).toBeNull();
         });
     });
+
+    describe("Description property", () =>
+    {
+        it("should have default empty Description", () =>
+        {
+            const elem = new TestElement();
+            expect(elem.Description).toBe("");
+        });
+
+        it("should allow getting and setting Description", () =>
+        {
+            const elem = new TestElement();
+            elem.Description = "Test description";
+            expect(elem.Description).toBe("Test description");
+
+            elem.Description = "Another description";
+            expect(elem.Description).toBe("Another description");
+        });
+    });
+
+    describe("GetChildrenOfType", () =>
+    {
+        it("should return empty array when no children", () =>
+        {
+            const parent = new TestElement();
+            const result = parent.GetChildrenOfType<TestElement>(TestElement);
+            expect(result).toEqual([]);
+        });
+
+        it("should return children of specified type", () =>
+        {
+            const parent = new TestElement();
+            const child1 = new TestElement();
+            const child2 = new TestElementWithProps();
+            const child3 = new TestElement();
+
+            parent.AppendChild(child1);
+            parent.AppendChild(child2);
+            parent.AppendChild(child3);
+
+            const result = parent.GetChildrenOfType<TestElement>(TestElement);
+            expect(result.length).toBe(3);
+            expect(result).toContain(child1);
+            expect(result).toContain(child2);
+            expect(result).toContain(child3);
+        });
+
+        it("should filter children by specific type", () =>
+        {
+            const parent = new TestElement();
+            const child1 = new TestElement();
+            const child2 = new TestElementWithProps();
+            const child3 = new TestElement();
+
+            parent.AppendChild(child1);
+            parent.AppendChild(child2);
+            parent.AppendChild(child3);
+
+            const result = parent.GetChildrenOfType<TestElementWithProps>(TestElementWithProps);
+            expect(result.length).toBe(1);
+            expect(result[0]).toBe(child2);
+        });
+
+        it("should not include grandchildren", () =>
+        {
+            const grandparent = new TestElement();
+            const parent = new TestElement();
+            const child = new TestElement();
+
+            grandparent.AppendChild(parent);
+            parent.AppendChild(child);
+
+            const result = grandparent.GetChildrenOfType<TestElement>(TestElement);
+            expect(result.length).toBe(1);
+            expect(result[0]).toBe(parent);
+        });
+    });
 });

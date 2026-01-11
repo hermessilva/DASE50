@@ -42,17 +42,26 @@ They exist to keep decisions consistent when trade-offs appear.
 
 1. The best code is code that writes itself — guided by clear intent.
 2. Any line of code that cannot be exercised by automated tests should not exist.
-3. Code is a liability: every added line MUST pay rent (clear value, verified behavior).
-4. Prefer constraints over freedom: strong types, explicit contracts, deterministic behavior.
-5. Make state explicit; implicit state becomes hidden bugs.
-6. Optimize for the next reader: the future maintainer is usually you.
-7. Complexity must be earned by measurable benefit; simple mechanisms scale best.
-8. Fail fast, fail loud: reject invalid input early with precise, actionable errors.
-9. Measure before optimizing; optimize only what profiling proves is hot.
-10. Security is an invariant, not a feature.
-11. **No metric theater:** we do not create artificial scenarios or “impossible” tests just to inflate coverage.
-12. **Coverage is a consequence:** aim for confidence and correctness; coverage follows.
-13. **If code is unreachable by design, make it explicit:** remove the branch or replace it with a clear invariant (e.g., unreachable/guard) and test the invariant through realistic behavior, not fabricated inputs.
+3. Truth over optics: we refuse “metric theater” (coverage inflation, artificial branches, cosmetic tests).
+4. Coverage is evidence, not a goal: the goal is confidence in behavior under realistic conditions.
+5. If a branch is truly unreachable, the correct action is removal or an explicit invariant — not a fabricated test.
+6. Unreachable code is a design smell: either the model is wrong, or the branch is dead, or the contract is unclear.
+7. Prefer deletion to decoration: removing dead paths is higher quality than “covering” them.
+8. Tests must represent plausible worlds: a test that cannot occur in production is documentation of fiction.
+9. Every test must answer a question: “What failure would this catch, and why would it matter?”
+10. Assertions are contracts: validate invariants where they belong, and test through public behavior.
+11. Strong contracts reduce defensive noise: less “just in case”, more “cannot happen by construction”.
+12. Write code that is easy to prove: clarity beats cleverness; determinism beats surprises.
+13. Prefer domain truth over framework convenience: the model dictates the code, not the other way around.
+14. Code is a liability: every added line MUST pay rent (clear value, verified behavior).
+15. Make state explicit; implicit state becomes hidden bugs.
+16. Optimize for the next reader: the future maintainer is usually you.
+17. Complexity must be earned by measurable benefit; simple mechanisms scale best.
+18. Fail fast, fail loud: reject invalid input early with precise, actionable errors.
+19. Measure before optimizing; optimize only what profiling proves is hot.
+20. Security is an invariant, not a feature.
+21. Integrity is non-negotiable: we do not trade truth for appearance, even when it looks “better” on paper.
+22. A green pipeline is not a certificate: it is a signal that must remain honest to keep meaning.
 
 ---
 

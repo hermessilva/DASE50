@@ -3,7 +3,8 @@ import {
     XDesignerErrorSeverity,
     XConcurrentBag,
     XDataValidateError,
-    XValidatableElement
+    XValidatableElement,
+    XValidator
 } from "../src/Core/XValidation.js";
 import { XGuid } from "../src/Core/XGuid.js";
 
@@ -260,6 +261,413 @@ describe("XConcurrentBag", () =>
                 result.push(item);
             }
             expect(result).toEqual([]);
+        });
+    });
+});
+
+// Mock document and design classes for testing XValidator
+interface MockDocument
+{
+    id: string;
+    name: string;
+    design: MockDesign | null;
+}
+
+interface MockDesign
+{
+    id: string;
+    elements: any[];
+}
+
+// Concrete XValidator implementation for testing
+class TestValidator extends XValidator<MockDocument, MockDesign>
+{
+    protected GetDesign(pDocument: MockDocument): MockDesign | null
+    {
+        return pDocument.design;
+    }
+
+    protected GetDocumentID(pDocument: MockDocument): string
+    {
+        return pDocument.id;
+    }
+
+    protected GetDocumentName(pDocument: MockDocument): string
+    {
+        return pDocument.name;
+    }
+}
+
+// Validator with custom validation logic
+class CustomValidator extends XValidator<MockDocument, MockDesign>
+{
+    protected GetDesign(pDocument: MockDocument): MockDesign | null
+    {
+        return pDocument.design;
+    }
+
+    protected GetDocumentID(pDocument: MockDocument): string
+    {
+        return pDocument.id;
+    }
+
+    protected GetDocumentName(pDocument: MockDocument): string
+    {
+        return pDocument.name;
+    }
+
+    protected ValidateDocument(pDocument: MockDocument): void
+    {
+        if (pDocument.name === "")
+        {
+            this.AddError(pDocument.id, pDocument.name, "Document name is required");
+        }
+    }
+
+    protected ValidateDesign(pDesign: MockDesign): void
+    {
+        if (pDesign.elements.length === 0)
+        {
+            this.AddWarning(pDesign.id, "Design", "Design has no elements");
+        }
+    }
+
+    protected ValidateElements(pDesign: MockDesign): void
+    {
+        for (const elem of pDesign.elements)
+        {
+            if (!elem.name)
+            {
+                this.AddError(elem.id, "Element", "Element name is required", "name");
+            }
+        }
+    }
+}
+
+// Validator that tests all AddXxx methods
+class CompleteValidator extends XValidator<MockDocument, MockDesign>
+{
+    private _TriggerMode: string = "";
+
+    protected GetDesign(pDocument: MockDocument): MockDesign | null
+    {
+        return pDocument.design;
+    }
+
+    protected GetDocumentID(pDocument: MockDocument): string
+    {
+        return pDocument.id;
+    }
+
+    protected GetDocumentName(pDocument: MockDocument): string
+    {
+        return pDocument.name;
+    }
+
+    protected override ValidateDocument(_pDocument: MockDocument): void
+    {
+        if (this._TriggerMode === "AddError")
+        {
+            this.AddError("elem1", "ElementName", "Error message");
+        }
+        else if (this._TriggerMode === "AddErrorWithProperty")
+        {
+            this.AddError("elem2", "ElementName2", "Error with property", "prop1");
+        }
+        else if (this._TriggerMode === "AddWarning")
+        {
+            this.AddWarning("elem3", "ElementName3", "Warning message");
+        }
+        else if (this._TriggerMode === "AddWarningWithProperty")
+        {
+            this.AddWarning("elem4", "ElementName4", "Warning with property", "prop2");
+        }
+        else if (this._TriggerMode === "AddIssue")
+        {
+            this.AddIssue("elem5", "ElementName5", XDesignerErrorSeverity.Error, "Issue error");
+        }
+        else if (this._TriggerMode === "AddIssueWarning")
+        {
+            this.AddIssue("elem6", "ElementName6", XDesignerErrorSeverity.Warning, "Issue warning", "prop3");
+        }
+    }
+
+    public TriggerAddError(): void
+    {
+        this._TriggerMode = "AddError";
+    }
+
+    public TriggerAddErrorWithProperty(): void
+    {
+        this._TriggerMode = "AddErrorWithProperty";
+    }
+
+    public TriggerAddWarning(): void
+    {
+        this._TriggerMode = "AddWarning";
+    }
+
+    public TriggerAddWarningWithProperty(): void
+    {
+        this._TriggerMode = "AddWarningWithProperty";
+    }
+
+    public TriggerAddIssue(): void
+    {
+        this._TriggerMode = "AddIssue";
+    }
+
+    public TriggerAddIssueWarning(): void
+    {
+        this._TriggerMode = "AddIssueWarning";
+    }
+}
+
+describe("XValidator", () =>
+{
+    describe("Validate with null document", () =>
+    {
+        it("should return error when document is null", () =>
+        {
+            const validator = new TestValidator();
+            const issues = validator.Validate(null as any);
+            expect(issues.length).toBe(1);
+            expect(issues[0].Severity).toBe(XDesignerErrorSeverity.Error);
+            expect(issues[0].Message).toBe("Document is null.");
+            expect(issues[0].ElementID).toBe("");
+            expect(issues[0].ElementName).toBe("");
+        });
+    });
+
+    describe("Validate with null design", () =>
+    {
+        it("should return error when design is null", () =>
+        {
+            const validator = new TestValidator();
+            const doc: MockDocument = {
+                id: "doc1",
+                name: "TestDoc",
+                design: null
+            };
+            const issues = validator.Validate(doc);
+            expect(issues.length).toBe(1);
+            expect(issues[0].Severity).toBe(XDesignerErrorSeverity.Error);
+            expect(issues[0].Message).toBe("Document has no design.");
+            expect(issues[0].ElementID).toBe("doc1");
+            expect(issues[0].ElementName).toBe("TestDoc");
+        });
+    });
+
+    describe("Validate with valid document", () =>
+    {
+        it("should return empty array when document is valid", () =>
+        {
+            const validator = new TestValidator();
+            const doc: MockDocument = {
+                id: "doc1",
+                name: "TestDoc",
+                design: { id: "design1", elements: [] }
+            };
+            const issues = validator.Validate(doc);
+            expect(issues.length).toBe(0);
+        });
+    });
+
+    describe("ValidateDocument custom logic", () =>
+    {
+        it("should call ValidateDocument and add errors", () =>
+        {
+            const validator = new CustomValidator();
+            const doc: MockDocument = {
+                id: "doc1",
+                name: "",
+                design: { id: "design1", elements: [] }
+            };
+            const issues = validator.Validate(doc);
+            expect(issues.length).toBeGreaterThan(0);
+            const docError = issues.find(i => i.Message === "Document name is required");
+            expect(docError).toBeDefined();
+            expect(docError?.Severity).toBe(XDesignerErrorSeverity.Error);
+        });
+    });
+
+    describe("ValidateDesign custom logic", () =>
+    {
+        it("should call ValidateDesign and add warnings", () =>
+        {
+            const validator = new CustomValidator();
+            const doc: MockDocument = {
+                id: "doc1",
+                name: "ValidName",
+                design: { id: "design1", elements: [] }
+            };
+            const issues = validator.Validate(doc);
+            expect(issues.length).toBe(1);
+            expect(issues[0].Message).toBe("Design has no elements");
+            expect(issues[0].Severity).toBe(XDesignerErrorSeverity.Warning);
+        });
+    });
+
+    describe("ValidateElements custom logic", () =>
+    {
+        it("should call ValidateElements and add errors for elements", () =>
+        {
+            const validator = new CustomValidator();
+            const doc: MockDocument = {
+                id: "doc1",
+                name: "ValidName",
+                design: {
+                    id: "design1",
+                    elements: [
+                        { id: "elem1", name: "" },
+                        { id: "elem2", name: "ValidName" }
+                    ]
+                }
+            };
+            const issues = validator.Validate(doc);
+            const elemErrors = issues.filter(i => i.Message === "Element name is required");
+            expect(elemErrors.length).toBe(1);
+            expect(elemErrors[0].PropertyID).toBe("name");
+        });
+    });
+
+    describe("AddError method", () =>
+    {
+        it("should add error without property", () =>
+        {
+            const validator = new CompleteValidator();
+            validator.TriggerAddError();
+            const issues = validator.Validate({
+                id: "doc1",
+                name: "Test",
+                design: { id: "d1", elements: [] }
+            });
+            const error = issues.find(i => i.ElementID === "elem1");
+            expect(error).toBeDefined();
+            expect(error?.Severity).toBe(XDesignerErrorSeverity.Error);
+            expect(error?.Message).toBe("Error message");
+            expect(error?.PropertyID).toBeUndefined();
+        });
+
+        it("should add error with property", () =>
+        {
+            const validator = new CompleteValidator();
+            validator.TriggerAddErrorWithProperty();
+            const issues = validator.Validate({
+                id: "doc1",
+                name: "Test",
+                design: { id: "d1", elements: [] }
+            });
+            const error = issues.find(i => i.ElementID === "elem2");
+            expect(error).toBeDefined();
+            expect(error?.PropertyID).toBe("prop1");
+        });
+    });
+
+    describe("AddWarning method", () =>
+    {
+        it("should add warning without property", () =>
+        {
+            const validator = new CompleteValidator();
+            validator.TriggerAddWarning();
+            const issues = validator.Validate({
+                id: "doc1",
+                name: "Test",
+                design: { id: "d1", elements: [] }
+            });
+            const warning = issues.find(i => i.ElementID === "elem3");
+            expect(warning).toBeDefined();
+            expect(warning?.Severity).toBe(XDesignerErrorSeverity.Warning);
+            expect(warning?.Message).toBe("Warning message");
+            expect(warning?.PropertyID).toBeUndefined();
+        });
+
+        it("should add warning with property", () =>
+        {
+            const validator = new CompleteValidator();
+            validator.TriggerAddWarningWithProperty();
+            const issues = validator.Validate({
+                id: "doc1",
+                name: "Test",
+                design: { id: "d1", elements: [] }
+            });
+            const warning = issues.find(i => i.ElementID === "elem4");
+            expect(warning).toBeDefined();
+            expect(warning?.PropertyID).toBe("prop2");
+        });
+    });
+
+    describe("AddIssue method", () =>
+    {
+        it("should add issue with error severity", () =>
+        {
+            const validator = new CompleteValidator();
+            validator.TriggerAddIssue();
+            const issues = validator.Validate({
+                id: "doc1",
+                name: "Test",
+                design: { id: "d1", elements: [] }
+            });
+            const issue = issues.find(i => i.ElementID === "elem5");
+            expect(issue).toBeDefined();
+            expect(issue?.Severity).toBe(XDesignerErrorSeverity.Error);
+            expect(issue?.Message).toBe("Issue error");
+        });
+
+        it("should add issue with warning severity and property", () =>
+        {
+            const validator = new CompleteValidator();
+            validator.TriggerAddIssueWarning();
+            const issues = validator.Validate({
+                id: "doc1",
+                name: "Test",
+                design: { id: "d1", elements: [] }
+            });
+            const issue = issues.find(i => i.ElementID === "elem6");
+            expect(issue).toBeDefined();
+            expect(issue?.Severity).toBe(XDesignerErrorSeverity.Warning);
+            expect(issue?.PropertyID).toBe("prop3");
+        });
+    });
+
+    describe("Multiple validations", () =>
+    {
+        it("should clear errors between validations", () =>
+        {
+            const validator = new CustomValidator();
+            const doc1: MockDocument = {
+                id: "doc1",
+                name: "",
+                design: { id: "d1", elements: [] }
+            };
+            const issues1 = validator.Validate(doc1);
+            expect(issues1.length).toBeGreaterThan(0);
+
+            const doc2: MockDocument = {
+                id: "doc2",
+                name: "ValidName",
+                design: { id: "d2", elements: [{ id: "e1", name: "Valid" }] }
+            };
+            const issues2 = validator.Validate(doc2);
+            expect(issues2.length).toBe(0);
+        });
+
+        it("should accumulate multiple errors in single validation", () =>
+        {
+            const validator = new CustomValidator();
+            const doc: MockDocument = {
+                id: "doc1",
+                name: "",
+                design: {
+                    id: "d1",
+                    elements: [
+                        { id: "e1", name: "" },
+                        { id: "e2", name: "" }
+                    ]
+                }
+            };
+            const issues = validator.Validate(doc);
+            expect(issues.length).toBe(3);
         });
     });
 });
