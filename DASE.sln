@@ -7,6 +7,10 @@ Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "TFX", "TFX\TFX.esproj", "{F
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Core", "Core", "{078C1A69-491D-4B71-897E-D06BF9EDCA93}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "DASE", "DASE", "{01F6F8A7-08D3-4DF8-9058-CCA96DE79F96}"
+EndProject
+Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "DASE", "DASE\DASE.esproj", "{26F9399E-8399-8E4B-709B-2D7B2C3E68E7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -19,12 +23,19 @@ Global
 		{F9631CFD-5E82-9D48-CD4A-052CE0749A37}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F9631CFD-5E82-9D48-CD4A-052CE0749A37}.Release|Any CPU.Build.0 = Release|Any CPU
 		{F9631CFD-5E82-9D48-CD4A-052CE0749A37}.Release|Any CPU.Deploy.0 = Release|Any CPU
+		{26F9399E-8399-8E4B-709B-2D7B2C3E68E7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{26F9399E-8399-8E4B-709B-2D7B2C3E68E7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{26F9399E-8399-8E4B-709B-2D7B2C3E68E7}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
+		{26F9399E-8399-8E4B-709B-2D7B2C3E68E7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{26F9399E-8399-8E4B-709B-2D7B2C3E68E7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{26F9399E-8399-8E4B-709B-2D7B2C3E68E7}.Release|Any CPU.Deploy.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{F9631CFD-5E82-9D48-CD4A-052CE0749A37} = {078C1A69-491D-4B71-897E-D06BF9EDCA93}
+		{26F9399E-8399-8E4B-709B-2D7B2C3E68E7} = {01F6F8A7-08D3-4DF8-9058-CCA96DE79F96}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {FCDC7E91-8004-44D5-A8C7-77AB7D4449CC}

@@ -1,4 +1,4 @@
-# TFX50 Coding Standards
+# TFX Coding Standards
 ## 🎯 Objetivo Principal
 
 Estas regras **não são sugestões**, são diretrizes mandatórias. O objetivo é produzir código C# (.NET 8+) que seja, em ordem de prioridade:
