@@ -1,0 +1,128 @@
+name: DASE CI
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'DASE/**'
+      - 'TFX/**'
+      - '.github/workflows/dase-ci.yml'
+  pull_request:
+    branches:
+      - master
+    paths:
+      - 'DASE/**'
+      - 'TFX/**'
+      - '.github/workflows/dase-ci.yml'
+
+jobs:
+  build-and-test:
+    name: Build and Test DASE
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [20.x]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: |
+            TFX/package-lock.json
+            DASE/package-lock.json
+
+      - name: Install TFX dependencies
+        run: npm ci
+        working-directory: TFX
+
+      - name: Build TFX
+        run: npm run build
+        working-directory: TFX
+
+      - name: Test TFX with coverage
+        run: npm run test:coverage
+        working-directory: TFX
+
+      - name: Install DASE dependencies
+        run: npm ci
+        working-directory: DASE
+
+      - name: Build DASE
+        run: npm run compile
+        working-directory: DASE
+
+      - name: Lint DASE
+        run: npm run lint
+        working-directory: DASE
+        continue-on-error: true
+
+      - name: Test DASE with coverage
+        run: npm run test:coverage
+        working-directory: DASE
+
+      - name: Upload DASE coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: dase-coverage-report
+          path: DASE/coverage/
+
+      - name: Upload TFX coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfx-coverage-report
+          path: TFX/coverage/
+
+  package:
+    name: Package Extension
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+          cache-dependency-path: |
+            TFX/package-lock.json
+            DASE/package-lock.json
+
+      - name: Install TFX dependencies
+        run: npm ci
+        working-directory: TFX
+
+      - name: Build TFX
+        run: npm run build
+        working-directory: TFX
+
+      - name: Install DASE dependencies
+        run: npm ci
+        working-directory: DASE
+
+      - name: Build DASE
+        run: npm run compile
+        working-directory: DASE
+
+      - name: Install vsce
+        run: npm install -g @vscode/vsce
+
+      - name: Package extension
+        working-directory: DASE
+        run: vsce package --out dase-${{ github.sha }}.vsix
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dase-vsix
+          path: DASE/dase-*.vsix

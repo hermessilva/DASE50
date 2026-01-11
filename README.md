@@ -1,10 +1,22 @@
 # DASE50 — Design-Aided Software Engineering
 
+## TFX — Core Framework
+
 [![TFX CI](https://github.com/Tootega/DASE50/actions/workflows/tfx-ci.yml/badge.svg)](https://github.com/Tootega/DASE50/actions/workflows/tfx-ci.yml)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
 ![Tests](https://img.shields.io/badge/tests-978%20passed-brightgreen)
 ![Node.js Version](https://img.shields.io/badge/node-%3E%3D%2020-blue.svg)
 ![Vitest](https://img.shields.io/badge/tested%20with-vitest-663399?logo=vitest)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-3178C6?logo=typescript&logoColor=white)
+![AI Written](https://img.shields.io/badge/written%20by-AI-blueviolet)
+
+## DASE — VS Code Extension
+
+[![DASE CI](https://github.com/Tootega/DASE50/actions/workflows/dase-ci.yml/badge.svg)](https://github.com/Tootega/DASE50/actions/workflows/dase-ci.yml)
+![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
+![Tests](https://img.shields.io/badge/tests-341%20passed-brightgreen)
+![Node.js Version](https://img.shields.io/badge/node-%3E%3D%2020-blue.svg)
+![Jest](https://img.shields.io/badge/tested%20with-jest-C21325?logo=jest)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-3178C6?logo=typescript&logoColor=white)
 ![AI Written](https://img.shields.io/badge/written%20by-AI-blueviolet)
 
@@ -378,6 +390,18 @@ npm run test:coverage
 npm run test:watch
 ```
 
+**TFX Scripts:**
+
+| Script | Description |
+|--------|-------------|
+| `npm run build` | Compile TypeScript to JavaScript (dist/) |
+| `npm run watch` | Watch mode compilation |
+| `npm run test` | Run all unit tests with Vitest |
+| `npm run test:coverage` | Generate coverage report (100% required) |
+| `npm run test:watch` | Interactive watch mode for tests |
+| `npm run clean` | Remove build artifacts (dist/) |
+| `npm run lint` | Run ESLint checks |
+
 ### DASE Extension Development
 
 ```powershell
@@ -388,46 +412,107 @@ cd DASE
 npm install
 
 # Build the extension
-npm run build
+npm run compile
 
-# Launch extension in VS Code (F5)
-# Or run:
-npm run watch
+# Run tests
+npm run test
+
+# Run tests with coverage
+npm run test:coverage
+
+# Launch extension in VS Code
+# Press F5 in VS Code, or:
+code --extensionDevelopmentPath=./DASE
 ```
 
-### Project Scripts
+**DASE Scripts:**
 
 | Script | Description |
 |--------|-------------|
-| `npm run build` | Compile TypeScript to JavaScript |
+| `npm run compile` | Compile TypeScript to JavaScript (out/) |
 | `npm run watch` | Watch mode compilation |
-| `npm run test` | Run all unit tests |
-| `npm run test:coverage` | Generate coverage report |
-| `npm run clean` | Remove build artifacts |
+| `npm run test` | Run all unit tests with Jest |
+| `npm run test:coverage` | Generate coverage report (100% required) |
 | `npm run lint` | Run ESLint checks |
+| `npm run package` | Create VSIX extension package |
+
+### Running Both Projects
+
+```powershell
+# From repository root, build everything
+cd TFX
+npm ci
+npm run build
+
+cd ../DASE
+npm ci
+npm run compile
+
+# Run all tests
+cd ../TFX && npm run test:coverage
+cd ../DASE && npm run test:coverage
+```
 
 ---
 
-## 🚀 CI/CD Pipeline
+## 🚀 CI/CD Pipelines
 
-The continuous integration workflow ([tfx-ci.yml](.github/workflows/tfx-ci.yml)) runs automatically on every `push` or `pull_request` to the `master` branch.
+The repository maintains two independent CI/CD workflows:
 
-### Pipeline Stages
+### TFX Framework Pipeline
 
+**Workflow:** [.github/workflows/tfx-ci.yml](.github/workflows/tfx-ci.yml)
+
+**Triggers:**
+- Push to `master` branch (TFX/** changes)
+- Pull requests to `master` branch
+
+**Pipeline Stages:**
 1. **Checkout** — Clone repository
-2. **Setup Node.js** — Configure Node.js 20
-3. **Install Dependencies** — Run `npm ci`
-4. **Build** — Compile TypeScript
-5. **Test** — Execute test suite
-6. **Coverage** — Generate and validate coverage report
-7. **Report** — Publish results
+2. **Setup Node.js 20** — Configure Node.js environment
+3. **Install Dependencies** — Run `npm ci` in TFX/
+4. **Build** — Compile TypeScript (`npm run build`)
+5. **Test** — Execute test suite with Vitest
+6. **Coverage** — Generate and validate 100% coverage
+7. **Upload Reports** — Publish coverage artifacts
 
-### Quality Gates
-
-- ✅ All tests must pass
+**Quality Gates:**
+- ✅ All 978 tests must pass
 - ✅ 100% code coverage required
 - ✅ No TypeScript compilation errors
-- ✅ No ESLint violations
+- ✅ Zero-allocation patterns enforced
+
+### DASE Extension Pipeline
+
+**Workflow:** [.github/workflows/dase-ci.yml](.github/workflows/dase-ci.yml)
+
+**Triggers:**
+- Push to `master` branch (DASE/** or TFX/** changes)
+- Pull requests to `master` branch
+
+**Pipeline Stages:**
+1. **Checkout** — Clone repository
+2. **Setup Node.js 20** — Configure Node.js environment
+3. **Build TFX** — Build framework dependency
+4. **Test TFX** — Validate framework integrity
+5. **Install DASE Dependencies** — Run `npm ci` in DASE/
+6. **Build DASE** — Compile extension (`npm run compile`)
+7. **Lint** — Run ESLint checks
+8. **Test** — Execute test suite with Jest
+9. **Coverage** — Generate and validate 100% coverage
+10. **Upload Reports** — Publish coverage artifacts
+11. **Package** (master only) — Create VSIX extension package
+
+**Quality Gates:**
+- ✅ All 341 tests must pass
+- ✅ 100% code coverage required
+- ✅ No TypeScript/ESLint violations
+- ✅ TFX dependency integrity validated
+- ✅ VSIX package builds successfully
+
+**Artifacts:**
+- Coverage reports (both TFX and DASE)
+- VSIX extension package (master branch only)
 
 ---
 
