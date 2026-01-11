@@ -1,9 +1,9 @@
 import * as vscode from "vscode";
-import { XORMDesignerEditorProvider } from "./Designer/ORMDesignerEditorProvider";
-import { XNewORMDesignerCommand } from "./Commands/NewORMDesignerCommand";
-import { XOpenORMDesignerCommand } from "./Commands/OpenORMDesignerCommand";
-import { XAddTableCommand } from "./Commands/AddTableCommand";
-import { XValidateORMModelCommand } from "./Commands/ValidateORMModelCommand";
+import { XORMDesignerEditorProvider } from "./Designers/ORM/ORMDesignerEditorProvider";
+import { XNewORMDesignerCommand } from "./Designers/ORM/Commands/NewORMDesignerCommand";
+import { XOpenORMDesignerCommand } from "./Designers/ORM/Commands/OpenORMDesignerCommand";
+import { XAddTableCommand } from "./Designers/ORM/Commands/AddTableCommand";
+import { XValidateORMModelCommand } from "./Designers/ORM/Commands/ValidateORMModelCommand";
 import { XDeleteSelectedCommand } from "./Commands/DeleteSelectedCommand";
 import { XRenameSelectedCommand } from "./Commands/RenameSelectedCommand";
 import { XIssuesViewProvider } from "./Views/IssuesViewProvider";

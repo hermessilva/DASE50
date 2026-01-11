@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { GetSelectionService } from "../Services/SelectionService";
 import { XPropertyItem } from "../Models/PropertyItem";
-import { XORMDesignerEditorProvider } from "../Designer/ORMDesignerEditorProvider";
+import { XORMDesignerEditorProvider } from "../Designers/ORM/ORMDesignerEditorProvider";
 import { XDesignerSelection } from "../Models/DesignerSelection";
 
 export class XPropertiesViewProvider implements vscode.WebviewViewProvider

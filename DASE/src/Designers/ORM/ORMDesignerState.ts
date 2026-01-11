@@ -1,10 +1,10 @@
 import * as vscode from "vscode";
-import { XTFXBridge } from "../Services/TFXBridge";
-import { GetIssueService, XIssueService } from "../Services/IssueService";
-import { GetSelectionService, XSelectionService } from "../Services/SelectionService";
-import { GetLogService } from "../Services/LogService";
-import { XPropertyItem } from "../Models/PropertyItem";
-import { XIssueItem } from "../Models/IssueItem";
+import { XTFXBridge } from "../../Services/TFXBridge";
+import { GetIssueService, XIssueService } from "../../Services/IssueService";
+import { GetSelectionService, XSelectionService } from "../../Services/SelectionService";
+import { GetLogService } from "../../Services/LogService";
+import { XPropertyItem } from "../../Models/PropertyItem";
+import { XIssueItem } from "../../Models/IssueItem";
 
 interface IOperationResult
 {

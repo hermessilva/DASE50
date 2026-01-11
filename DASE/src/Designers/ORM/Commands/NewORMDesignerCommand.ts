@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { XORMDesignerEditorProvider } from "../Designer/ORMDesignerEditorProvider";
+import { XORMDesignerEditorProvider } from "../ORMDesignerEditorProvider";
 
 export class XNewORMDesignerCommand
 {

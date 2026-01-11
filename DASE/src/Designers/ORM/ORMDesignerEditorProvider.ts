@@ -2,10 +2,10 @@ import * as vscode from "vscode";
 import * as path from "path";
 import { XDesignerMessageType } from "./ORMDesignerMessages";
 import { XORMDesignerState } from "./ORMDesignerState";
-import { GetSelectionService } from "../Services/SelectionService";
-import { GetLogService } from "../Services/LogService";
-import { XDesignerSelection } from "../Models/DesignerSelection";
-import { XIssueItem } from "../Models/IssueItem";
+import { GetSelectionService } from "../../Services/SelectionService";
+import { GetLogService } from "../../Services/LogService";
+import { XDesignerSelection } from "../../Models/DesignerSelection";
+import { XIssueItem } from "../../Models/IssueItem";
 
 interface ISelectPayload
 {
