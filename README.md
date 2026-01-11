@@ -1,6 +1,8 @@
 # DASE50 Project
 
-![Build Status](https://github.com/<OWNER>/<REPO>/actions/workflows/tfx-ci.yml/badge.svg)
+[![TFX CI](https://github.com/Tootega/DASE50/actions/workflows/tfx-ci.yml/badge.svg)](https://github.com/Tootega/DASE50/actions/workflows/tfx-ci.yml)
+![Coverage](https://img.shields.io/badge/coverage-80%25-green)
+![Tests](https://img.shields.io/badge/tests-passed-brightgreen)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![Node.js Version](https://img.shields.io/badge/node-%3E%3D%2020-blue.svg)
 ![Vitest](https://img.shields.io/badge/tested%20with-vitest-663399?logo=vitest)
