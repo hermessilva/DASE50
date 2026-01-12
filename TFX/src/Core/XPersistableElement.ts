@@ -684,7 +684,7 @@ export abstract class XPersistableElement extends XElement
         return true;
     }
 
-    private TrackChange(pProperty: XProperty, pOldValue: unknown, pNewValue: unknown): void
+    protected TrackChange(pProperty: XProperty, pOldValue: unknown, pNewValue: unknown): void
     {
         if (this.Document === null)
             return;
