@@ -480,6 +480,159 @@
         return path;
     }
 
+    function SimplifyReferencePoints(pPoints, pSourceTable, pTargetTable)
+    {
+        // ══════════════════════════════════════════════════════════════════════════════
+        // REGRAS DE ROTEAMENTO DE LINHAS (REFERÊNCIAS) - XORMDesign.ts
+        // ══════════════════════════════════════════════════════════════════════════════
+        // 1. SOURCE: SEMPRE sai HORIZONTALMENTE (esquerda ou direita)
+        // 2. TARGET: Pode receber de QUALQUER lado (Left, Right, Top, Bottom)
+        // 3. SEGMENTOS: NUNCA diagonal - sempre vertical OU horizontal
+        // 4. Segmento mínimo: 30px no source e no target
+        // 5. TIPOS DE ROTA: L (2 segmentos), Z/C (3 segmentos)
+        // ══════════════════════════════════════════════════════════════════════════════
+        
+        const MIN_SEGMENT = 30;
+        
+        if (!pPoints || pPoints.length < 2)
+            return [];
+
+        // Filtrar pontos inválidos
+        const valid = pPoints.filter(p => p && Number.isFinite(p.X) && Number.isFinite(p.Y));
+        if (valid.length < 2)
+            return [];
+
+        const start = { X: valid[0].X, Y: valid[0].Y };
+        const end = { X: valid[valid.length - 1].X, Y: valid[valid.length - 1].Y };
+
+        // Se não temos tabelas, apenas garantir ortogonalidade básica
+        if (!pSourceTable || !pTargetTable)
+        {
+            // Converter em L simples se for diagonal
+            if (Math.abs(end.X - start.X) > 2 && Math.abs(end.Y - start.Y) > 2)
+            {
+                return [start, { X: end.X, Y: start.Y }, end];
+            }
+            return [start, end];
+        }
+
+        // Calcular bounds das tabelas
+        const srcLeft = pSourceTable.X;
+        const srcRight = pSourceTable.X + (pSourceTable.Width || 200);
+        const srcTop = pSourceTable.Y;
+        const srcBottom = pSourceTable.Y + (pSourceTable.Height || 150);
+        
+        const tgtLeft = pTargetTable.X;
+        const tgtRight = pTargetTable.X + (pTargetTable.Width || 200);
+        const tgtTop = pTargetTable.Y;
+        const tgtBottom = pTargetTable.Y + (pTargetTable.Height || 150);
+        const tgtCenterX = tgtLeft + (pTargetTable.Width || 200) / 2;
+        const tgtCenterY = tgtTop + (pTargetTable.Height || 150) / 2;
+
+        // Determinar lado de saída do source (baseado na posição do ponto inicial)
+        const exitingRight = Math.abs(start.X - srcRight) < Math.abs(start.X - srcLeft);
+        
+        // Determinar lado de entrada no target (baseado na posição do ponto final)
+        const distToLeft = Math.abs(end.X - tgtLeft);
+        const distToRight = Math.abs(end.X - tgtRight);
+        const distToTop = Math.abs(end.Y - tgtTop);
+        const distToBottom = Math.abs(end.Y - tgtBottom);
+        const minDist = Math.min(distToLeft, distToRight, distToTop, distToBottom);
+        
+        let targetSide;
+        if (minDist === distToLeft) targetSide = 'left';
+        else if (minDist === distToRight) targetSide = 'right';
+        else if (minDist === distToTop) targetSide = 'top';
+        else targetSide = 'bottom';
+
+        // ══════════════════════════════════════════════════════════════════════════════
+        // CRIAR ROTA ORTOGONAL OTIMIZADA (L ou Z/C)
+        // ══════════════════════════════════════════════════════════════════════════════
+        
+        const result = [start];
+
+        if (targetSide === 'left' || targetSide === 'right')
+        {
+            // Target recebe pela lateral - ROTA EM L (horizontal → vertical → horizontal)
+            // Mas se source Y == target entry Y, é uma linha reta horizontal
+            if (Math.abs(start.Y - end.Y) < 2)
+            {
+                // Linha horizontal direta
+                result.push(end);
+            }
+            else
+            {
+                // Rota em L: horizontal até alinhar com entry, depois vertical, depois horizontal até target
+                // Para L simples: horizontal → vertical (2 segmentos)
+                const turnX = end.X + (targetSide === 'left' ? -MIN_SEGMENT : MIN_SEGMENT);
+                
+                // Se o turnX está entre source e target, usar L simples
+                if ((exitingRight && turnX > start.X) || (!exitingRight && turnX < start.X))
+                {
+                    // L simples: horizontal até turnX, depois vertical até end
+                    result.push({ X: turnX, Y: start.Y });
+                    result.push({ X: turnX, Y: end.Y });
+                    result.push(end);
+                }
+                else
+                {
+                    // Z route: precisa de ponto intermediário
+                    const midX = exitingRight 
+                        ? Math.max(srcRight + MIN_SEGMENT, (start.X + end.X) / 2)
+                        : Math.min(srcLeft - MIN_SEGMENT, (start.X + end.X) / 2);
+                    result.push({ X: midX, Y: start.Y });
+                    result.push({ X: midX, Y: end.Y });
+                    result.push(end);
+                }
+            }
+        }
+        else
+        {
+            // Target recebe por cima ou por baixo - ROTA EM L (horizontal → vertical)
+            if (Math.abs(start.X - end.X) < 2)
+            {
+                // Linha vertical direta (raro, source deveria sair horizontal)
+                result.push(end);
+            }
+            else
+            {
+                // Rota em L: horizontal até alinhar com target X, depois vertical
+                // Este é o L mais simples: 2 segmentos
+                result.push({ X: end.X, Y: start.Y });
+                result.push(end);
+            }
+        }
+
+        // Remover pontos duplicados consecutivos
+        const cleaned = [result[0]];
+        for (let i = 1; i < result.length; i++)
+        {
+            const prev = cleaned[cleaned.length - 1];
+            if (Math.abs(result[i].X - prev.X) > 1 || Math.abs(result[i].Y - prev.Y) > 1)
+                cleaned.push(result[i]);
+        }
+
+        // Remover pontos colineares
+        if (cleaned.length > 2)
+        {
+            const final = [cleaned[0]];
+            for (let i = 1; i < cleaned.length - 1; i++)
+            {
+                const a = final[final.length - 1];
+                const b = cleaned[i];
+                const c = cleaned[i + 1];
+                const sameX = Math.abs(a.X - b.X) < 2 && Math.abs(b.X - c.X) < 2;
+                const sameY = Math.abs(a.Y - b.Y) < 2 && Math.abs(b.Y - c.Y) < 2;
+                if (!sameX && !sameY)
+                    final.push(b);
+            }
+            final.push(cleaned[cleaned.length - 1]);
+            return final;
+        }
+
+        return cleaned;
+    }
+
     function RenderRelations()
     {
         _RelationsLayer.innerHTML = "";
@@ -509,7 +662,8 @@
         g.setAttribute("data-id", pRef.ID);
 
         // Se há pontos de roteamento, use-os; caso contrário, calcule um caminho simples
-        const points = pRef.Points && pRef.Points.length >= 2 ? pRef.Points : [];
+        const pointsRaw = pRef.Points && pRef.Points.length >= 2 ? pRef.Points : [];
+        const points = SimplifyReferencePoints(pointsRaw, sourceTable, targetTable);
         
         if (points.length >= 2)
         {

@@ -430,3 +430,4 @@ coverage/
 *.temp
 /.vs
 /.vscode
+/DASE/test-results.json

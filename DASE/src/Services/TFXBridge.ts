@@ -492,18 +492,72 @@ export class XTFXBridge
             };
         });
 
+        // Helper para limpar pontos de roteamento (não modifica a rota, apenas limpa)
+        // O roteamento correto é feito pelo XORMDesign.ts que segue as regras definidas
+        const simplifyRoutePoints = (points: Array<{X: number, Y: number}>, sourceTable: any, targetTable: any): Array<{X: number, Y: number}> =>
+        {
+            // Retornar pontos se não houver suficientes
+            if (points.length < 2) return points;
+
+            // 1) Filtrar pontos inválidos
+            const valid = points.filter(p => p && Number.isFinite(p.X) && Number.isFinite(p.Y));
+            if (valid.length < 2)
+                return [];
+
+            // 2) Remover duplicados consecutivos (tolerância de 1px)
+            const unique: Array<{X: number, Y: number}> = [valid[0]];
+            for (let i = 1; i < valid.length; i++)
+            {
+                const prev = unique[unique.length - 1];
+                if (Math.abs(valid[i].X - prev.X) > 1 || Math.abs(valid[i].Y - prev.Y) > 1)
+                    unique.push({ X: valid[i].X, Y: valid[i].Y });
+            }
+
+            if (unique.length < 2)
+                return [];
+
+            // 3) Remover pontos colineares intermediários
+            const simplified: Array<{X: number, Y: number}> = [unique[0]];
+            for (let i = 1; i < unique.length - 1; i++)
+            {
+                const a = simplified[simplified.length - 1];
+                const b = unique[i];
+                const c = unique[i + 1];
+
+                // Tolerância de 2px para considerar colinear
+                const sameX = Math.abs(a.X - b.X) < 2 && Math.abs(b.X - c.X) < 2;
+                const sameY = Math.abs(a.Y - b.Y) < 2 && Math.abs(b.Y - c.Y) < 2;
+
+                if (!sameX && !sameY)
+                    simplified.push(b);
+            }
+            simplified.push(unique[unique.length - 1]);
+
+            return simplified;
+        };
+
         const refsData: IReferenceData[] = references.map((r: any) => {
             GetLogService().Debug(`Reference: ID=${r.ID}, Name=${r.Name}, Source=${r.Source}, Target=${r.Target}`);
             GetLogService().Debug(`Reference Points raw: ${JSON.stringify(r.Points)}`);
             GetLogService().Debug(`Reference Points length: ${r.Points?.length || 0}`);
-            const mappedPoints = r.Points?.map((p: any) => ({ X: p.X, Y: p.Y })) || [];
-            GetLogService().Debug(`Reference Points mapped: ${JSON.stringify(mappedPoints)}`);
+            
+            // Encontrar tabelas source e target para simplificação
+            const sourceTable = tables.find((t: any) => {
+                const fields = t.GetChildrenOfType?.(XORMField) ?? t.Fields ?? [];
+                return fields.some((f: any) => f.ID === r.Source);
+            });
+            const targetTable = tables.find((t: any) => t.ID === r.Target);
+            
+            const rawPoints = r.Points?.map((p: any) => ({ X: p.X, Y: p.Y })) || [];
+            const simplifiedPoints = simplifyRoutePoints(rawPoints, sourceTable, targetTable);
+            
+            GetLogService().Debug(`Reference Points simplified: ${JSON.stringify(simplifiedPoints)}`);
             return {
                 ID: r.ID,
                 Name: r.Name,
                 SourceFieldID: r.Source,
                 TargetTableID: r.Target,
-                Points: mappedPoints
+                Points: simplifiedPoints
             };
         });
 

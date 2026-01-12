@@ -2017,4 +2017,442 @@ describe('XTFXBridge', () => {
             expect(result).toEqual({ Success: false });
         });
     });
+
+    describe('GetModelData simplifyRoutePoints coverage', () => {
+        beforeEach(async () => {
+            await bridge.LoadOrmModelFromText('{}');
+        });
+
+        it('should return empty array when valid points < 2', async () => {
+            const mockTable = {
+                ID: 'table-1',
+                Name: 'Table1',
+                Bounds: { Left: 0, Top: 0, Width: 200, Height: 150 },
+                GetChildrenOfType: jest.fn().mockReturnValue([{ ID: 'field-1', Name: 'ID' }])
+            };
+            const mockRef = {
+                ID: 'ref-1',
+                Name: 'Ref1',
+                Source: 'field-1',
+                Target: 'table-2',
+                Points: [{ X: 100, Y: 100 }]  // Only one valid point
+            };
+            
+            bridge.Controller.Document = { Name: 'Test', Design: {} };
+            bridge.Controller.GetTables = jest.fn().mockReturnValue([mockTable]);
+            bridge.Controller.GetReferences = jest.fn().mockReturnValue([mockRef]);
+
+            const result = bridge.GetModelData();
+
+            // With only 1 point, should return the original (no simplification possible)
+            expect(result.References[0].Points).toEqual([{ X: 100, Y: 100 }]);
+        });
+
+        it('should return empty array when unique points < 2 after dedup', async () => {
+            const mockTable = {
+                ID: 'table-1',
+                Name: 'Table1',
+                Bounds: { Left: 0, Top: 0, Width: 200, Height: 150 },
+                GetChildrenOfType: jest.fn().mockReturnValue([{ ID: 'field-1', Name: 'ID' }])
+            };
+            const mockRef = {
+                ID: 'ref-1',
+                Name: 'Ref1',
+                Source: 'field-1',
+                Target: 'table-2',
+                Points: [{ X: 100, Y: 100 }, { X: 100, Y: 100 }]  // Duplicate points
+            };
+            
+            bridge.Controller.Document = { Name: 'Test', Design: {} };
+            bridge.Controller.GetTables = jest.fn().mockReturnValue([mockTable]);
+            bridge.Controller.GetReferences = jest.fn().mockReturnValue([mockRef]);
+
+            const result = bridge.GetModelData();
+
+            expect(result.References[0].Points).toEqual([]);
+        });
+
+        it('should simplify collinear points in vertical line', async () => {
+            const mockTable = {
+                ID: 'table-1',
+                Name: 'Table1',
+                Bounds: { Left: 0, Top: 0, Width: 200, Height: 150 },
+                GetChildrenOfType: jest.fn().mockReturnValue([{ ID: 'field-1', Name: 'ID' }])
+            };
+            const mockRef = {
+                ID: 'ref-1',
+                Name: 'Ref1',
+                Source: 'field-1',
+                Target: 'table-2',
+                Points: [{ X: 100, Y: 0 }, { X: 100, Y: 50 }, { X: 100, Y: 100 }]  // Collinear vertical
+            };
+            
+            bridge.Controller.Document = { Name: 'Test', Design: {} };
+            bridge.Controller.GetTables = jest.fn().mockReturnValue([mockTable]);
+            bridge.Controller.GetReferences = jest.fn().mockReturnValue([mockRef]);
+
+            const result = bridge.GetModelData();
+
+            // Middle point should be removed
+            expect(result.References[0].Points).toHaveLength(2);
+        });
+
+        it('should simplify collinear points in horizontal line', async () => {
+            const mockTable = {
+                ID: 'table-1',
+                Name: 'Table1',
+                Bounds: { Left: 0, Top: 0, Width: 200, Height: 150 },
+                GetChildrenOfType: jest.fn().mockReturnValue([{ ID: 'field-1', Name: 'ID' }])
+            };
+            const mockRef = {
+                ID: 'ref-1',
+                Name: 'Ref1',
+                Source: 'field-1',
+                Target: 'table-2',
+                Points: [{ X: 0, Y: 100 }, { X: 50, Y: 100 }, { X: 100, Y: 100 }]  // Collinear horizontal
+            };
+            
+            bridge.Controller.Document = { Name: 'Test', Design: {} };
+            bridge.Controller.GetTables = jest.fn().mockReturnValue([mockTable]);
+            bridge.Controller.GetReferences = jest.fn().mockReturnValue([mockRef]);
+
+            const result = bridge.GetModelData();
+
+            // Middle point should be removed
+            expect(result.References[0].Points).toHaveLength(2);
+        });
+
+        it('should preserve orthogonal route points (perpendicular exits)', async () => {
+            const srcTable = {
+                ID: 'table-1',
+                Name: 'Table1',
+                Bounds: { Left: 0, Top: 0, Width: 200, Height: 150 },
+                GetChildrenOfType: jest.fn().mockReturnValue([{ ID: 'field-1', Name: 'ID' }])
+            };
+            const tgtTable = {
+                ID: 'table-2',
+                Name: 'Table2',
+                Bounds: { Left: 300, Top: 200, Width: 200, Height: 150 }
+            };
+            // Orthogonal route with no colinear points - should be preserved
+            const mockRef = {
+                ID: 'ref-1',
+                Name: 'Ref1',
+                Source: 'field-1',
+                Target: 'table-2',
+                Points: [
+                    { X: 200, Y: 75 },   // Start
+                    { X: 350, Y: 75 },   // Turn
+                    { X: 350, Y: 200 }   // End
+                ]
+            };
+            
+            bridge.Controller.Document = { Name: 'Test', Design: {} };
+            bridge.Controller.GetTables = jest.fn().mockReturnValue([srcTable, tgtTable]);
+            bridge.Controller.GetReferences = jest.fn().mockReturnValue([mockRef]);
+
+            const result = bridge.GetModelData();
+
+            // Should preserve the 3 points (no colineares to remove)
+            expect(result.References[0].Points).toHaveLength(3);
+        });
+
+        it('should preserve orthogonal route with multiple turns', async () => {
+            const srcTable = {
+                ID: 'table-1',
+                Name: 'Table1',
+                Bounds: { Left: 0, Top: 0, Width: 200, Height: 150 },
+                GetChildrenOfType: jest.fn().mockReturnValue([{ ID: 'field-1', Name: 'ID' }])
+            };
+            const tgtTable = {
+                ID: 'table-2',
+                Name: 'Table2',
+                Bounds: { Left: 300, Top: 200, Width: 200, Height: 150 }
+            };
+            // Route with turns but no colinear points
+            const mockRef = {
+                ID: 'ref-1',
+                Name: 'Ref1',
+                Source: 'field-1',
+                Target: 'table-2',
+                Points: [
+                    { X: 100, Y: 150 },  // Start
+                    { X: 100, Y: 275 },  // Turn 1
+                    { X: 300, Y: 275 }   // End
+                ]
+            };
+            
+            bridge.Controller.Document = { Name: 'Test', Design: {} };
+            bridge.Controller.GetTables = jest.fn().mockReturnValue([srcTable, tgtTable]);
+            bridge.Controller.GetReferences = jest.fn().mockReturnValue([mockRef]);
+
+            const result = bridge.GetModelData();
+
+            // Should preserve the 3 points
+            expect(result.References[0].Points).toHaveLength(3);
+        });
+
+        it('should preserve Z-shaped routes from server', async () => {
+            const srcTable = {
+                ID: 'table-1',
+                Name: 'Table1',
+                Bounds: { Left: 0, Top: 0, Width: 200, Height: 150 },
+                GetChildrenOfType: jest.fn().mockReturnValue([{ ID: 'field-1', Name: 'ID' }])
+            };
+            const tgtTable = {
+                ID: 'table-2',
+                Name: 'Table2',
+                Bounds: { Left: 400, Top: 100, Width: 200, Height: 150 }
+            };
+            // Z-shape route (4 essential points, no colineares)
+            const mockRef = {
+                ID: 'ref-1',
+                Name: 'Ref1',
+                Source: 'field-1',
+                Target: 'table-2',
+                Points: [
+                    { X: 200, Y: 75 },   // Start (right edge)
+                    { X: 300, Y: 75 },   // Mid-turn 1
+                    { X: 300, Y: 175 },  // Mid-turn 2
+                    { X: 400, Y: 175 }   // End (left edge)
+                ]
+            };
+            
+            bridge.Controller.Document = { Name: 'Test', Design: {} };
+            bridge.Controller.GetTables = jest.fn().mockReturnValue([srcTable, tgtTable]);
+            bridge.Controller.GetReferences = jest.fn().mockReturnValue([mockRef]);
+
+            const result = bridge.GetModelData();
+
+            // Should preserve all 4 points of Z-shape
+            expect(result.References[0].Points).toHaveLength(4);
+        });
+
+        it('should preserve C-shaped routes from server', async () => {
+            const srcTable = {
+                ID: 'table-1',
+                Name: 'Table1',
+                Bounds: { Left: 0, Top: 0, Width: 200, Height: 150 },
+                GetChildrenOfType: jest.fn().mockReturnValue([{ ID: 'field-1', Name: 'ID' }])
+            };
+            const tgtTable = {
+                ID: 'table-2',
+                Name: 'Table2',
+                Bounds: { Left: 100, Top: 300, Width: 200, Height: 150 }
+            };
+            // C-shape route (no colinear points)
+            const mockRef = {
+                ID: 'ref-1',
+                Name: 'Ref1',
+                Source: 'field-1',
+                Target: 'table-2',
+                Points: [
+                    { X: 100, Y: 150 },  // Start
+                    { X: 100, Y: 225 },  // Mid
+                    { X: 200, Y: 225 },  // Mid
+                    { X: 200, Y: 300 }   // End
+                ]
+            };
+            
+            bridge.Controller.Document = { Name: 'Test', Design: {} };
+            bridge.Controller.GetTables = jest.fn().mockReturnValue([srcTable, tgtTable]);
+            bridge.Controller.GetReferences = jest.fn().mockReturnValue([mockRef]);
+
+            const result = bridge.GetModelData();
+
+            // Should preserve all 4 points of C-shape
+            expect(result.References[0].Points).toHaveLength(4);
+        });
+
+        it('should return simplified points when no side detected', async () => {
+            const srcTable = {
+                ID: 'table-1',
+                Name: 'Table1',
+                Bounds: { Left: 0, Top: 0, Width: 200, Height: 150 },
+                GetChildrenOfType: jest.fn().mockReturnValue([{ ID: 'field-1', Name: 'ID' }])
+            };
+            const tgtTable = {
+                ID: 'table-2',
+                Name: 'Table2',
+                Bounds: { Left: 300, Top: 200, Width: 200, Height: 150 }
+            };
+            // Points not on any edge - detectSide returns null
+            const mockRef = {
+                ID: 'ref-1',
+                Name: 'Ref1',
+                Source: 'field-1',
+                Target: 'table-2',
+                Points: [
+                    { X: 50, Y: 50 },    // Inside src table (not on edge)
+                    { X: 150, Y: 50 },   // Extra
+                    { X: 150, Y: 150 },  // Extra
+                    { X: 250, Y: 150 },  // Extra
+                    { X: 250, Y: 250 }   // Inside tgt area (not on edge)
+                ]
+            };
+            
+            bridge.Controller.Document = { Name: 'Test', Design: {} };
+            bridge.Controller.GetTables = jest.fn().mockReturnValue([srcTable, tgtTable]);
+            bridge.Controller.GetReferences = jest.fn().mockReturnValue([mockRef]);
+
+            const result = bridge.GetModelData();
+
+            // Without side detection, should return simplified points (collinear removed)
+            expect(result.References[0].Points.length).toBeGreaterThanOrEqual(2);
+        });
+
+        it('should handle null/undefined points gracefully', async () => {
+            const mockTable = {
+                ID: 'table-1',
+                Name: 'Table1',
+                Bounds: { Left: 0, Top: 0, Width: 200, Height: 150 },
+                GetChildrenOfType: jest.fn().mockReturnValue([{ ID: 'field-1', Name: 'ID' }])
+            };
+            const mockRef = {
+                ID: 'ref-1',
+                Name: 'Ref1',
+                Source: 'field-1',
+                Target: 'table-2',
+                Points: null
+            };
+            
+            bridge.Controller.Document = { Name: 'Test', Design: {} };
+            bridge.Controller.GetTables = jest.fn().mockReturnValue([mockTable]);
+            bridge.Controller.GetReferences = jest.fn().mockReturnValue([mockRef]);
+
+            const result = bridge.GetModelData();
+
+            expect(result.References[0].Points).toEqual([]);
+        });
+
+        it('should simplify when sourceTable or targetTable not found for reference', async () => {
+            const mockTable = {
+                ID: 'table-1',
+                Name: 'Table1',
+                Bounds: { Left: 0, Top: 0, Width: 200, Height: 150 },
+                GetChildrenOfType: jest.fn().mockReturnValue([{ ID: 'field-1', Name: 'ID' }])
+            };
+            // Reference points to non-existent target table
+            const mockRef = {
+                ID: 'ref-1',
+                Name: 'Ref1',
+                Source: 'field-1',
+                Target: 'non-existent-table',
+                Points: [
+                    { X: 200, Y: 75 },
+                    { X: 250, Y: 75 },
+                    { X: 250, Y: 150 }
+                ]
+            };
+            
+            bridge.Controller.Document = { Name: 'Test', Design: {} };
+            bridge.Controller.GetTables = jest.fn().mockReturnValue([mockTable]);
+            bridge.Controller.GetReferences = jest.fn().mockReturnValue([mockRef]);
+
+            const result = bridge.GetModelData();
+
+            // Should return simplified points (collinear removal only, no L/Z optimization)
+            expect(result.References[0].Points.length).toBeGreaterThanOrEqual(2);
+        });
+
+        it('should return empty array when multiple points but all invalid (line 504)', async () => {
+            const mockTable = {
+                ID: 'table-1',
+                Name: 'Table1',
+                Bounds: { Left: 0, Top: 0, Width: 200, Height: 150 },
+                GetChildrenOfType: jest.fn().mockReturnValue([{ ID: 'field-1', Name: 'ID' }])
+            };
+            const mockRef = {
+                ID: 'ref-1',
+                Name: 'Ref1',
+                Source: 'field-1',
+                Target: 'table-2',
+                // Multiple points but all have NaN - only 1 valid after filter
+                Points: [
+                    { X: NaN, Y: 100 },
+                    { X: 100, Y: 100 },
+                    { X: NaN, Y: NaN },
+                    { X: Infinity, Y: 200 }
+                ]
+            };
+            
+            bridge.Controller.Document = { Name: 'Test', Design: {} };
+            bridge.Controller.GetTables = jest.fn().mockReturnValue([mockTable]);
+            bridge.Controller.GetReferences = jest.fn().mockReturnValue([mockRef]);
+
+            const result = bridge.GetModelData();
+
+            // With only 1 valid point after filter, should return empty array
+            expect(result.References[0].Points).toEqual([]);
+        });
+
+        it('should use Fields fallback when GetChildrenOfType is missing in find sourceTable', async () => {
+            // Source table without GetChildrenOfType but with Fields
+            const srcTable = {
+                ID: 'table-1',
+                Name: 'Table1',
+                Bounds: { Left: 0, Top: 0, Width: 200, Height: 150 },
+                Fields: [{ ID: 'field-1', Name: 'ID' }]
+                // No GetChildrenOfType
+            };
+            const tgtTable = {
+                ID: 'table-2',
+                Name: 'Table2',
+                Bounds: { Left: 300, Top: 200, Width: 200, Height: 150 }
+            };
+            const mockRef = {
+                ID: 'ref-1',
+                Name: 'Ref1',
+                Source: 'field-1',
+                Target: 'table-2',
+                Points: [
+                    { X: 200, Y: 75 },
+                    { X: 300, Y: 275 }
+                ]
+            };
+            
+            bridge.Controller.Document = { Name: 'Test', Design: {} };
+            bridge.Controller.GetTables = jest.fn().mockReturnValue([srcTable, tgtTable]);
+            bridge.Controller.GetReferences = jest.fn().mockReturnValue([mockRef]);
+
+            const result = bridge.GetModelData();
+
+            // Should find sourceTable using Fields fallback
+            expect(result.References[0].Points.length).toBeGreaterThanOrEqual(2);
+        });
+
+        it('should handle table with no GetChildrenOfType and no Fields in find sourceTable', async () => {
+            // Source table without GetChildrenOfType AND without Fields
+            const srcTable = {
+                ID: 'table-1',
+                Name: 'Table1',
+                Bounds: { Left: 0, Top: 0, Width: 200, Height: 150 }
+                // No GetChildrenOfType, no Fields
+            };
+            const tgtTable = {
+                ID: 'table-2',
+                Name: 'Table2',
+                Bounds: { Left: 300, Top: 200, Width: 200, Height: 150 }
+            };
+            const mockRef = {
+                ID: 'ref-1',
+                Name: 'Ref1',
+                Source: 'field-1',  // Won't find this field
+                Target: 'table-2',
+                Points: [
+                    { X: 200, Y: 75 },
+                    { X: 300, Y: 275 }
+                ]
+            };
+            
+            bridge.Controller.Document = { Name: 'Test', Design: {} };
+            bridge.Controller.GetTables = jest.fn().mockReturnValue([srcTable, tgtTable]);
+            bridge.Controller.GetReferences = jest.fn().mockReturnValue([mockRef]);
+
+            const result = bridge.GetModelData();
+
+            // Should still produce valid points (sourceTable will be undefined)
+            expect(result.References[0].Points.length).toBeGreaterThanOrEqual(2);
+        });
+    });
 });

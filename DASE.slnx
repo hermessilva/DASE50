@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/Core/">
+    <Project Path="TFX/TFX.esproj">
+      <Build />
+      <Deploy />
+    </Project>
+  </Folder>
+  <Folder Name="/DASE/">
+    <Project Path="DASE/DASE.esproj">
+      <Build />
+      <Deploy />
+    </Project>
+  </Folder>
+</Solution>
