@@ -177,35 +177,21 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
 
     async saveCustomDocument(pDocument: ICustomDocument, _pCancellation: vscode.CancellationToken): Promise<void>
     {
-        GetLogService().Info(`saveCustomDocument called for: ${pDocument.uri.toString()}`);
         const state = this._States.get(pDocument.uri.toString());
         if (state)
-        {
             await state.Save();
-            GetLogService().Info(`Document saved successfully: ${pDocument.uri.toString()}`);
-        }
-        else
-        {
-            GetLogService().Error(`saveCustomDocument: State not found for ${pDocument.uri.toString()}`);
-        }
     }
 
     async saveCustomDocumentAs(pDocument: ICustomDocument, pDestination: vscode.Uri, _pCancellation: vscode.CancellationToken): Promise<void>
     {
-        GetLogService().Info(`saveCustomDocumentAs called: ${pDocument.uri.toString()} -> ${pDestination.toString()}`);
         const state = this._States.get(pDocument.uri.toString());
         if (state)
         {
             const text = state.Bridge.SaveOrmModelToText();
             const bytes = Buffer.from(text, "utf8");
             await vscode.workspace.fs.writeFile(pDestination, bytes);
-            GetLogService().Info(`Document saved as successfully: ${pDestination.toString()}`);
             // Note: Do not set IsDirty = false here. VS Code will close the old editor
             // and open a new one for the destination URI.
-        }
-        else
-        {
-            GetLogService().Error(`saveCustomDocumentAs: State not found for ${pDocument.uri.toString()}`);
         }
     }
 
@@ -265,9 +251,6 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         const type = pMsg.Type;
         const payload = pMsg.Payload || {};
 
-        // Log all messages for debugging
-        GetLogService().Debug(`Message received: ${type}, Payload: ${JSON.stringify(payload)}`);
-
         switch (type)
         {
             case XDesignerMessageType.DesignerReady:
@@ -326,15 +309,9 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
     async OnDesignerReady(pPanel: vscode.WebviewPanel, pState: XORMDesignerState): Promise<void>
     {
         // Route all lines before sending model to ensure proper orthogonal routing
-        GetLogService().Info('[OnDesignerReady] About to call AlignLines');
-        const alignResult = pState.AlignLines();
-        GetLogService().Info(`[OnDesignerReady] AlignLines result: ${JSON.stringify(alignResult)}`);
+        pState.AlignLines();
 
         const modelData = await pState.GetModelData();
-        GetLogService().Info(`[OnDesignerReady] ModelData references: ${modelData.References?.length || 0}`);
-        modelData.References?.forEach((ref: any, i: number) => {
-            GetLogService().Info(`  Ref ${i}: ${ref.Name}, Points: ${ref.Points?.length || 0}`);
-        });
         pPanel.webview.postMessage({
             Type: XDesignerMessageType.LoadModel,
             Payload: modelData
@@ -352,7 +329,6 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         try
         {
             await pState.Save();
-            GetLogService().Info("Model saved successfully");
         }
         catch (err)
         {
@@ -365,7 +341,6 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
     OnSelectElement(pPayload: ISelectPayload): void
     {
         const selectionService = GetSelectionService();
-        GetLogService().Info(`[OnSelectElement] Payload: Clear=${pPayload.Clear}, Toggle=${pPayload.Toggle}, Add=${pPayload.Add}, ElementID=${pPayload.ElementID}`);
         
         if (pPayload.Clear)
             selectionService.Clear();
@@ -374,10 +349,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         else if (pPayload.Add && pPayload.ElementID)
             selectionService.AddToSelection(pPayload.ElementID);
         else if (pPayload.ElementID)
-        {
-            GetLogService().Info(`[OnSelectElement] Calling selectionService.Select(${pPayload.ElementID})`);
             selectionService.Select(pPayload.ElementID);
-        }
     }
 
     async OnAddTable(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: IAddTablePayload): Promise<void>
@@ -431,15 +403,11 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
 
     async OnAddRelation(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: IAddRelationPayload): Promise<void>
     {
-        GetLogService().Info(`Adding relation: Source=${pPayload.SourceID}, Target=${pPayload.TargetID}`);
-        
         const result = pState.AddReference(
             pPayload.SourceID,
             pPayload.TargetID,
             pPayload.Name || ""
         );
-
-        GetLogService().Info(`AddReference result: Success=${result.Success}, Message=${result.Message || "none"}`);
 
         if (result.Success)
         {
@@ -494,16 +462,12 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
             if (!dataType)
                 return;
         }
-
-        GetLogService().Info(`Adding field: TableID=${tableID}, Name=${fieldName}, DataType=${dataType}`);
         
         const result = pState.AddField(
             tableID,
             fieldName,
             dataType
         );
-
-        GetLogService().Info(`AddField result: Success=${result.Success}, Message=${result.Message || "none"}`);
 
         if (result.Success)
         {
@@ -519,11 +483,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
 
     async OnAlignLines(pPanel: vscode.WebviewPanel, pState: XORMDesignerState): Promise<void>
     {
-        GetLogService().Info('OnAlignLines called');
-        
         const result = pState.AlignLines();
-
-        GetLogService().Info(`AlignLines result: Success=${result.Success}, Message=${result.Message || "none"}`);
 
         if (result.Success)
         {
@@ -659,29 +619,19 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
 
     GetActiveState(): XORMDesignerState | null
     {
-        GetLogService().Debug(`[GetActiveState] _Webviews.size=${this._Webviews.size}, _States.size=${this._States.size}, _LastActiveKey=${this._LastActiveKey}`);
-        
         for (const [key, panel] of this._Webviews)
         {
-            GetLogService().Debug(`[GetActiveState] Checking panel key=${key}, active=${panel.active}`);
             if (panel.active)
             {
                 this._LastActiveKey = key;
-                const state = this._States.get(key);
-                GetLogService().Debug(`[GetActiveState] Found active panel, state=${state ? 'exists' : 'null'}`);
-                return state || null;
+                return this._States.get(key) || null;
             }
         }
         
         // Fallback to last active state
         if (this._LastActiveKey)
-        {
-            const state = this._States.get(this._LastActiveKey);
-            GetLogService().Debug(`[GetActiveState] Using fallback _LastActiveKey=${this._LastActiveKey}, state=${state ? 'exists' : 'null'}`);
-            return state || null;
-        }
+            return this._States.get(this._LastActiveKey) || null;
             
-        GetLogService().Debug(`[GetActiveState] No active state found`);
         return null;
     }
 

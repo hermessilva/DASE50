@@ -33,7 +33,6 @@ export interface XIAddTableData
     X: number;
     Y: number;
     Name?: string;
-    Schema?: string;
 }
 
 export interface XIAddReferenceData
@@ -142,8 +141,7 @@ export class XORMController
         const table = this.Design.CreateTable({
             X: pData.X,
             Y: pData.Y,
-            Name: pData.Name,
-            Schema: pData.Schema
+            Name: pData.Name
         });
 
         return { Success: true, ElementID: table.ID };

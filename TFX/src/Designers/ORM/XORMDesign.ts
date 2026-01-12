@@ -1,6 +1,7 @@
 import { XDesign, XRouteOptions } from "../../Design/XDesign.js";
 import { XGuid } from "../../Core/XGuid.js";
 import { XRect, XPoint } from "../../Core/XGeometry.js";
+import { XProperty } from "../../Core/XProperty.js";
 import { XORMTable } from "./XORMTable.js";
 import { XORMReference } from "./XORMReference.js";
 import { XORMField } from "./XORMField.js";
@@ -15,7 +16,6 @@ export interface XICreateTableOptions
     Width?: number;
     Height?: number;
     Name?: string;
-    Schema?: string;
 }
 
 export interface XICreateReferenceOptions
@@ -68,11 +68,29 @@ export interface XICreateReferenceOptions
  */
 export class XORMDesign extends XDesign
 {
+    public static readonly SchemaProp = XProperty.Register<XORMDesign, string>(
+        (p: XORMDesign) => p.Schema,
+        "00000001-0002-0001-0001-000000000002",
+        "Schema",
+        "Database Schema",
+        "dbo"
+    );
+
     private _TablesWithListeners: Set<string> = new Set<string>();
 
     public constructor()
     {
         super();
+    }
+
+    public get Schema(): string
+    {
+        return this.GetValue(XORMDesign.SchemaProp) as string;
+    }
+
+    public set Schema(pValue: string)
+    {
+        this.SetValue(XORMDesign.SchemaProp, pValue);
     }
 
     public override Initialize(): void
@@ -121,7 +139,6 @@ export class XORMDesign extends XDesign
         const table = new XORMTable();
         table.ID = XGuid.NewValue();
         table.Name = pOptions?.Name ?? this.GenerateTableName();
-        table.Schema = pOptions?.Schema ?? "dbo";
         table.Bounds = new XRect(
             pOptions?.X ?? 0,
             pOptions?.Y ?? 0,

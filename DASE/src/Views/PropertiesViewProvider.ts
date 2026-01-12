@@ -1,6 +1,5 @@
 import * as vscode from "vscode";
 import { GetSelectionService } from "../Services/SelectionService";
-import { GetLogService } from "../Services/LogService";
 import { XPropertyItem } from "../Models/PropertyItem";
 import { XORMDesignerEditorProvider } from "../Designers/ORM/ORMDesignerEditorProvider";
 import { XDesignerSelection } from "../Models/DesignerSelection";
@@ -24,39 +23,30 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
         
         // Register selection listener immediately, not when webview resolves
         const selectionService = GetSelectionService();
-        const log = GetLogService();
         selectionService.OnSelectionChanged(async (pSelection: XDesignerSelection) => {
-            log.Info(`[PropertiesViewProvider] OnSelectionChanged: PrimaryID=${pSelection.PrimaryID}`);
             this._ElementID = pSelection.PrimaryID;
             
             if (pSelection.PrimaryID)
             {
                 const state = this._DesignerProvider.GetActiveState();
-                log.Info(`[PropertiesViewProvider] GetActiveState returned: ${state ? 'valid state' : 'null'}`);
                 if (state)
-                {
                     this._Properties = state.GetProperties(pSelection.PrimaryID);
-                    log.Info(`[PropertiesViewProvider] GetProperties returned ${this._Properties.length} properties`);
-                }
                 else
                     this._Properties = [];
             }
             else
                 this._Properties = [];
-
-            log.Info(`[PropertiesViewProvider] Calling UpdateView with ${this._Properties.length} properties, View=${this._View ? 'exists' : 'null'}`);
             
             // If view is not resolved yet, try to reveal it
             if (!this._View && this._Properties.length > 0)
             {
-                log.Info(`[PropertiesViewProvider] View not resolved, attempting to focus the panel`);
                 try
                 {
                     await vscode.commands.executeCommand(`${XPropertiesViewProvider.ViewType}.focus`);
                 }
-                catch (err)
+                catch
                 {
-                    log.Debug(`[PropertiesViewProvider] Could not focus panel: ${err}`);
+                    // Panel focus failed, will update on next visibility change
                 }
             }
             
@@ -71,7 +61,6 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
 
     static Register(pContext: vscode.ExtensionContext, pDesignerProvider: XORMDesignerEditorProvider): XPropertiesViewProvider
     {
-        GetLogService().Info(`[PropertiesViewProvider] Registering provider for view type: ${XPropertiesViewProvider.ViewType}`);
         const provider = new XPropertiesViewProvider(pContext, pDesignerProvider);
         const registration = vscode.window.registerWebviewViewProvider(
             XPropertiesViewProvider.ViewType,
@@ -83,13 +72,11 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
             }
         );
         pContext.subscriptions.push(registration);
-        GetLogService().Info("[PropertiesViewProvider] Provider registered successfully");
         return provider;
     }
 
     resolveWebviewView(pWebviewView: vscode.WebviewView, _pContext: vscode.WebviewViewResolveContext, _pToken: vscode.CancellationToken): void
     {
-        GetLogService().Info("[PropertiesViewProvider] resolveWebviewView called");
         this._View = pWebviewView;
 
         pWebviewView.webview.options = {
@@ -99,26 +86,19 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
         // Always set fresh HTML content
         const htmlContent = this.GetHtmlContent();
         pWebviewView.webview.html = htmlContent;
-        GetLogService().Debug(`[PropertiesViewProvider] HTML content set, length=${htmlContent.length}`);
         
         // Handle view disposal
         pWebviewView.onDidDispose(() => {
-            GetLogService().Info("[PropertiesViewProvider] View disposed");
             this._View = null;
         });
         
         // Handle visibility changes - re-send properties when view becomes visible
         pWebviewView.onDidChangeVisibility(() => {
-            GetLogService().Debug(`[PropertiesViewProvider] Visibility changed: visible=${pWebviewView.visible}`);
             if (pWebviewView.visible && this._Properties.length > 0)
-            {
-                GetLogService().Debug(`[PropertiesViewProvider] Re-sending ${this._Properties.length} properties on visibility change`);
                 this.UpdateView();
-            }
         });
         
         // Update view with current properties (in case selection happened before resolve)
-        GetLogService().Info(`[PropertiesViewProvider] resolveWebviewView - sending ${this._Properties.length} properties`);
         this.UpdateView();
 
         pWebviewView.webview.onDidReceiveMessage((pMsg: { Type: string; PropertyKey?: string; Value?: unknown }) => {
@@ -175,14 +155,10 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                 Group: p.Group
             }));
             
-            GetLogService().Debug(`[PropertiesViewProvider] UpdateView sending ${serializedProperties.length} serialized properties`);
-            
             // Force HTML refresh if webview script might not be initialized
             // This is a workaround for VS Code caching issues
             if (serializedProperties.length > 0)
-            {
                 this._View.webview.html = this.GetHtmlContentWithProperties(serializedProperties);
-            }
             else
             {
                 this._View.webview.postMessage({

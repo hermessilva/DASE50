@@ -25,7 +25,7 @@
         AlignLines: "AlignLines"
     };
 
-    let _Model = { Tables: [], References: [] };
+    let _Model = { DesignID: null, Tables: [], References: [] };
     let _SelectedIDs = [];
     let _DragState = null;
     let _RelationDragState = null;
@@ -65,7 +65,7 @@
         switch (pMsg.Type)
         {
             case XMessageType.LoadModel:
-                _Model = pMsg.Payload || { Tables: [], References: [] };
+                _Model = pMsg.Payload || { DesignID: null, Tables: [], References: [] };
                 RenderModel();
                 break;
 
@@ -192,7 +192,11 @@
         _Canvas.addEventListener("click", function(e) {
             if (e.target === _Canvas || e.target.id === "relations-layer" || e.target.id === "tables-layer")
             {
-                SendMessage(XMessageType.SelectElement, { Clear: true });
+                // Select the Design when clicking on the background
+                if (_Model.DesignID)
+                    SendMessage(XMessageType.SelectElement, { ElementID: _Model.DesignID });
+                else
+                    SendMessage(XMessageType.SelectElement, { Clear: true });
             }
         });
 
@@ -340,6 +344,7 @@
             }
 
             e.preventDefault();
+            e.stopPropagation();
             
             if (!e.ctrlKey)
                 SendMessage(XMessageType.SelectElement, { ElementID: pTable.ID });

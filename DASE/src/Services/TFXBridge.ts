@@ -14,6 +14,7 @@ import {
     XIRenameElementData,
     XIOperationResult,
     XORMDocument,
+    XORMDesign,
     XORMTable,
     XORMField,
     XORMFieldDataType,
@@ -52,7 +53,6 @@ interface ITableData
     Y: number;
     Width: number;
     Height: number;
-    Schema?: string;
     Description?: string;
     FillProp?: string;
     Fields: IFieldData[];
@@ -83,6 +83,8 @@ interface ILegacyReferenceData
 
 interface IModelData
 {
+    DesignID?: string;
+    Schema?: string;
     Tables: ITableData[];
     References: IReferenceData[];
 }
@@ -90,6 +92,7 @@ interface IModelData
 interface IJsonData
 {
     Name?: string;
+    Schema?: string;
     Tables?: ITableData[];
     References?: ILegacyReferenceData[];
 }
@@ -188,19 +191,11 @@ export class XTFXBridge
                     if (result.Success && result.Data)
                     {
                         // Initialize the document to consolidate multiple XORMDesign instances
-                        GetLogService().Info('[TFXBridge] Before Initialize: ChildNodes count = ' + result.Data.ChildNodes?.length);
                         result.Data.Initialize();
-                        GetLogService().Info('[TFXBridge] After Initialize: ChildNodes count = ' + result.Data.ChildNodes?.length);
-                        GetLogService().Info('[TFXBridge] Design children count = ' + result.Data.Design?.ChildNodes?.length);
                         this._Controller.Document = result.Data;
                         
                         // Route all lines after document is fully loaded and relationships established
-                        GetLogService().Info('[TFXBridge] Routing lines after load...');
                         const references = result.Data.Design?.GetReferences?.();
-                        GetLogService().Info(`[TFXBridge] Found ${references?.length || 0} references before routing`);
-                        references?.forEach((ref: any, i: number) => {
-                            GetLogService().Info(`  Ref ${i}: Points before = ${ref.Points?.length || 0}, Points = ${JSON.stringify(ref.Points)}`);
-                        });
 
                         // If points were defined in the XML but deserialized into invalid values (e.g., NaN),
                         // recover them from the original XML.
@@ -233,12 +228,6 @@ export class XTFXBridge
                         
                         if (shouldRoute)
                             result.Data.Design?.RouteAllLines?.();
-                        
-                        GetLogService().Info(`[TFXBridge] Found ${references?.length || 0} references after routing`);
-                        references?.forEach((ref: any, i: number) => {
-                            GetLogService().Info(`  Ref ${i}: Points after = ${ref.Points?.length || 0}, Points = ${JSON.stringify(ref.Points)}`);
-                        });
-                        GetLogService().Info('[TFXBridge] Lines routed');
                         
                         return result.Data;
                     }
@@ -330,22 +319,18 @@ export class XTFXBridge
 
     AddReference(pSourceTableID: string, pTargetTableID: string, pName: string): XIOperationResult
     {
-        GetLogService().Info(`TFXBridge.AddReference: SourceTable=${pSourceTableID}, TargetTable=${pTargetTableID}, Name=${pName}`);
-        
         // Get the target table to build the FK field name
         const targetTable = this._Controller?.GetElementByID(pTargetTableID) as XORMTable | null;
         const targetName = targetTable?.Name || "Target";
         
         // First create the FK field in the source table
         const fkFieldName = `${targetName}ID`;
-        GetLogService().Info(`Creating FK field: ${fkFieldName} in table ${pSourceTableID}`);
         
         const addFieldData: XIAddFieldData = {
             TableID: pSourceTableID,
             Name: fkFieldName
         };
         const fieldResult = this._Controller?.AddField(addFieldData);
-        GetLogService().Info(`FK field creation result: ${JSON.stringify(fieldResult)}`);
         
         if (!fieldResult?.Success || !fieldResult?.ElementID)
             return { Success: false, Message: "Failed to create FK field." };
@@ -356,30 +341,21 @@ export class XTFXBridge
             TargetTableID: pTargetTableID,
             Name: pName || `FK_${targetName}`
         };
-        const result: XIOperationResult = this._Controller?.AddReference(addRefData) || { Success: false };
-        GetLogService().Info(`Controller.AddReference result: ${JSON.stringify(result)}`);
-        
-        return result;
+        return this._Controller?.AddReference(addRefData) || { Success: false };
     }
 
     AddField(pTableID: string, pName: string, _pDataType: string): XIOperationResult
     {
-        GetLogService().Info(`TFXBridge.AddField: TableID=${pTableID}, Name=${pName}`);
         const addFieldData: XIAddFieldData = {
             TableID: pTableID,
             Name: pName
         };
-        const result: XIOperationResult = this._Controller?.AddField(addFieldData) || { Success: false };
-        GetLogService().Info(`Controller.AddField result: ${JSON.stringify(result)}`);
-        return result;
+        return this._Controller?.AddField(addFieldData) || { Success: false };
     }
 
     AlignLines(): boolean
     {
-        GetLogService().Info('TFXBridge.AlignLines called');
-        const result = this._Controller?.RouteAllLines?.();
-        GetLogService().Info(`Controller.RouteAllLines result: ${result}`);
-        return result ?? false;
+        return this._Controller?.RouteAllLines?.() ?? false;
     }
 
     DeleteElement(pElementID: string): XIOperationResult
@@ -408,18 +384,99 @@ export class XTFXBridge
 
     UpdateProperty(pElementID: string, pPropertyKey: string, pValue: unknown): XIOperationResult
     {
-        let convertedValue = pValue;
-        
-        // Convert color string to XColor object
-        if (pPropertyKey === "Fill" && typeof pValue === "string")
-            convertedValue = XColor.Parse(pValue);
-        
-        const updateData: XIUpdatePropertyData = {
-            ElementID: pElementID,
-            PropertyKey: pPropertyKey,
-            Value: convertedValue
-        };
-        return this._Controller?.UpdateProperty(updateData) || { Success: false };
+        this.Initialize();
+
+        const element = this._Controller?.GetElementByID(pElementID);
+        if (!element)
+            return { Success: false, Message: "Element not found." };
+
+        // Directly set known properties instead of using SetValueByKey
+        // This avoids key mismatch issues with the property registry
+        if (pPropertyKey === "Name")
+            element.Name = pValue as string;
+        else if (element instanceof XORMTable)
+        {
+            switch (pPropertyKey)
+            {
+                case "Description":
+                    element.Description = pValue as string;
+                    break;
+                case "Fill":
+                    if (typeof pValue === "string")
+                        element.Fill = XColor.Parse(pValue);
+                    else if (pValue instanceof XColor)
+                        element.Fill = pValue;
+                    break;
+                case "X":
+                case "Y":
+                case "Width":
+                case "Height":
+                    const bounds = element.Bounds;
+                    const newBounds = new XRect(
+                        pPropertyKey === "X" ? (pValue as number) : bounds.Left,
+                        pPropertyKey === "Y" ? (pValue as number) : bounds.Top,
+                        pPropertyKey === "Width" ? (pValue as number) : bounds.Width,
+                        pPropertyKey === "Height" ? (pValue as number) : bounds.Height
+                    );
+                    element.Bounds = newBounds;
+                    break;
+                default:
+                    return { Success: false, Message: `Unknown property: ${pPropertyKey}` };
+            }
+        }
+        else if (element instanceof XORMReference)
+        {
+            switch (pPropertyKey)
+            {
+                case "Description":
+                    element.Description = pValue as string;
+                    break;
+                default:
+                    return { Success: false, Message: `Unknown property: ${pPropertyKey}` };
+            }
+        }
+        else if (element instanceof XORMField)
+        {
+            switch (pPropertyKey)
+            {
+                case "DataType":
+                    element.DataType = pValue as XORMFieldDataType;
+                    break;
+                case "Length":
+                    element.Length = pValue as number;
+                    break;
+                case "IsPrimaryKey":
+                    element.IsPrimaryKey = pValue as boolean;
+                    break;
+                case "IsNullable":
+                    element.IsNullable = pValue as boolean;
+                    break;
+                case "IsAutoIncrement":
+                    element.IsAutoIncrement = pValue as boolean;
+                    break;
+                case "DefaultValue":
+                    element.DefaultValue = pValue as string;
+                    break;
+                case "Description":
+                    element.Description = pValue as string;
+                    break;
+                default:
+                    return { Success: false, Message: `Unknown property: ${pPropertyKey}` };
+            }
+        }
+        else if (element instanceof XORMDesign)
+        {
+            switch (pPropertyKey)
+            {
+                case "Schema":
+                    element.Schema = pValue as string;
+                    break;
+                default:
+                    return { Success: false, Message: `Unknown property: ${pPropertyKey}` };
+            }
+        }
+
+        return { Success: true, ElementID: pElementID };
     }
 
     GetProperties(pElementID: string): XPropertyItem[]
@@ -437,12 +494,17 @@ export class XTFXBridge
 
         if (element instanceof XORMTable)
         {
-            props.push(new XPropertyItem("Schema", "Schema", element.Schema, XPropertyType.String));
             props.push(new XPropertyItem("Description", "Description", element.Description, XPropertyType.String));
             
             const fillColor = element.Fill;
             if (fillColor)
-                props.push(new XPropertyItem("Fill", "Fill", fillColor.ToString(), XPropertyType.Color));
+            {
+                // Handle both XColor objects and strings
+                const colorStr = typeof fillColor.ToString === 'function' 
+                    ? fillColor.ToString() 
+                    : String(fillColor);
+                props.push(new XPropertyItem("Fill", "Fill", colorStr, XPropertyType.Color));
+            }
 
             const bounds = element.Bounds;
             props.push(new XPropertyItem("X", "X", bounds.Left, XPropertyType.Number));
@@ -466,6 +528,10 @@ export class XTFXBridge
             props.push(new XPropertyItem("DefaultValue", "Default Value", element.DefaultValue, XPropertyType.String));
             props.push(new XPropertyItem("Description", "Description", element.Description, XPropertyType.String));
         }
+        else if (element instanceof XORMDesign)
+        {
+            props.push(new XPropertyItem("Schema", "Schema", element.Schema, XPropertyType.String));
+        }
 
         return props;
     }
@@ -479,7 +545,9 @@ export class XTFXBridge
             return null;
 
         let typeName = "Unknown";
-        if (element instanceof XORMTable)
+        if (element instanceof XORMDesign)
+            typeName = "XORMDesign";
+        else if (element instanceof XORMTable)
             typeName = "XORMTable";
         else if (element instanceof XORMReference)
             typeName = "XORMReference";
@@ -501,17 +569,23 @@ export class XTFXBridge
         if (!doc || !doc.Design)
             return { Tables: [], References: [] };
 
+        const design = doc.Design;
         const tables = this._Controller.GetTables();
         const references = this._Controller.GetReferences();
-
-        GetLogService().Debug(`GetModelData: Found ${tables?.length || 0} tables, ${references?.length || 0} references`);
 
         const tablesData: ITableData[] = tables.map((t: any) => {
             // Get fields using GetChildrenOfType or directly from Fields array
             const fields = t.GetChildrenOfType?.(XORMField) ?? t.Fields ?? [];
             
-            // Get fill color as HTML hex string
-            const fillColor = t.Fill ? `#${t.Fill.ToString().substring(2)}` : undefined;
+            // Get fill color as HTML hex string - handle both XColor objects and strings
+            let fillColor: string | undefined;
+            if (t.Fill)
+            {
+                if (typeof t.Fill.ToString === 'function')
+                    fillColor = `#${t.Fill.ToString().substring(2)}`;
+                else if (typeof t.Fill === 'string')
+                    fillColor = t.Fill.startsWith('#') ? t.Fill : `#${t.Fill.substring(2)}`;
+            }
             
             return {
                 ID: t.ID,
@@ -576,10 +650,6 @@ export class XTFXBridge
         };
 
         const refsData: IReferenceData[] = references.map((r: any) => {
-            GetLogService().Debug(`Reference: ID=${r.ID}, Name=${r.Name}, Source=${r.Source}, Target=${r.Target}`);
-            GetLogService().Debug(`Reference Points raw: ${JSON.stringify(r.Points)}`);
-            GetLogService().Debug(`Reference Points length: ${r.Points?.length || 0}`);
-            
             // Encontrar tabelas source e target para simplificação
             const sourceTable = tables.find((t: any) => {
                 const fields = t.GetChildrenOfType?.(XORMField) ?? t.Fields ?? [];
@@ -590,7 +660,6 @@ export class XTFXBridge
             const rawPoints = r.Points?.map((p: any) => ({ X: p.X, Y: p.Y })) || [];
             const simplifiedPoints = simplifyRoutePoints(rawPoints, sourceTable, targetTable);
             
-            GetLogService().Debug(`Reference Points simplified: ${JSON.stringify(simplifiedPoints)}`);
             return {
                 ID: r.ID,
                 Name: r.Name,
@@ -600,7 +669,7 @@ export class XTFXBridge
             };
         });
 
-        return { Tables: tablesData, References: refsData };
+        return { DesignID: design.ID, Tables: tablesData, References: refsData };
     }
 
     LoadFromJson(pDoc: any, pData: IJsonData): void
@@ -613,6 +682,9 @@ export class XTFXBridge
         if (pData.Name)
             pDoc.Name = pData.Name;
 
+        if (pData.Schema)
+            design.Schema = pData.Schema;
+
         if (pData.Tables && Array.isArray(pData.Tables))
         {
             for (const tData of pData.Tables)
@@ -622,8 +694,7 @@ export class XTFXBridge
                     Y: tData.Y || 0,
                     Width: tData.Width || 200,
                     Height: tData.Height || 150,
-                    Name: tData.Name || "",
-                    Schema: tData.Schema || "dbo"
+                    Name: tData.Name || ""
                 });
 
                 if (tData.ID)
@@ -692,6 +763,7 @@ export class XTFXBridge
 
         return {
             Name: pDoc.Name,
+            Schema: pDoc.Design.Schema,
             Tables: tables.map((t: any) => {
                 // Get fields using GetChildrenOfType or directly from Fields array
                 const fields = t.GetChildrenOfType?.(null) ?? t.Fields ?? [];
@@ -699,7 +771,6 @@ export class XTFXBridge
                 return {
                     ID: t.ID,
                     Name: t.Name,
-                    Schema: t.Schema,
                     Description: t.Description,
                     X: t.Bounds.Left,
                     Y: t.Bounds.Top,

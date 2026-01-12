@@ -89,14 +89,12 @@ export class XORMDesignerState
         try
         {
             const uri = this._Document.uri;
-            GetLogService().Info(`Loading ORM model: ${uri.fsPath}`);
             
             // Handle untitled files
             if (uri.scheme === "untitled")
             {
                 this._Bridge.LoadOrmModelFromText("{}");
                 this._IsDirty = true; // Mark as dirty so user is prompted to save
-                GetLogService().Info("Created new empty ORM model");
                 return;
             }
 
@@ -104,7 +102,6 @@ export class XORMDesignerState
             const text = Buffer.from(bytes).toString("utf8");
             this._Bridge.LoadOrmModelFromText(text);
             this._IsDirty = false;
-            GetLogService().Info(`ORM model loaded successfully: ${uri.fsPath}`);
         }
         catch (error)
         {
@@ -122,16 +119,12 @@ export class XORMDesignerState
             // For untitled files, we can't write directly - just mark as dirty
             // The VS Code framework will prompt the user to "Save As"
             if (uri.scheme === "untitled")
-            {
-                GetLogService().Info("Untitled file - changes kept in memory until saved");
                 return;
-            }
             
             const text = this._Bridge.SaveOrmModelToText();
             const bytes = Buffer.from(text, "utf8");
             await vscode.workspace.fs.writeFile(uri, bytes);
             this._IsDirty = false;
-            GetLogService().Info(`ORM model saved: ${uri.fsPath}`);
         }
         catch (error)
         {
@@ -162,9 +155,7 @@ export class XORMDesignerState
 
     AddReference(pSourceTableID: string, pTargetTableID: string, pName: string): XIOperationResult
     {
-        GetLogService().Info(`ORMDesignerState.AddReference: Source=${pSourceTableID}, Target=${pTargetTableID}, Name=${pName}`);
         const result = this._Bridge.AddReference(pSourceTableID, pTargetTableID, pName);
-        GetLogService().Info(`Bridge.AddReference result: ${JSON.stringify(result)}`);
         if (result?.Success)
             this.IsDirty = true;
         return result || { Success: false };
@@ -172,9 +163,7 @@ export class XORMDesignerState
 
     AddField(pTableID: string, pName: string, pDataType: string): XIOperationResult
     {
-        GetLogService().Info(`ORMDesignerState.AddField: TableID=${pTableID}, Name=${pName}, DataType=${pDataType}`);
         const result = this._Bridge.AddField(pTableID, pName, pDataType);
-        GetLogService().Info(`Bridge.AddField result: ${JSON.stringify(result)}`);
         if (result?.Success)
             this.IsDirty = true;
         return result || { Success: false };
@@ -182,7 +171,6 @@ export class XORMDesignerState
 
     AlignLines(): XIOperationResult
     {
-        GetLogService().Info('ORMDesignerState.AlignLines called');
         const result = this._Bridge.AlignLines();
         if (result)
             this.IsDirty = true;

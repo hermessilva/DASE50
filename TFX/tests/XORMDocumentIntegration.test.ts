@@ -170,17 +170,17 @@ describe("XORMDocument Integration Tests", () => {
         // Create 3 tables with different coordinates
         const customers = doc.Design!.CreateTable({ 
             X: 100, Y: 150, Width: 250, Height: 200, 
-            Name: "Customers", Schema: "dbo" 
+            Name: "Customers"
         });
         
         const orders = doc.Design!.CreateTable({ 
             X: 450, Y: 150, Width: 250, Height: 200, 
-            Name: "Orders", Schema: "sales" 
+            Name: "Orders"
         });
         
         const products = doc.Design!.CreateTable({ 
             X: 800, Y: 150, Width: 250, Height: 200, 
-            Name: "Products", Schema: "catalog" 
+            Name: "Products"
         });
 
         // Add fields to customers
@@ -313,15 +313,12 @@ describe("XORMDocument Integration Tests", () => {
         // 5. Verify coordinates are preserved exactly
         expect(loadedCustomers!.Bounds.Left).toBe(100);
         expect(loadedCustomers!.Bounds.Top).toBe(150);
-        expect(loadedCustomers!.Schema).toBe("dbo");
 
         expect(loadedOrders!.Bounds.Left).toBe(450);
         expect(loadedOrders!.Bounds.Top).toBe(150);
-        expect(loadedOrders!.Schema).toBe("sales");
 
         expect(loadedProducts!.Bounds.Left).toBe(800);
         expect(loadedProducts!.Bounds.Top).toBe(150);
-        expect(loadedProducts!.Schema).toBe("catalog");
 
         // 6. Verify fields
         const customerFields = loadedCustomers!.GetFields();

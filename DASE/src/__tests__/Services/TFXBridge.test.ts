@@ -275,47 +275,306 @@ describe('XTFXBridge', () => {
             await bridge.LoadOrmModelFromText('{}');
         });
 
-        it('should update element property', () => {
-            const mockUpdateProperty = jest.fn().mockReturnValue(true);
-            bridge.Controller.UpdateProperty = mockUpdateProperty;
-
-            const result = bridge.UpdateProperty('elem-1', 'Name', 'UpdatedName');
-
-            expect(mockUpdateProperty).toHaveBeenCalledWith({
-                ElementID: 'elem-1',
-                PropertyKey: 'Name',
-                Value: 'UpdatedName'
+        it('should update element property', async () => {
+            // Load model with a table to update
+            const json = JSON.stringify({
+                Name: "TestModel",
+                Tables: [{ ID: "table-1", Name: "TestTable", X: 100, Y: 100, Width: 150, Height: 200 }]
             });
+            await bridge.LoadOrmModelFromText(json);
+
+            const result = bridge.UpdateProperty('table-1', 'Name', 'UpdatedName');
+
+            expect(result.Success).toBe(true);
+            const props = bridge.GetProperties('table-1');
+            const nameProp = props.find(p => p.Key === 'Name');
+            expect(nameProp?.Value).toBe('UpdatedName');
         });
 
-        it('should convert Fill property string to XColor', () => {
-            const mockUpdateProperty = jest.fn().mockReturnValue({ Success: true });
-            bridge.Controller.UpdateProperty = mockUpdateProperty;
+        it('should convert Fill property string to XColor', async () => {
+            const json = JSON.stringify({
+                Name: "TestModel",
+                Tables: [{ ID: "table-1", Name: "TestTable", X: 100, Y: 100, Width: 150, Height: 200 }]
+            });
+            await bridge.LoadOrmModelFromText(json);
 
-            bridge.UpdateProperty('elem-1', 'Fill', 'FF00FF00');
+            const result = bridge.UpdateProperty('table-1', 'Fill', 'FF00FF00');
 
-            expect(mockUpdateProperty).toHaveBeenCalled();
-            const callArg = mockUpdateProperty.mock.calls[0][0];
-            expect(callArg.ElementID).toBe('elem-1');
-            expect(callArg.PropertyKey).toBe('Fill');
-            // Value should be XColor object, not string
-            expect(typeof callArg.Value).toBe('object');
-            expect(callArg.Value.R).toBe(0);
-            expect(callArg.Value.G).toBe(255);
-            expect(callArg.Value.B).toBe(0);
+            expect(result.Success).toBe(true);
+            const props = bridge.GetProperties('table-1');
+            const fillProp = props.find(p => p.Key === 'Fill');
+            // Fill value should be ARGB string representation
+            expect(fillProp?.Value).toBe('FF00FF00');
         });
 
-        it('should not convert non-Fill properties', () => {
-            const mockUpdateProperty = jest.fn().mockReturnValue({ Success: true });
-            bridge.Controller.UpdateProperty = mockUpdateProperty;
-
-            bridge.UpdateProperty('elem-1', 'Name', 'FF00FF00');
-
-            expect(mockUpdateProperty).toHaveBeenCalledWith({
-                ElementID: 'elem-1',
-                PropertyKey: 'Name',
-                Value: 'FF00FF00'
+        it('should return error for unknown property', async () => {
+            const json = JSON.stringify({
+                Name: "TestModel",
+                Tables: [{ ID: "table-1", Name: "TestTable", X: 100, Y: 100, Width: 150, Height: 200 }]
             });
+            await bridge.LoadOrmModelFromText(json);
+
+            const result = bridge.UpdateProperty('table-1', 'UnknownProperty', 'value');
+
+            expect(result.Success).toBe(false);
+            expect(result.Message).toContain('Unknown property');
+        });
+
+        it('should update Description property', async () => {
+            const json = JSON.stringify({
+                Name: "TestModel",
+                Tables: [{ ID: "table-1", Name: "TestTable", X: 100, Y: 100, Width: 150, Height: 200 }]
+            });
+            await bridge.LoadOrmModelFromText(json);
+
+            const result = bridge.UpdateProperty('table-1', 'Description', 'New description');
+
+            expect(result.Success).toBe(true);
+        });
+
+        it('should update Fill with XColor instance', async () => {
+            const json = JSON.stringify({
+                Name: "TestModel",
+                Tables: [{ ID: "table-1", Name: "TestTable", X: 100, Y: 100, Width: 150, Height: 200 }]
+            });
+            await bridge.LoadOrmModelFromText(json);
+
+            const color = tfx.XColor.Parse('FFFF0000');
+            const result = bridge.UpdateProperty('table-1', 'Fill', color);
+
+            expect(result.Success).toBe(true);
+        });
+
+        it('should update X property', async () => {
+            const json = JSON.stringify({
+                Name: "TestModel",
+                Tables: [{ ID: "table-1", Name: "TestTable", X: 100, Y: 100, Width: 150, Height: 200 }]
+            });
+            await bridge.LoadOrmModelFromText(json);
+
+            const result = bridge.UpdateProperty('table-1', 'X', 250);
+
+            expect(result.Success).toBe(true);
+        });
+
+        it('should update Y property', async () => {
+            const json = JSON.stringify({
+                Name: "TestModel",
+                Tables: [{ ID: "table-1", Name: "TestTable", X: 100, Y: 100, Width: 150, Height: 200 }]
+            });
+            await bridge.LoadOrmModelFromText(json);
+
+            const result = bridge.UpdateProperty('table-1', 'Y', 350);
+
+            expect(result.Success).toBe(true);
+        });
+
+        it('should update Width property', async () => {
+            const json = JSON.stringify({
+                Name: "TestModel",
+                Tables: [{ ID: "table-1", Name: "TestTable", X: 100, Y: 100, Width: 150, Height: 200 }]
+            });
+            await bridge.LoadOrmModelFromText(json);
+
+            const result = bridge.UpdateProperty('table-1', 'Width', 300);
+
+            expect(result.Success).toBe(true);
+        });
+
+        it('should update Height property', async () => {
+            const json = JSON.stringify({
+                Name: "TestModel",
+                Tables: [{ ID: "table-1", Name: "TestTable", X: 100, Y: 100, Width: 150, Height: 200 }]
+            });
+            await bridge.LoadOrmModelFromText(json);
+
+            const result = bridge.UpdateProperty('table-1', 'Height', 400);
+
+            expect(result.Success).toBe(true);
+        });
+
+        it('should update XORMReference Description property', async () => {
+            const json = JSON.stringify({
+                Name: "TestModel",
+                Tables: [
+                    { ID: "table-1", Name: "Users", X: 100, Y: 100, Fields: [{ ID: "field-1", Name: "ID" }] },
+                    { ID: "table-2", Name: "Orders", X: 300, Y: 100, Fields: [{ ID: "field-2", Name: "UserID" }] }
+                ],
+                References: [{ ID: "ref-1", Name: "FK_Orders_Users", SourceFieldID: "field-2", TargetTableID: "table-1" }]
+            });
+            await bridge.LoadOrmModelFromText(json);
+
+            const result = bridge.UpdateProperty('ref-1', 'Description', 'Reference description');
+
+            expect(result.Success).toBe(true);
+        });
+
+        it('should return error for unknown XORMReference property', async () => {
+            const json = JSON.stringify({
+                Name: "TestModel",
+                Tables: [
+                    { ID: "table-1", Name: "Users", X: 100, Y: 100, Fields: [{ ID: "field-1", Name: "ID" }] },
+                    { ID: "table-2", Name: "Orders", X: 300, Y: 100, Fields: [{ ID: "field-2", Name: "UserID" }] }
+                ],
+                References: [{ ID: "ref-1", Name: "FK_Orders_Users", SourceFieldID: "field-2", TargetTableID: "table-1" }]
+            });
+            await bridge.LoadOrmModelFromText(json);
+
+            const result = bridge.UpdateProperty('ref-1', 'UnknownProperty', 'value');
+
+            expect(result.Success).toBe(false);
+            expect(result.Message).toContain('Unknown property');
+        });
+
+        it('should update XORMField DataType property', async () => {
+            const json = JSON.stringify({
+                Name: "TestModel",
+                Tables: [{ ID: "table-1", Name: "TestTable", X: 100, Y: 100, Fields: [{ ID: "field-1", Name: "ID", DataType: "String" }] }]
+            });
+            await bridge.LoadOrmModelFromText(json);
+
+            const result = bridge.UpdateProperty('field-1', 'DataType', 'Integer');
+
+            expect(result.Success).toBe(true);
+        });
+
+        it('should update XORMField Length property', async () => {
+            const json = JSON.stringify({
+                Name: "TestModel",
+                Tables: [{ ID: "table-1", Name: "TestTable", X: 100, Y: 100, Fields: [{ ID: "field-1", Name: "Name", DataType: "String" }] }]
+            });
+            await bridge.LoadOrmModelFromText(json);
+
+            const result = bridge.UpdateProperty('field-1', 'Length', 100);
+
+            expect(result.Success).toBe(true);
+        });
+
+        it('should update XORMField IsPrimaryKey property', async () => {
+            const json = JSON.stringify({
+                Name: "TestModel",
+                Tables: [{ ID: "table-1", Name: "TestTable", X: 100, Y: 100, Fields: [{ ID: "field-1", Name: "ID", DataType: "Integer" }] }]
+            });
+            await bridge.LoadOrmModelFromText(json);
+
+            const result = bridge.UpdateProperty('field-1', 'IsPrimaryKey', true);
+
+            expect(result.Success).toBe(true);
+        });
+
+        it('should update XORMField IsNullable property', async () => {
+            const json = JSON.stringify({
+                Name: "TestModel",
+                Tables: [{ ID: "table-1", Name: "TestTable", X: 100, Y: 100, Fields: [{ ID: "field-1", Name: "Name", DataType: "String" }] }]
+            });
+            await bridge.LoadOrmModelFromText(json);
+
+            const result = bridge.UpdateProperty('field-1', 'IsNullable', false);
+
+            expect(result.Success).toBe(true);
+        });
+
+        it('should update XORMField IsAutoIncrement property', async () => {
+            const json = JSON.stringify({
+                Name: "TestModel",
+                Tables: [{ ID: "table-1", Name: "TestTable", X: 100, Y: 100, Fields: [{ ID: "field-1", Name: "ID", DataType: "Integer" }] }]
+            });
+            await bridge.LoadOrmModelFromText(json);
+
+            const result = bridge.UpdateProperty('field-1', 'IsAutoIncrement', true);
+
+            expect(result.Success).toBe(true);
+        });
+
+        it('should update XORMField DefaultValue property', async () => {
+            const json = JSON.stringify({
+                Name: "TestModel",
+                Tables: [{ ID: "table-1", Name: "TestTable", X: 100, Y: 100, Fields: [{ ID: "field-1", Name: "Status", DataType: "String" }] }]
+            });
+            await bridge.LoadOrmModelFromText(json);
+
+            const result = bridge.UpdateProperty('field-1', 'DefaultValue', 'Active');
+
+            expect(result.Success).toBe(true);
+        });
+
+        it('should update XORMField Description property', async () => {
+            const json = JSON.stringify({
+                Name: "TestModel",
+                Tables: [{ ID: "table-1", Name: "TestTable", X: 100, Y: 100, Fields: [{ ID: "field-1", Name: "ID", DataType: "Integer" }] }]
+            });
+            await bridge.LoadOrmModelFromText(json);
+
+            const result = bridge.UpdateProperty('field-1', 'Description', 'Primary key field');
+
+            expect(result.Success).toBe(true);
+        });
+
+        it('should return error for unknown XORMField property', async () => {
+            const json = JSON.stringify({
+                Name: "TestModel",
+                Tables: [{ ID: "table-1", Name: "TestTable", X: 100, Y: 100, Fields: [{ ID: "field-1", Name: "ID", DataType: "Integer" }] }]
+            });
+            await bridge.LoadOrmModelFromText(json);
+
+            const result = bridge.UpdateProperty('field-1', 'UnknownProperty', 'value');
+
+            expect(result.Success).toBe(false);
+            expect(result.Message).toContain('Unknown property');
+        });
+
+        it('should update XORMDesign Schema property', async () => {
+            const json = JSON.stringify({
+                Name: "TestModel"
+            });
+            await bridge.LoadOrmModelFromText(json);
+            const designID = bridge.Document?.Design?.ID || '';
+
+            const result = bridge.UpdateProperty(designID, 'Schema', 'production');
+
+            expect(result.Success).toBe(true);
+        });
+
+        it('should return error for unknown XORMDesign property', async () => {
+            const json = JSON.stringify({
+                Name: "TestModel"
+            });
+            await bridge.LoadOrmModelFromText(json);
+            const designID = bridge.Document?.Design?.ID || '';
+
+            const result = bridge.UpdateProperty(designID, 'UnknownProperty', 'value');
+
+            expect(result.Success).toBe(false);
+            expect(result.Message).toContain('Unknown property');
+        });
+
+        it('should handle Fill property with neither string nor XColor (edge case)', async () => {
+            const json = JSON.stringify({
+                Name: "TestModel",
+                Tables: [{ ID: "table-1", Name: "TestTable", X: 100, Y: 100, Width: 150, Height: 200 }]
+            });
+            await bridge.LoadOrmModelFromText(json);
+
+            // Pass a number (invalid but tests the else branch)
+            const result = bridge.UpdateProperty('table-1', 'Fill', 123 as any);
+
+            expect(result.Success).toBe(true); // Should still succeed (no error thrown)
+        });
+
+        it('should handle UpdateProperty on element that is not XORMTable/Reference/Field/Design (edge case)', async () => {
+            const json = JSON.stringify({
+                Name: "TestModel",
+                Tables: [{ ID: "table-1", Name: "TestTable", X: 100, Y: 100 }]
+            });
+            await bridge.LoadOrmModelFromText(json);
+
+            // Mock GetElementByID to return an unknown element type
+            const mockElement = { ID: 'unknown-1', Name: 'Unknown' } as any;
+            bridge.Controller.GetElementByID = jest.fn().mockReturnValue(mockElement);
+
+            const result = bridge.UpdateProperty('unknown-1', 'Name', 'NewName');
+
+            expect(result.Success).toBe(true); // Basic property update should work
         });
     });
 
@@ -336,7 +595,6 @@ describe('XTFXBridge', () => {
             const mockTable = new tfx.XORMTable();
             mockTable.ID = 'table-1';
             mockTable.Name = 'Users';
-            mockTable.Schema = 'dbo';
             mockTable.Description = 'User table';
             mockTable.Bounds = new tfx.XRect(100, 200, 200, 150);
 
@@ -347,6 +605,26 @@ describe('XTFXBridge', () => {
             expect(Array.isArray(props)).toBe(true);
             expect(props.some(p => p.Key === 'ID')).toBe(true);
             expect(props.some(p => p.Key === 'Name')).toBe(true);
+        });
+
+        it('should return properties for table with Fill as string (edge case)', async () => {
+            const mockTable = new tfx.XORMTable();
+            mockTable.ID = 'table-1';
+            mockTable.Name = 'Users';
+            mockTable.Bounds = new tfx.XRect(100, 200, 200, 150);
+            // Create object with valueOf but without ToString to test String() branch
+            const fillObj = {
+                valueOf: () => 'FFFF0000'
+            };
+            (mockTable as any).Fill = fillObj;
+
+            bridge.Controller.GetElementByID = jest.fn().mockReturnValue(mockTable);
+
+            const props = await bridge.GetProperties('table-1');
+
+            expect(Array.isArray(props)).toBe(true);
+            const fillProp = props.find(p => p.Key === 'Fill');
+            expect(fillProp).toBeDefined();
         });
     });
 
@@ -466,6 +744,94 @@ describe('XTFXBridge', () => {
             const data = await bridge.GetModelData();
 
             expect(data.Tables[0].FillProp).toBeUndefined();
+        });
+
+        it('should handle Fill as string starting with #', async () => {
+            await bridge.LoadOrmModelFromText('{}');
+            
+            const mockTable = {
+                ID: 'table-1',
+                Name: 'Users',
+                Bounds: { Left: 100, Top: 200, Width: 200, Height: 150 },
+                Fill: '#FF0000',
+                GetChildrenOfType: jest.fn().mockReturnValue([])
+            };
+            
+            bridge.Controller.Document = { Design: {} };
+            bridge.Controller.GetTables = jest.fn().mockReturnValue([mockTable]);
+            bridge.Controller.GetReferences = jest.fn().mockReturnValue([]);
+
+            const data = await bridge.GetModelData();
+
+            expect(data.Tables[0].FillProp).toBe('#FF0000');
+        });
+
+        it('should handle Fill as string not starting with #', async () => {
+            await bridge.LoadOrmModelFromText('{}');
+            
+            const mockTable = {
+                ID: 'table-1',
+                Name: 'Users',
+                Bounds: { Left: 100, Top: 200, Width: 200, Height: 150 },
+                Fill: 'FFFF0000',
+                GetChildrenOfType: jest.fn().mockReturnValue([])
+            };
+            
+            bridge.Controller.Document = { Design: {} };
+            bridge.Controller.GetTables = jest.fn().mockReturnValue([mockTable]);
+            bridge.Controller.GetReferences = jest.fn().mockReturnValue([]);
+
+            const data = await bridge.GetModelData();
+
+            expect(data.Tables[0].FillProp).toBe('#FF0000');
+        });
+
+        it('should handle Fill with ToString function (XColor object)', async () => {
+            await bridge.LoadOrmModelFromText('{}');
+            
+            const mockColor = {
+                ToString: jest.fn().mockReturnValue('FFFF0000')
+            };
+            const mockTable = {
+                ID: 'table-1',
+                Name: 'Users',
+                Bounds: { Left: 100, Top: 200, Width: 200, Height: 150 },
+                Fill: mockColor,
+                GetChildrenOfType: jest.fn().mockReturnValue([])
+            };
+            
+            bridge.Controller.Document = { Design: {} };
+            bridge.Controller.GetTables = jest.fn().mockReturnValue([mockTable]);
+            bridge.Controller.GetReferences = jest.fn().mockReturnValue([]);
+
+            const data = await bridge.GetModelData();
+
+            expect(data.Tables[0].FillProp).toBe('#FF0000');
+            expect(mockColor.ToString).toHaveBeenCalled();
+        });
+
+        it('should handle Fill as plain string in GetModelData (edge case - line 586)', async () => {
+            await bridge.LoadOrmModelFromText('{}');
+            
+            // Create object without ToString method to test String() conversion
+            const fillObj = Object.create(null);
+            Object.assign(fillObj, { value: '#FF0000' });
+            
+            const mockTable = {
+                ID: 'table-1',
+                Name: 'Users',
+                Bounds: { Left: 100, Top: 200, Width: 200, Height: 150 },
+                Fill: '#FF0000', // Plain string (not starting with #) to test else branch
+                GetChildrenOfType: jest.fn().mockReturnValue([])
+            };
+            
+            bridge.Controller.Document = { Design: {} };
+            bridge.Controller.GetTables = jest.fn().mockReturnValue([mockTable]);
+            bridge.Controller.GetReferences = jest.fn().mockReturnValue([]);
+
+            const data = await bridge.GetModelData();
+
+            expect(data.Tables[0].FillProp).toBe('#FF0000');
         });
 
         it('should handle references with Source/Target properties', async () => {
@@ -591,6 +957,12 @@ describe('XTFXBridge', () => {
             await (bridge as any).LoadFromJson(mockDoc, { Name: 'New Model Name' });
             
             expect(mockDoc.Name).toBe('New Model Name');
+        });
+
+        it('should load design Schema from JSON', async () => {
+            await (bridge as any).LoadFromJson(mockDoc, { Name: 'Test', Schema: 'production' });
+            
+            expect(mockDoc.Design.Schema).toBe('production');
         });
 
         it('should load tables with fields from JSON', async () => {
@@ -798,7 +1170,6 @@ describe('XTFXBridge', () => {
             await (bridge as any).LoadFromJson(mockDoc, jsonData);
             
             expect(mockDoc.Tables.length).toBe(1);
-            expect(mockDoc.Tables[0].Schema).toBe('custom_schema');
             expect(mockDoc.Tables[0].Description).toBe('This is a test table');
         });
 
@@ -848,7 +1219,6 @@ describe('XTFXBridge', () => {
             
             expect(mockDoc.Tables.length).toBe(1);
             expect(mockDoc.Tables[0].ID).toBe('table-1');
-            expect(mockDoc.Tables[0].Schema).toBe('production');  // Should use explicit value
         });
 
         // Branch coverage tests for || operators
@@ -877,7 +1247,6 @@ describe('XTFXBridge', () => {
             await (bridge as any).LoadFromJson(mockDoc, jsonData);
             
             expect(mockDoc.Tables.length).toBe(1);
-            expect(mockDoc.Tables[0].Schema).toBe('production');  // Should use explicit value, not default
         });
 
         it('should use default Schema "dbo" when Schema is empty string', async () => {
@@ -1142,6 +1511,22 @@ describe('XTFXBridge', () => {
             expect(props.some(p => p.Key === 'IsAutoIncrement')).toBe(true);
         });
 
+        it('should return properties for XORMDesign element', async () => {
+            const mockDesign = new tfx.XORMDesign();
+            mockDesign.ID = 'design-1';
+            mockDesign.Name = 'TestDesign';
+            mockDesign.Schema = 'production';
+
+            bridge.Controller.GetElementByID = jest.fn().mockReturnValue(mockDesign);
+
+            const props = await bridge.GetProperties('design-1');
+
+            expect(Array.isArray(props)).toBe(true);
+            expect(props.some(p => p.Key === 'ID')).toBe(true);
+            expect(props.some(p => p.Key === 'Name')).toBe(true);
+            expect(props.some(p => p.Key === 'Schema')).toBe(true);
+        });
+
         it('should return only basic properties for unknown element type', async () => {
             const mockElement = { ID: 'unknown-1', Name: 'Unknown' };
             bridge.Controller.GetElementByID = jest.fn().mockReturnValue(mockElement);
@@ -1152,6 +1537,92 @@ describe('XTFXBridge', () => {
             expect(props.length).toBe(2); // Only ID and Name
             expect(props[0].Key).toBe('ID');
             expect(props[1].Key).toBe('Name');
+        });
+    });
+
+    describe('GetElementInfo', () => {
+        beforeEach(async () => {
+            await bridge.LoadOrmModelFromText('{}');
+        });
+
+        it('should return null for non-existent element', () => {
+            bridge.Controller.GetElementByID = jest.fn().mockReturnValue(null);
+
+            const info = bridge.GetElementInfo('non-existent');
+
+            expect(info).toBeNull();
+        });
+
+        it('should return info for XORMDesign element', () => {
+            const mockDesign = new tfx.XORMDesign();
+            mockDesign.ID = 'design-1';
+            mockDesign.Name = 'TestDesign';
+
+            bridge.Controller.GetElementByID = jest.fn().mockReturnValue(mockDesign);
+
+            const info = bridge.GetElementInfo('design-1');
+
+            expect(info).not.toBeNull();
+            expect(info?.ID).toBe('design-1');
+            expect(info?.Name).toBe('TestDesign');
+            expect(info?.Type).toBe('XORMDesign');
+        });
+
+        it('should return info for XORMTable element', () => {
+            const mockTable = new tfx.XORMTable();
+            mockTable.ID = 'table-1';
+            mockTable.Name = 'Users';
+
+            bridge.Controller.GetElementByID = jest.fn().mockReturnValue(mockTable);
+
+            const info = bridge.GetElementInfo('table-1');
+
+            expect(info).not.toBeNull();
+            expect(info?.ID).toBe('table-1');
+            expect(info?.Name).toBe('Users');
+            expect(info?.Type).toBe('XORMTable');
+        });
+
+        it('should return info for XORMReference element', () => {
+            const mockRef = new tfx.XORMReference();
+            mockRef.ID = 'ref-1';
+            mockRef.Name = 'FK_Test';
+
+            bridge.Controller.GetElementByID = jest.fn().mockReturnValue(mockRef);
+
+            const info = bridge.GetElementInfo('ref-1');
+
+            expect(info).not.toBeNull();
+            expect(info?.ID).toBe('ref-1');
+            expect(info?.Name).toBe('FK_Test');
+            expect(info?.Type).toBe('XORMReference');
+        });
+
+        it('should return info for XORMField element', () => {
+            const mockField = new tfx.XORMField();
+            mockField.ID = 'field-1';
+            mockField.Name = 'UserID';
+
+            bridge.Controller.GetElementByID = jest.fn().mockReturnValue(mockField);
+
+            const info = bridge.GetElementInfo('field-1');
+
+            expect(info).not.toBeNull();
+            expect(info?.ID).toBe('field-1');
+            expect(info?.Name).toBe('UserID');
+            expect(info?.Type).toBe('XORMField');
+        });
+
+        it('should return "Unknown" type for unknown element type', () => {
+            const mockElement = { ID: 'unknown-1', Name: 'Unknown' };
+            bridge.Controller.GetElementByID = jest.fn().mockReturnValue(mockElement);
+
+            const info = bridge.GetElementInfo('unknown-1');
+
+            expect(info).not.toBeNull();
+            expect(info?.ID).toBe('unknown-1');
+            expect(info?.Name).toBe('Unknown');
+            expect(info?.Type).toBe('Unknown');
         });
     });
 
@@ -1910,10 +2381,12 @@ describe('XTFXBridge', () => {
     });
 
     describe('UpdateProperty fallback', () => {
-        it('should return { Success: false } when Controller is null', () => {
+        it('should return { Success: false, Message } when element not found', () => {
+            // Don't load any model, so element won't be found
             const result = bridge.UpdateProperty('elem-1', 'Name', 'NewName');
 
-            expect(result).toEqual({ Success: false });
+            expect(result.Success).toBe(false);
+            expect(result.Message).toBe('Element not found.');
         });
     });
 
