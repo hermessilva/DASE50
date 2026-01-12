@@ -1,16 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
-<XORMDocument ID="695d2535-bbd5-4fd9-ad62-ce1eabfc5761" Name="ORM Model">
+<XORMDocument ID="7607e50d-e931-4714-beba-a69dc25c7661" Name="ORM Model">
   <XValues>
-    <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">695d2535-bbd5-4fd9-ad62-ce1eabfc5761</XData>
+    <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">7607e50d-e931-4714-beba-a69dc25c7661</XData>
     <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">ORM Model</XData>
   </XValues>
   <XORMDesign>
-    <XORMTable ID="e8adeeb3-bd7b-4f01-a6aa-aa511375856a" Name="NewTable">
+    <XORMTable ID="a5452362-60ab-4727-ace1-7e51a63a2c4b" Name="NewTable">
       <XValues>
-        <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">e8adeeb3-bd7b-4f01-a6aa-aa511375856a</XData>
+        <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">a5452362-60ab-4727-ace1-7e51a63a2c4b</XData>
         <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">NewTable</XData>
         <XData Name="Bounds" ID="00000001-0001-0001-0003-000000000001" Type="Rect">{X=undefined;Y=undefined;Width=200;Height=150}</XData>
       </XValues>
     </XORMTable>
+    <XORMTable ID="efe7d0a2-3bd6-47d9-bdfa-164b6058e419" Name="NewTable">
+      <XValues>
+        <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">efe7d0a2-3bd6-47d9-bdfa-164b6058e419</XData>
+        <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">NewTable</XData>
+        <XData Name="Bounds" ID="00000001-0001-0001-0003-000000000001" Type="Rect">{X=undefined;Y=undefined;Width=200;Height=150}</XData>
+      </XValues>
+      <XORMField ID="6eacf2d4-31da-4ee8-901f-a45fcb4891ae" Name="NewTableID">
+        <XValues>
+          <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">6eacf2d4-31da-4ee8-901f-a45fcb4891ae</XData>
+          <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">NewTableID</XData>
+        </XValues>
+      </XORMField>
+    </XORMTable>
+    <XORMReference ID="7cc71609-7e7a-45f6-a85b-60ef20c33831" Name="FK_NewTable">
+      <XValues>
+        <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">7cc71609-7e7a-45f6-a85b-60ef20c33831</XData>
+        <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">FK_NewTable</XData>
+        <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="Point[]">{X=957;Y=195}|{X=352;Y=195}</XData>
+      </XValues>
+    </XORMReference>
   </XORMDesign>
 </XORMDocument>

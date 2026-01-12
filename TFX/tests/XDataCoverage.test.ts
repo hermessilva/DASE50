@@ -251,7 +251,7 @@ describe("XTypeConverter Coverage", () => {
         expect(XTypeConverter.FromString("not-a-number", "Decimal")).toBe(0);
         expect(XTypeConverter.FromString("not-a-date", "DateTime").getTime()).toBe(0);
         expect(XTypeConverter.FromString("bad-size", "Size")).toEqual({ Width: 0, Height: 0 });
-        expect(XTypeConverter.FromString("bad-rect", "Rect")).toEqual({ X: 0, Y: 0, Width: 0, Height: 0 });
+        expect(XTypeConverter.FromString("bad-rect", "Rect")).toEqual({ X: 0, Y: 0, Left: 0, Top: 0, Width: 0, Height: 0 });
         expect(XTypeConverter.FromString("bad-point", "Point")).toEqual({ X: 0, Y: 0 });
         expect(XTypeConverter.FromString("bad-color", "Color")).toEqual({ A: 255, R: 0, G: 0, B: 0 });
         expect(XTypeConverter.FromString("bad-thickness", "Thickness")).toEqual({ Left: 0, Top: 0, Right: 0, Bottom: 0 });

@@ -217,33 +217,43 @@ export class XTypeConverter
 
         XTypeConverter.Register<XIRect>({
             TypeName: "Rect",
-            ToString: (pValue: XIRect): string =>
+            ToString: (pValue: XIRect | { Left?: number; Top?: number; Width?: number; Height?: number }): string =>
             {
                 if (!pValue)
                     return "{X=0;Y=0;Width=0;Height=0}";
-                return `{X=${pValue.X};Y=${pValue.Y};Width=${pValue.Width};Height=${pValue.Height}}`;
+                const x = ("X" in pValue ? pValue.X : (pValue as { Left?: number }).Left) ?? 0;
+                const y = ("Y" in pValue ? pValue.Y : (pValue as { Top?: number }).Top) ?? 0;
+                const w = pValue.Width ?? 0;
+                const h = pValue.Height ?? 0;
+                return `{X=${x};Y=${y};Width=${w};Height=${h}}`;
             },
-            FromString: (pValue: string): XIRect =>
+            FromString: (pValue: string): XIRect & { Left: number; Top: number } =>
             {
                 const match = pValue?.match(/X=([^;]+);Y=([^;]+);Width=([^;]+);Height=([^}]+)/);
-                if (!match)
-                    return { X: 0, Y: 0, Width: 0, Height: 0 };
+                const x = match ? (parseFloat(match[1]) || 0) : 0;
+                const y = match ? (parseFloat(match[2]) || 0) : 0;
+                const w = match ? (parseFloat(match[3]) || 0) : 0;
+                const h = match ? (parseFloat(match[4]) || 0) : 0;
                 
                 return {
-                    X: parseFloat(match[1]) || 0,
-                    Y: parseFloat(match[2]) || 0,
-                    Width: parseFloat(match[3]) || 0,
-                    Height: parseFloat(match[4]) || 0
+                    X: x,
+                    Y: y,
+                    Left: x,
+                    Top: y,
+                    Width: w,
+                    Height: h
                 };
                 
             },
             
-            IsDefault: (pValue: XIRect, pDefault: XIRect): boolean =>
-                pValue?.X === pDefault?.X &&
-                pValue?.Y === pDefault?.Y &&
-                pValue?.Width === pDefault?.Width &&
-                pValue?.Height === pDefault?.Height
-            
+            IsDefault: (pValue: XIRect | { Left?: number; Top?: number; Width?: number; Height?: number }, pDefault: XIRect | { Left?: number; Top?: number; Width?: number; Height?: number }): boolean =>
+            {
+                const px = ("X" in pValue ? pValue.X : (pValue as { Left?: number }).Left) ?? 0;
+                const py = ("Y" in pValue ? pValue.Y : (pValue as { Top?: number }).Top) ?? 0;
+                const dx = ("X" in pDefault ? pDefault.X : (pDefault as { Left?: number }).Left) ?? 0;
+                const dy = ("Y" in pDefault ? pDefault.Y : (pDefault as { Top?: number }).Top) ?? 0;
+                return px === dx && py === dy && pValue?.Width === pDefault?.Width && pValue?.Height === pDefault?.Height;
+            }
         });
 
         XTypeConverter.Register<XIPoint>({
@@ -438,9 +448,9 @@ export class XTypeConverter
 
         if (typeof pValue === "object")
         {
-            if ("Width" in pValue && "Height" in pValue && !("X" in pValue))
+            if ("Width" in pValue && "Height" in pValue && !("X" in pValue) && !("Left" in pValue))
                 return "Size";
-            if ("X" in pValue && "Y" in pValue && "Width" in pValue)
+            if (("X" in pValue || "Left" in pValue) && ("Y" in pValue || "Top" in pValue) && "Width" in pValue)
                 return "Rect";
             if ("X" in pValue && "Y" in pValue && !("Width" in pValue))
                 return "Point";
