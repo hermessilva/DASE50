@@ -152,6 +152,68 @@ describe('XORMDesignerEditorProvider', () => {
             // Verify state is null after dispose
             expect(provider.GetActiveState()).toBeNull();
         });
+
+        it('should clear _LastActiveKey on panel dispose when it was the last active', async () => {
+            const uri = Uri.file('/test/model.dsorm');
+            const mockDoc = { uri, dispose: jest.fn() };
+            const mockPanel = createMockWebviewPanel();
+            mockPanel.active = true;
+            const token = {} as vscode.CancellationToken;
+
+            (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from('{}'));
+            await provider.resolveCustomEditor(mockDoc as any, mockPanel as any, token);
+            
+            // Get active state to set _LastActiveKey
+            const state1 = provider.GetActiveState();
+            expect(state1).toBeDefined();
+            
+            // Make panel inactive
+            mockPanel.active = false;
+            
+            // Should still get state from fallback
+            const state2 = provider.GetActiveState();
+            expect(state2).toBeDefined();
+            
+            // Trigger dispose callback
+            if (mockPanel._disposeListeners) {
+                mockPanel._disposeListeners.forEach((cb: () => void) => cb());
+            }
+
+            // After dispose, _LastActiveKey should be cleared
+            expect(provider.GetActiveState()).toBeNull();
+        });
+
+        it('should update _LastActiveKey when panel becomes active via onDidChangeViewState', async () => {
+            const uri1 = Uri.file('/test/model1.dsorm');
+            const uri2 = Uri.file('/test/model2.dsorm');
+            const mockDoc1 = { uri: uri1, dispose: jest.fn() };
+            const mockDoc2 = { uri: uri2, dispose: jest.fn() };
+            const mockPanel1 = createMockWebviewPanel();
+            const mockPanel2 = createMockWebviewPanel();
+            const token = {} as vscode.CancellationToken;
+
+            (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from('{}'));
+            
+            // Initially panel1 is active
+            mockPanel1.active = true;
+            mockPanel2.active = false;
+            await provider.resolveCustomEditor(mockDoc1 as any, mockPanel1 as any, token);
+            await provider.resolveCustomEditor(mockDoc2 as any, mockPanel2 as any, token);
+
+            // Verify panel2 was last resolved, so it's the last active key
+            mockPanel1.active = false;
+            const state = provider.GetActiveState();
+            expect(state).toBeDefined();
+
+            // Now simulate panel1 becoming active via onDidChangeViewState
+            mockPanel1.active = true;
+            if (mockPanel1._viewStateListeners) {
+                mockPanel1._viewStateListeners.forEach((cb) => cb({ webviewPanel: mockPanel1 as any }));
+            }
+
+            // GetActiveState should now return state for panel1
+            expect(provider.GetActiveState()).toBeDefined();
+        });
     });
 
     describe('saveCustomDocument', () => {
@@ -383,6 +445,29 @@ describe('XORMDesignerEditorProvider', () => {
 
             expect(state).toBeNull();
         });
+
+        it('should fallback to last active state when no panel is active', async () => {
+            const uri = Uri.file('/test/model.dsorm');
+            const mockDoc = { uri, dispose: jest.fn() };
+            const mockPanel = createMockWebviewPanel();
+            mockPanel.active = true; // Initially active
+            const token = {} as vscode.CancellationToken;
+
+            (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from('{}'));
+            await provider.resolveCustomEditor(mockDoc as any, mockPanel as any, token);
+            
+            // First call sets _LastActiveKey
+            const state1 = provider.GetActiveState();
+            expect(state1).toBeDefined();
+            
+            // Now make panel inactive
+            mockPanel.active = false;
+            
+            // Should fallback to last active
+            const state2 = provider.GetActiveState();
+            expect(state2).toBeDefined();
+            expect(state2).toBe(state1);
+        });
     });
 
     describe('GetActivePanel', () => {
@@ -432,6 +517,29 @@ describe('XORMDesignerEditorProvider', () => {
 
             expect(panel).toBeDefined();
             expect(panel).toBe(mockPanel2);
+        });
+
+        it('should fallback to last active panel when no panel is active', async () => {
+            const uri = Uri.file('/test/model.dsorm');
+            const mockDoc = { uri, dispose: jest.fn() };
+            const mockPanel = createMockWebviewPanel();
+            mockPanel.active = true;
+            const token = {} as vscode.CancellationToken;
+
+            (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from('{}'));
+            await provider.resolveCustomEditor(mockDoc as any, mockPanel as any, token);
+            
+            // First call sets _LastActiveKey
+            const panel1 = provider.GetActivePanel();
+            expect(panel1).toBeDefined();
+            
+            // Make panel inactive
+            mockPanel.active = false;
+            
+            // Should fallback to last active
+            const panel2 = provider.GetActivePanel();
+            expect(panel2).toBeDefined();
+            expect(panel2).toBe(mockPanel);
         });
     });
 

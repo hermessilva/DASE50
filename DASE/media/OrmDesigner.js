@@ -257,11 +257,24 @@
         headerMask.setAttribute("y", headerHeight - 4);
         headerMask.setAttribute("width", width);
         headerMask.setAttribute("height", 4);
+        if (pTable.FillProp)
+            headerMask.style.fill = pTable.FillProp;
         g.appendChild(headerMask);
+
+        // Apply FillProp to header if defined
+        if (pTable.FillProp)
+            header.style.fill = pTable.FillProp;
+
+        const icon = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        icon.setAttribute("class", "orm-table-icon");
+        icon.setAttribute("x", 8);
+        icon.setAttribute("y", 18);
+        icon.textContent = "ID";
+        g.appendChild(icon);
 
         const title = document.createElementNS("http://www.w3.org/2000/svg", "text");
         title.setAttribute("class", "orm-table-title");
-        title.setAttribute("x", 10);
+        title.setAttribute("x", 28);
         title.setAttribute("y", 18);
         title.textContent = pTable.Name || "Unnamed";
         g.appendChild(title);
@@ -645,6 +658,14 @@
         }
     }
 
+    function GetTableColor(pTableID)
+    {
+        const table = _Model.Tables.find(t => t.ID === pTableID);
+        if (table && table.FillProp)
+            return table.FillProp;
+        return "#2d8a4e";
+    }
+
     function CreateRelationElement(pRef)
     {
         // Source is a field ID - find the table that contains this field
@@ -673,6 +694,7 @@
             path.setAttribute("class", "orm-reference-line");
             path.setAttribute("d", pathData);
             path.setAttribute("fill", "none");
+            path.setAttribute("stroke", GetTableColor(pRef.TargetTableID));
             g.appendChild(path);
 
             // Label no ponto médio
@@ -700,6 +722,7 @@
             line.setAttribute("y1", y1);
             line.setAttribute("x2", x2);
             line.setAttribute("y2", y2);
+            line.setAttribute("stroke", GetTableColor(pRef.TargetTableID));
             g.appendChild(line);
 
             const midX = (x1 + x2) / 2;

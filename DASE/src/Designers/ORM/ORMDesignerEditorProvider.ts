@@ -73,6 +73,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
     private _Webviews: Map<string, vscode.WebviewPanel>;
     private _States: Map<string, XORMDesignerState>;
     private _Documents: Map<string, ICustomDocument>;
+    private _LastActiveKey: string | null;
 
     private _OnDidChangeCustomDocument = new vscode.EventEmitter<vscode.CustomDocumentContentChangeEvent<ICustomDocument>>();
     public readonly onDidChangeCustomDocument = this._OnDidChangeCustomDocument.event;
@@ -83,6 +84,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         this._Webviews = new Map<string, vscode.WebviewPanel>();
         this._States = new Map<string, XORMDesignerState>();
         this._Documents = new Map<string, ICustomDocument>();
+        this._LastActiveKey = null;
     }
 
     static get ViewType(): string
@@ -118,10 +120,20 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
 
     async resolveCustomEditor(pDocument: ICustomDocument, pWebviewPanel: vscode.WebviewPanel, _pToken: vscode.CancellationToken): Promise<void>
     {
+        const key = pDocument.uri.toString();
         const state = new XORMDesignerState(pDocument as unknown as vscode.TextDocument);
-        this._States.set(pDocument.uri.toString(), state);
-        this._Webviews.set(pDocument.uri.toString(), pWebviewPanel);
-        this._Documents.set(pDocument.uri.toString(), pDocument);
+        this._States.set(key, state);
+        this._Webviews.set(key, pWebviewPanel);
+        this._Documents.set(key, pDocument);
+
+        // Set as last active immediately so Properties panel can find it
+        this._LastActiveKey = key;
+
+        // Track view state changes to update last active key
+        pWebviewPanel.onDidChangeViewState((e) => {
+            if (e.webviewPanel.active)
+                this._LastActiveKey = key;
+        });
 
         // Listen to state changes to notify VS Code about dirty state
         state.OnStateChanged((e) => {
@@ -144,10 +156,13 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         this.SetupMessageHandling(pWebviewPanel, state);
 
         pWebviewPanel.onDidDispose(() => {
-            this._Webviews.delete(pDocument.uri.toString());
-            this._States.delete(pDocument.uri.toString());
-            this._Documents.delete(pDocument.uri.toString());
+            this._Webviews.delete(key);
+            this._States.delete(key);
+            this._Documents.delete(key);
             state.Dispose();
+            
+            if (this._LastActiveKey === key)
+                this._LastActiveKey = null;
         });
 
         try
@@ -250,9 +265,8 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         const type = pMsg.Type;
         const payload = pMsg.Payload || {};
 
-        // Log all messages except frequent ones
-        if (type !== XDesignerMessageType.SelectElement && type !== XDesignerMessageType.MoveElement)
-            GetLogService().Debug(`Message received: ${type}, Payload: ${JSON.stringify(payload)}`);
+        // Log all messages for debugging
+        GetLogService().Debug(`Message received: ${type}, Payload: ${JSON.stringify(payload)}`);
 
         switch (type)
         {
@@ -351,6 +365,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
     OnSelectElement(pPayload: ISelectPayload): void
     {
         const selectionService = GetSelectionService();
+        GetLogService().Info(`[OnSelectElement] Payload: Clear=${pPayload.Clear}, Toggle=${pPayload.Toggle}, Add=${pPayload.Add}, ElementID=${pPayload.ElementID}`);
         
         if (pPayload.Clear)
             selectionService.Clear();
@@ -359,7 +374,10 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         else if (pPayload.Add && pPayload.ElementID)
             selectionService.AddToSelection(pPayload.ElementID);
         else if (pPayload.ElementID)
+        {
+            GetLogService().Info(`[OnSelectElement] Calling selectionService.Select(${pPayload.ElementID})`);
             selectionService.Select(pPayload.ElementID);
+        }
     }
 
     async OnAddTable(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: IAddTablePayload): Promise<void>
@@ -641,21 +659,47 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
 
     GetActiveState(): XORMDesignerState | null
     {
+        GetLogService().Debug(`[GetActiveState] _Webviews.size=${this._Webviews.size}, _States.size=${this._States.size}, _LastActiveKey=${this._LastActiveKey}`);
+        
         for (const [key, panel] of this._Webviews)
         {
+            GetLogService().Debug(`[GetActiveState] Checking panel key=${key}, active=${panel.active}`);
             if (panel.active)
-                return this._States.get(key) || null;
+            {
+                this._LastActiveKey = key;
+                const state = this._States.get(key);
+                GetLogService().Debug(`[GetActiveState] Found active panel, state=${state ? 'exists' : 'null'}`);
+                return state || null;
+            }
         }
+        
+        // Fallback to last active state
+        if (this._LastActiveKey)
+        {
+            const state = this._States.get(this._LastActiveKey);
+            GetLogService().Debug(`[GetActiveState] Using fallback _LastActiveKey=${this._LastActiveKey}, state=${state ? 'exists' : 'null'}`);
+            return state || null;
+        }
+            
+        GetLogService().Debug(`[GetActiveState] No active state found`);
         return null;
     }
 
     GetActivePanel(): vscode.WebviewPanel | null
     {
-        for (const [, panel] of this._Webviews)
+        for (const [key, panel] of this._Webviews)
         {
             if (panel.active)
+            {
+                this._LastActiveKey = key;
                 return panel;
+            }
         }
+        
+        // Fallback to last active panel
+        if (this._LastActiveKey)
+            return this._Webviews.get(this._LastActiveKey) || null;
+            
         return null;
     }
 

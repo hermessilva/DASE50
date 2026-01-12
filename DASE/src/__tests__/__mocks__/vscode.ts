@@ -22,6 +22,61 @@ export class EventEmitter<T> {
     }
 }
 
+export enum TreeItemCollapsibleState {
+    None = 0,
+    Collapsed = 1,
+    Expanded = 2
+}
+
+export class TreeItem {
+    public label?: string | { label: string };
+    public id?: string;
+    public iconPath?: unknown;
+    public description?: string;
+    public tooltip?: string | unknown;
+    public command?: { command: string; title: string; arguments?: unknown[] };
+    public contextValue?: string;
+    public collapsibleState?: TreeItemCollapsibleState;
+
+    constructor(label: string | { label: string }, collapsibleState?: TreeItemCollapsibleState) {
+        this.label = label;
+        this.collapsibleState = collapsibleState ?? TreeItemCollapsibleState.None;
+    }
+}
+
+export class ThemeIcon {
+    public id: string;
+
+    constructor(id: string) {
+        this.id = id;
+    }
+}
+
+export class MarkdownString {
+    public value: string;
+    public isTrusted?: boolean;
+    public supportThemeIcons?: boolean;
+
+    constructor(value?: string) {
+        this.value = value ?? "";
+    }
+
+    appendText(value: string): MarkdownString {
+        this.value += value;
+        return this;
+    }
+
+    appendMarkdown(value: string): MarkdownString {
+        this.value += value;
+        return this;
+    }
+
+    appendCodeblock(value: string, language?: string): MarkdownString {
+        this.value += `\`\`\`${language ?? ""}\n${value}\n\`\`\``;
+        return this;
+    }
+}
+
 export class Uri {
     readonly scheme: string;
     readonly authority: string;
@@ -133,9 +188,10 @@ export interface WebviewPanel {
     dispose(): void;
 }
 
-export function createMockWebviewPanel(): WebviewPanel & { _disposeListeners: (() => void)[] } {
+export function createMockWebviewPanel(): WebviewPanel & { _disposeListeners: (() => void)[]; _viewStateListeners: ((e: { webviewPanel: WebviewPanel }) => void)[] } {
     const disposables: (() => void)[] = [];
     const messageListeners: ((msg: unknown) => void)[] = [];
+    const viewStateListeners: ((e: { webviewPanel: WebviewPanel }) => void)[] = [];
     
     const onDidReceiveMessageMock = jest.fn((listener) => {
         messageListeners.push(listener);
@@ -146,24 +202,30 @@ export function createMockWebviewPanel(): WebviewPanel & { _disposeListeners: ((
         disposables.push(listener);
         return { dispose: () => { } };
     });
-    
-    return {
+
+    const panel = {
         webview: {
             html: '',
             options: {},
             onDidReceiveMessage: onDidReceiveMessageMock,
             postMessage: jest.fn(() => Promise.resolve(true)),
-            asWebviewUri: (uri) => uri,
+            asWebviewUri: (uri: Uri) => uri,
             cspSource: 'mock-csp-source'
         },
         active: true,
         visible: true,
         onDidDispose: onDidDisposeMock,
         _disposeListeners: disposables,
-        onDidChangeViewState: () => ({ dispose: () => { } }),
+        _viewStateListeners: viewStateListeners,
+        onDidChangeViewState: jest.fn((listener: (e: { webviewPanel: WebviewPanel }) => void) => {
+            viewStateListeners.push(listener);
+            return { dispose: () => { } };
+        }),
         reveal: jest.fn(),
         dispose: () => disposables.forEach(d => d())
     };
+    
+    return panel as WebviewPanel & { _disposeListeners: (() => void)[]; _viewStateListeners: ((e: { webviewPanel: WebviewPanel }) => void)[] };
 }
 
 export interface TextDocument {

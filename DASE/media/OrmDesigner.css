@@ -90,8 +90,9 @@ body {
 
 .orm-table-rect {
     fill: var(--vscode-editor-background);
-    stroke: var(--vscode-panel-border);
+    stroke: #2d8a4e;
     stroke-width: 2;
+    filter: drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.3));
 }
 
 .orm-table.selected .orm-table-rect {
@@ -100,13 +101,18 @@ body {
 }
 
 .orm-table-header {
-    fill: var(--vscode-sideBarSectionHeader-background);
+    fill: #2d8a4e;
 }
 
 .orm-table-title {
-    fill: var(--vscode-foreground);
-    font-size: 12px;
+    fill: white;
+    font-size: 13px;
     font-weight: 600;
+}
+
+.orm-table-icon {
+    fill: white;
+    font-size: 12px;
 }
 
 .orm-table-field {

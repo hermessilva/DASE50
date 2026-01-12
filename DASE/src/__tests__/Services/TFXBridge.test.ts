@@ -287,6 +287,36 @@ describe('XTFXBridge', () => {
                 Value: 'UpdatedName'
             });
         });
+
+        it('should convert Fill property string to XColor', () => {
+            const mockUpdateProperty = jest.fn().mockReturnValue({ Success: true });
+            bridge.Controller.UpdateProperty = mockUpdateProperty;
+
+            bridge.UpdateProperty('elem-1', 'Fill', 'FF00FF00');
+
+            expect(mockUpdateProperty).toHaveBeenCalled();
+            const callArg = mockUpdateProperty.mock.calls[0][0];
+            expect(callArg.ElementID).toBe('elem-1');
+            expect(callArg.PropertyKey).toBe('Fill');
+            // Value should be XColor object, not string
+            expect(typeof callArg.Value).toBe('object');
+            expect(callArg.Value.R).toBe(0);
+            expect(callArg.Value.G).toBe(255);
+            expect(callArg.Value.B).toBe(0);
+        });
+
+        it('should not convert non-Fill properties', () => {
+            const mockUpdateProperty = jest.fn().mockReturnValue({ Success: true });
+            bridge.Controller.UpdateProperty = mockUpdateProperty;
+
+            bridge.UpdateProperty('elem-1', 'Name', 'FF00FF00');
+
+            expect(mockUpdateProperty).toHaveBeenCalledWith({
+                ElementID: 'elem-1',
+                PropertyKey: 'Name',
+                Value: 'FF00FF00'
+            });
+        });
     });
 
     describe('GetProperties', () => {
@@ -396,6 +426,46 @@ describe('XTFXBridge', () => {
             expect(data.Tables[0].Fields.length).toBe(1);
             expect(data.References.length).toBe(1);
             expect(data.References[0].Points.length).toBe(2);
+        });
+
+        it('should include FillProp when table has Fill color', async () => {
+            await bridge.LoadOrmModelFromText('{}');
+            
+            const mockTable = {
+                ID: 'table-1',
+                Name: 'Users',
+                Bounds: { Left: 100, Top: 200, Width: 200, Height: 150 },
+                Fill: { ToString: () => 'FF00FF00' },  // Green color
+                GetChildrenOfType: jest.fn().mockReturnValue([])
+            };
+            
+            bridge.Controller.Document = { Design: {} };
+            bridge.Controller.GetTables = jest.fn().mockReturnValue([mockTable]);
+            bridge.Controller.GetReferences = jest.fn().mockReturnValue([]);
+
+            const data = await bridge.GetModelData();
+
+            expect(data.Tables[0].FillProp).toBe('#00FF00');
+        });
+
+        it('should not include FillProp when table has no Fill', async () => {
+            await bridge.LoadOrmModelFromText('{}');
+            
+            const mockTable = {
+                ID: 'table-1',
+                Name: 'Users',
+                Bounds: { Left: 100, Top: 200, Width: 200, Height: 150 },
+                Fill: null,
+                GetChildrenOfType: jest.fn().mockReturnValue([])
+            };
+            
+            bridge.Controller.Document = { Design: {} };
+            bridge.Controller.GetTables = jest.fn().mockReturnValue([mockTable]);
+            bridge.Controller.GetReferences = jest.fn().mockReturnValue([]);
+
+            const data = await bridge.GetModelData();
+
+            expect(data.Tables[0].FillProp).toBeUndefined();
         });
 
         it('should handle references with Source/Target properties', async () => {

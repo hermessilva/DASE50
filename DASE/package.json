@@ -91,13 +91,13 @@
             "dasePanel": [
                 {
                     "type": "webview",
-                    "id": "Dase.Issues",
-                    "name": "DASE Issues"
+                    "id": "Dase.Properties",
+                    "name": "DASE Properties"
                 },
                 {
                     "type": "webview",
-                    "id": "Dase.Properties",
-                    "name": "DASE Properties"
+                    "id": "Dase.Issues",
+                    "name": "DASE Issues"
                 }
             ]
         },

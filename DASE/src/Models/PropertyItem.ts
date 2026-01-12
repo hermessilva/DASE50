@@ -18,8 +18,9 @@ export class XPropertyItem
     Options: string[] | null;
     IsReadOnly: boolean;
     Category: string;
+    Group?: string;
 
-    constructor(pKey: string, pName: string, pValue: unknown, pType?: TPropertyType, pOptions?: string[])
+    constructor(pKey: string, pName: string, pValue: unknown, pType?: TPropertyType, pOptions?: string[], pGroup?: string)
     {
         this.Key = pKey;
         this.Name = pName;
@@ -28,5 +29,6 @@ export class XPropertyItem
         this.Options = pOptions || null;
         this.IsReadOnly = false;
         this.Category = "General";
+        this.Group = pGroup;
     }
 }

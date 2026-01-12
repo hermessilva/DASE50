@@ -24,7 +24,8 @@ import {
     XRect,
     XGuid,
     XSerializationEngine,
-    RegisterORMElements
+    RegisterORMElements,
+    XColor
 } from "@tootega/tfx";
 
 // Data interfaces for webview communication (JSON-serializable)
@@ -53,6 +54,7 @@ interface ITableData
     Height: number;
     Schema?: string;
     Description?: string;
+    FillProp?: string;
     Fields: IFieldData[];
 }
 
@@ -406,10 +408,16 @@ export class XTFXBridge
 
     UpdateProperty(pElementID: string, pPropertyKey: string, pValue: unknown): XIOperationResult
     {
+        let convertedValue = pValue;
+        
+        // Convert color string to XColor object
+        if (pPropertyKey === "Fill" && typeof pValue === "string")
+            convertedValue = XColor.Parse(pValue);
+        
         const updateData: XIUpdatePropertyData = {
             ElementID: pElementID,
             PropertyKey: pPropertyKey,
-            Value: pValue
+            Value: convertedValue
         };
         return this._Controller?.UpdateProperty(updateData) || { Success: false };
     }
@@ -431,6 +439,10 @@ export class XTFXBridge
         {
             props.push(new XPropertyItem("Schema", "Schema", element.Schema, XPropertyType.String));
             props.push(new XPropertyItem("Description", "Description", element.Description, XPropertyType.String));
+            
+            const fillColor = element.Fill;
+            if (fillColor)
+                props.push(new XPropertyItem("Fill", "Fill", fillColor.ToString(), XPropertyType.Color));
 
             const bounds = element.Bounds;
             props.push(new XPropertyItem("X", "X", bounds.Left, XPropertyType.Number));
@@ -458,6 +470,29 @@ export class XTFXBridge
         return props;
     }
 
+    GetElementInfo(pElementID: string): { ID: string; Name: string; Type: string } | null
+    {
+        this.Initialize();
+
+        const element = this._Controller?.GetElementByID(pElementID);
+        if (!element)
+            return null;
+
+        let typeName = "Unknown";
+        if (element instanceof XORMTable)
+            typeName = "XORMTable";
+        else if (element instanceof XORMReference)
+            typeName = "XORMReference";
+        else if (element instanceof XORMField)
+            typeName = "XORMField";
+
+        return {
+            ID: element.ID,
+            Name: element.Name,
+            Type: typeName
+        };
+    }
+
     GetModelData(): IModelData
     {
         this.Initialize();
@@ -475,6 +510,9 @@ export class XTFXBridge
             // Get fields using GetChildrenOfType or directly from Fields array
             const fields = t.GetChildrenOfType?.(XORMField) ?? t.Fields ?? [];
             
+            // Get fill color as HTML hex string
+            const fillColor = t.Fill ? `#${t.Fill.ToString().substring(2)}` : undefined;
+            
             return {
                 ID: t.ID,
                 Name: t.Name,
@@ -482,6 +520,7 @@ export class XTFXBridge
                 Y: t.Bounds.Top,
                 Width: t.Bounds.Width,
                 Height: t.Bounds.Height,
+                FillProp: fillColor,
                 Fields: fields.map((f: any) => ({
                     ID: f.ID,
                     Name: f.Name,

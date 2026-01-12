@@ -247,6 +247,11 @@ export class XORMDesignerState
         return this._Bridge.GetProperties(pElementID);
     }
 
+    GetElementInfo(pElementID: string): { ID: string; Name: string; Type: string } | null
+    {
+        return this._Bridge.GetElementInfo(pElementID);
+    }
+
     Dispose(): void
     {
         this._OnStateChanged.dispose();

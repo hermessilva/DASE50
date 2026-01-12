@@ -116,10 +116,16 @@ export class XIssuesViewProvider implements vscode.WebviewViewProvider
         }
         .issue-message {
             margin-bottom: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .issue-element {
             font-size: 0.9em;
             opacity: 0.7;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .no-issues {
             padding: 16px;
