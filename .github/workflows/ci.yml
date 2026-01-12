@@ -9,16 +9,25 @@ on:
       - master
 
 jobs:
-  # ====================
-  # TFX Build and Test
-  # ====================
-  tfx:
-    name: TFX - Build and Test
+  build_test:
+    name: Build and Test (TFX + DASE)
     runs-on: ubuntu-latest
 
     outputs:
-      tests: ${{ steps.test-results.outputs.tests }}
-      coverage: ${{ steps.test-results.outputs.coverage }}
+      tfxTests: ${{ steps.tfx-metrics.outputs.tests }}
+      tfxCoverage: ${{ steps.tfx-metrics.outputs.coverage }}
+      tfxLinesCovered: ${{ steps.tfx-metrics.outputs.linesCovered }}
+      tfxLinesTotal: ${{ steps.tfx-metrics.outputs.linesTotal }}
+
+      daseTests: ${{ steps.dase-metrics.outputs.tests }}
+      daseCoverage: ${{ steps.dase-metrics.outputs.coverage }}
+      daseLinesCovered: ${{ steps.dase-metrics.outputs.linesCovered }}
+      daseLinesTotal: ${{ steps.dase-metrics.outputs.linesTotal }}
+
+      allTests: ${{ steps.all-metrics.outputs.tests }}
+      allCoverage: ${{ steps.all-metrics.outputs.coverage }}
+      allLinesCovered: ${{ steps.all-metrics.outputs.linesCovered }}
+      allLinesTotal: ${{ steps.all-metrics.outputs.linesTotal }}
 
     steps:
       - name: Checkout repository
@@ -27,61 +36,15 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: TFX/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-        working-directory: TFX
-
-      - name: Run build
-        run: npm run build
-        working-directory: TFX
-
-      - name: Run tests with coverage
-        run: npm run test:coverage
-        working-directory: TFX
-
-      - name: Extract test results
-        id: test-results
-        run: |
-          TESTS=$(cat TFX/test-results.json | jq '.numPassedTests')
-          COVERAGE=$(cat TFX/coverage/coverage-summary.json | jq '.total.lines.pct')
-          echo "tests=$TESTS" >> $GITHUB_OUTPUT
-          echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
-
-      - name: Upload TFX coverage report
-        uses: actions/upload-artifact@v4
-        with:
-          name: tfx-coverage-report
-          path: TFX/coverage/
-
-  # ====================
-  # DASE Build and Test (depends on TFX)
-  # ====================
-  dase:
-    name: DASE - Build and Test
-    runs-on: ubuntu-latest
-    needs: tfx
-
-    outputs:
-      tests: ${{ steps.test-results.outputs.tests }}
-      coverage: ${{ steps.test-results.outputs.coverage }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
           cache-dependency-path: |
             TFX/package-lock.json
             DASE/package-lock.json
 
+      # --------------------
+      # TFX
+      # --------------------
       - name: Install TFX dependencies
         run: npm ci
         working-directory: TFX
@@ -90,6 +53,32 @@ jobs:
         run: npm run build
         working-directory: TFX
 
+      - name: Test TFX with coverage
+        run: npm run test:coverage
+        working-directory: TFX
+
+      - name: Extract TFX metrics
+        id: tfx-metrics
+        run: |
+          TESTS=$(cat TFX/test-results.json | jq '.numPassedTests')
+          COVERAGE=$(cat TFX/coverage/coverage-summary.json | jq '.total.lines.pct')
+          LINES_COVERED=$(cat TFX/coverage/coverage-summary.json | jq '.total.lines.covered')
+          LINES_TOTAL=$(cat TFX/coverage/coverage-summary.json | jq '.total.lines.total')
+
+          echo "tests=$TESTS" >> $GITHUB_OUTPUT
+          echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+          echo "linesCovered=$LINES_COVERED" >> $GITHUB_OUTPUT
+          echo "linesTotal=$LINES_TOTAL" >> $GITHUB_OUTPUT
+
+      - name: Upload TFX coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfx-coverage-report
+          path: TFX/coverage/
+
+      # --------------------
+      # DASE
+      # --------------------
       - name: Install DASE dependencies
         run: npm ci
         working-directory: DASE
@@ -103,17 +92,22 @@ jobs:
         working-directory: DASE
         continue-on-error: true
 
-      - name: Run tests with coverage
+      - name: Test DASE with coverage
         run: npm run test:coverage
         working-directory: DASE
 
-      - name: Extract test results
-        id: test-results
+      - name: Extract DASE metrics
+        id: dase-metrics
         run: |
           TESTS=$(cat DASE/test-results.json | jq '.numPassedTests')
           COVERAGE=$(cat DASE/coverage/coverage-summary.json | jq '.total.lines.pct')
+          LINES_COVERED=$(cat DASE/coverage/coverage-summary.json | jq '.total.lines.covered')
+          LINES_TOTAL=$(cat DASE/coverage/coverage-summary.json | jq '.total.lines.total')
+
           echo "tests=$TESTS" >> $GITHUB_OUTPUT
           echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+          echo "linesCovered=$LINES_COVERED" >> $GITHUB_OUTPUT
+          echo "linesTotal=$LINES_TOTAL" >> $GITHUB_OUTPUT
 
       - name: Upload DASE coverage report
         uses: actions/upload-artifact@v4
@@ -121,16 +115,81 @@ jobs:
           name: dase-coverage-report
           path: DASE/coverage/
 
-  # ====================
-  # Update Badges (only on master push)
-  # ====================
-  badges:
-    name: Update Badges
+      # --------------------
+      # Totais (TFX + DASE)
+      # --------------------
+      - name: Extract Total metrics
+        id: all-metrics
+        env:
+          TFX_TESTS: ${{ steps.tfx-metrics.outputs.tests }}
+          TFX_LINES_COVERED: ${{ steps.tfx-metrics.outputs.linesCovered }}
+          TFX_LINES_TOTAL: ${{ steps.tfx-metrics.outputs.linesTotal }}
+
+          DASE_TESTS: ${{ steps.dase-metrics.outputs.tests }}
+          DASE_LINES_COVERED: ${{ steps.dase-metrics.outputs.linesCovered }}
+          DASE_LINES_TOTAL: ${{ steps.dase-metrics.outputs.linesTotal }}
+        run: |
+          ALL_TESTS=$((TFX_TESTS + DASE_TESTS))
+          ALL_LINES_COVERED=$((TFX_LINES_COVERED + DASE_LINES_COVERED))
+          ALL_LINES_TOTAL=$((TFX_LINES_TOTAL + DASE_LINES_TOTAL))
+
+          if [ "$ALL_LINES_TOTAL" -gt 0 ]; then
+            ALL_COVERAGE=$(awk "BEGIN { printf \"%.2f\", ($ALL_LINES_COVERED/$ALL_LINES_TOTAL)*100 }")
+          else
+            ALL_COVERAGE="0"
+          fi
+
+          echo "tests=$ALL_TESTS" >> $GITHUB_OUTPUT
+          echo "linesCovered=$ALL_LINES_COVERED" >> $GITHUB_OUTPUT
+          echo "linesTotal=$ALL_LINES_TOTAL" >> $GITHUB_OUTPUT
+          echo "coverage=$ALL_COVERAGE" >> $GITHUB_OUTPUT
+
+      - name: Write job summary
+        run: |
+          {
+            echo "## Results"
+            echo ""
+            echo "| Package | Tests Passed | Coverage (Lines) | Lines Covered | Lines Total |"
+            echo "|---|---:|---:|---:|---:|"
+            echo "| TFX | ${{ steps.tfx-metrics.outputs.tests }} | ${{ steps.tfx-metrics.outputs.coverage }}% | ${{ steps.tfx-metrics.outputs.linesCovered }} | ${{ steps.tfx-metrics.outputs.linesTotal }} |"
+            echo "| DASE | ${{ steps.dase-metrics.outputs.tests }} | ${{ steps.dase-metrics.outputs.coverage }}% | ${{ steps.dase-metrics.outputs.linesCovered }} | ${{ steps.dase-metrics.outputs.linesTotal }} |"
+            echo "| TOTAL | ${{ steps.all-metrics.outputs.tests }} | ${{ steps.all-metrics.outputs.coverage }}% | ${{ steps.all-metrics.outputs.linesCovered }} | ${{ steps.all-metrics.outputs.linesTotal }} |"
+          } >> $GITHUB_STEP_SUMMARY
+
+      # --------------------
+      # Package VSIX (apenas master push)
+      # --------------------
+      - name: Install vsce
+        if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+        run: npm install -g @vscode/vsce
+
+      - name: Package extension
+        if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+        working-directory: DASE
+        run: vsce package --no-dependencies --out dase-${{ github.sha }}.vsix
+
+      - name: Upload VSIX artifact
+        if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dase-vsix
+          path: DASE/dase-*.vsix
+
+  publish:
+    name: Publish Badges and README
     runs-on: ubuntu-latest
-    needs: [tfx, dase]
+    needs: build_test
     if: github.ref == 'refs/heads/master' && github.event_name == 'push' && vars.BADGE_GIST_ID != ''
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # --------------------
+      # Badges (TFX)
+      # --------------------
       - name: TFX Tests Badge
         uses: schneegans/dynamic-badges-action@v1.7.0
         continue-on-error: true
@@ -139,7 +198,7 @@ jobs:
           gistID: ${{ vars.BADGE_GIST_ID }}
           filename: tfx-tests.json
           label: TFX Tests
-          message: ${{ needs.tfx.outputs.tests }} passed
+          message: ${{ needs.build_test.outputs.tfxTests }} passed
           color: brightgreen
 
       - name: TFX Coverage Badge
@@ -150,11 +209,25 @@ jobs:
           gistID: ${{ vars.BADGE_GIST_ID }}
           filename: tfx-coverage.json
           label: TFX Coverage
-          message: ${{ needs.tfx.outputs.coverage }}%
-          valColorRange: ${{ needs.tfx.outputs.coverage }}
+          message: ${{ needs.build_test.outputs.tfxCoverage }}%
+          valColorRange: ${{ needs.build_test.outputs.tfxCoverage }}
           maxColorRange: 100
           minColorRange: 50
 
+      - name: TFX Lines Badge
+        uses: schneegans/dynamic-badges-action@v1.7.0
+        continue-on-error: true
+        with:
+          auth: ${{ secrets.GIST_SECRET }}
+          gistID: ${{ vars.BADGE_GIST_ID }}
+          filename: tfx-lines.json
+          label: TFX Lines
+          message: ${{ needs.build_test.outputs.tfxLinesCovered }} / ${{ needs.build_test.outputs.tfxLinesTotal }}
+          color: blue
+
+      # --------------------
+      # Badges (DASE)
+      # --------------------
       - name: DASE Tests Badge
         uses: schneegans/dynamic-badges-action@v1.7.0
         continue-on-error: true
@@ -163,7 +236,7 @@ jobs:
           gistID: ${{ vars.BADGE_GIST_ID }}
           filename: dase-tests.json
           label: DASE Tests
-          message: ${{ needs.dase.outputs.tests }} passed
+          message: ${{ needs.build_test.outputs.daseTests }} passed
           color: brightgreen
 
       - name: DASE Coverage Badge
@@ -174,26 +247,63 @@ jobs:
           gistID: ${{ vars.BADGE_GIST_ID }}
           filename: dase-coverage.json
           label: DASE Coverage
-          message: ${{ needs.dase.outputs.coverage }}%
-          valColorRange: ${{ needs.dase.outputs.coverage }}
+          message: ${{ needs.build_test.outputs.daseCoverage }}%
+          valColorRange: ${{ needs.build_test.outputs.daseCoverage }}
           maxColorRange: 100
           minColorRange: 50
 
-  # ====================
-  # Update README with real badge URLs
-  # ====================
-  update-readme:
-    name: Update README Badges
-    runs-on: ubuntu-latest
-    needs: badges
-    if: github.ref == 'refs/heads/master' && github.event_name == 'push' && vars.BADGE_GIST_ID != ''
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: DASE Lines Badge
+        uses: schneegans/dynamic-badges-action@v1.7.0
+        continue-on-error: true
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          auth: ${{ secrets.GIST_SECRET }}
+          gistID: ${{ vars.BADGE_GIST_ID }}
+          filename: dase-lines.json
+          label: DASE Lines
+          message: ${{ needs.build_test.outputs.daseLinesCovered }} / ${{ needs.build_test.outputs.daseLinesTotal }}
+          color: blue
 
+      # --------------------
+      # Badges (TOTAL)
+      # --------------------
+      - name: Total Tests Badge
+        uses: schneegans/dynamic-badges-action@v1.7.0
+        continue-on-error: true
+        with:
+          auth: ${{ secrets.GIST_SECRET }}
+          gistID: ${{ vars.BADGE_GIST_ID }}
+          filename: all-tests.json
+          label: All Tests
+          message: ${{ needs.build_test.outputs.allTests }} passed
+          color: brightgreen
+
+      - name: Total Coverage Badge
+        uses: schneegans/dynamic-badges-action@v1.7.0
+        continue-on-error: true
+        with:
+          auth: ${{ secrets.GIST_SECRET }}
+          gistID: ${{ vars.BADGE_GIST_ID }}
+          filename: all-coverage.json
+          label: All Coverage
+          message: ${{ needs.build_test.outputs.allCoverage }}%
+          valColorRange: ${{ needs.build_test.outputs.allCoverage }}
+          maxColorRange: 100
+          minColorRange: 50
+
+      - name: Total Lines Badge
+        uses: schneegans/dynamic-badges-action@v1.7.0
+        continue-on-error: true
+        with:
+          auth: ${{ secrets.GIST_SECRET }}
+          gistID: ${{ vars.BADGE_GIST_ID }}
+          filename: all-lines.json
+          label: All Lines
+          message: ${{ needs.build_test.outputs.allLinesCovered }} / ${{ needs.build_test.outputs.allLinesTotal }}
+          color: blue
+
+      # --------------------
+      # README (atualiza URLs reais se você usa o script)
+      # --------------------
       - name: Update README with Gist ID
         run: node scripts/update-readme-badges.js ${{ vars.BADGE_GIST_ID }}
 
@@ -208,54 +318,3 @@ jobs:
             git commit -m "chore: update README badges with Gist ID [skip ci]"
             git push
           fi
-
-  # ====================
-  # Package Extension (only on master push)
-  # ====================
-  package:
-    name: Package Extension
-    runs-on: ubuntu-latest
-    needs: dase
-    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: |
-            TFX/package-lock.json
-            DASE/package-lock.json
-
-      - name: Install TFX dependencies
-        run: npm ci
-        working-directory: TFX
-
-      - name: Build TFX
-        run: npm run build
-        working-directory: TFX
-
-      - name: Install DASE dependencies
-        run: npm ci
-        working-directory: DASE
-
-      - name: Build DASE
-        run: npm run compile
-        working-directory: DASE
-
-      - name: Install vsce
-        run: npm install -g @vscode/vsce
-
-      - name: Package extension
-        working-directory: DASE
-        run: vsce package --no-dependencies --out dase-${{ github.sha }}.vsix
-
-      - name: Upload VSIX artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: dase-vsix
-          path: DASE/dase-*.vsix
