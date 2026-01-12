@@ -287,12 +287,37 @@ export class XRect
     public Width: number;
     public Height: number;
 
+    public declare X: number;
+    public declare Y: number;
+
     public constructor(pLeft: number = 0, pTop: number = 0, pWidth: number = 0, pHeight: number = 0)
     {
         this.Left = pLeft;
         this.Top = pTop;
         this.Width = pWidth;
         this.Height = pHeight;
+
+        // Provide X/Y aliases (XIRect) while keeping Left/Top as the backing fields.
+        // Defined as enumerable so deep-equality assertions and JSON-style inspection include X/Y.
+        Object.defineProperty(this, "X", {
+            enumerable: true,
+            configurable: true,
+            get: () => this.Left,
+            set: (value: number) =>
+            {
+                this.Left = value;
+            }
+        });
+
+        Object.defineProperty(this, "Y", {
+            enumerable: true,
+            configurable: true,
+            get: () => this.Top,
+            set: (value: number) =>
+            {
+                this.Top = value;
+            }
+        });
     }
 
     public static Parse(pValue: string): XRect

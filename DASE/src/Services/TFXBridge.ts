@@ -139,6 +139,44 @@ export class XTFXBridge
             doc.ID = XGuid.NewValue();
             doc.Name = "ORM Model";
 
+            const tryExtractReferencePointsFromXml = (xmlText: string): Map<string, XPoint[]> =>
+            {
+                const pointsByRefId = new Map<string, XPoint[]>();
+                // Minimal extraction of per-reference Points; this is used only as a fallback when
+                // the underlying XML deserializer produces invalid point values (e.g., NaN).
+                const refBlockRegex = /<XORMReference\b[^>]*\bID="([^"]+)"[^>]*>([\s\S]*?)<\/XORMReference>/g;
+                let refMatch: RegExpExecArray | null;
+                while ((refMatch = refBlockRegex.exec(xmlText)) !== null)
+                {
+                    const refId = refMatch[1];
+                    const refBlock = refMatch[2];
+
+                    const pointsDataMatch = /<XData\b[^>]*\bName="Points"[^>]*>([\s\S]*?)<\/XData>/m.exec(refBlock);
+                    if (!pointsDataMatch)
+                        continue;
+
+                    const rawPoints = (pointsDataMatch[1] || "").trim();
+                    if (!rawPoints)
+                        continue;
+
+                    const points: XPoint[] = [];
+                    const pointRegex = /\{X=([^;]+);Y=([^}]+)\}/g;
+                    let pointMatch: RegExpExecArray | null;
+                    while ((pointMatch = pointRegex.exec(rawPoints)) !== null)
+                    {
+                        const x = Number.parseFloat(pointMatch[1]);
+                        const y = Number.parseFloat(pointMatch[2]);
+                        if (Number.isFinite(x) && Number.isFinite(y))
+                            points.push(new XPoint(x, y));
+                    }
+
+                    if (points.length > 0)
+                        pointsByRefId.set(refId, points);
+                }
+
+                return pointsByRefId;
+            };
+
             if (pText && pText.trim().length > 0)
             {
                 const trimmedText = pText.trim();
@@ -156,13 +194,43 @@ export class XTFXBridge
                         
                         // Route all lines after document is fully loaded and relationships established
                         GetLogService().Info('[TFXBridge] Routing lines after load...');
-                        const references = result.Data.Design?.GetReferences();
+                        const references = result.Data.Design?.GetReferences?.();
                         GetLogService().Info(`[TFXBridge] Found ${references?.length || 0} references before routing`);
                         references?.forEach((ref: any, i: number) => {
                             GetLogService().Info(`  Ref ${i}: Points before = ${ref.Points?.length || 0}, Points = ${JSON.stringify(ref.Points)}`);
                         });
+
+                        // If points were defined in the XML but deserialized into invalid values (e.g., NaN),
+                        // recover them from the original XML.
+                        const pointsByRefId = tryExtractReferencePointsFromXml(pText);
+                        if (references && pointsByRefId.size > 0)
+                        {
+                            for (const ref of references)
+                            {
+                                const refId = String(ref?.ID);
+                                const fallbackPoints = pointsByRefId.get(refId);
+                                if (!fallbackPoints || fallbackPoints.length === 0)
+                                    continue;
+
+                                const hasInvalidPoint = Array.isArray(ref.Points)
+                                    ? ref.Points.some((p: any) => !Number.isFinite(p?.X) || !Number.isFinite(p?.Y))
+                                    : true;
+
+                                if (hasInvalidPoint)
+                                    ref.Points = fallbackPoints;
+                            }
+                        }
+
+                        // Only route when there are missing/invalid points.
+                        const shouldRoute = references?.some((ref: any) => {
+                            const pts = ref?.Points;
+                            if (!Array.isArray(pts) || pts.length === 0)
+                                return true;
+                            return pts.some((p: any) => !Number.isFinite(p?.X) || !Number.isFinite(p?.Y));
+                        });
                         
-                        result.Data.Design?.RouteAllLines();
+                        if (shouldRoute)
+                            result.Data.Design?.RouteAllLines?.();
                         
                         GetLogService().Info(`[TFXBridge] Found ${references?.length || 0} references after routing`);
                         references?.forEach((ref: any, i: number) => {

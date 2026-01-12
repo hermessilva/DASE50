@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { XPoint } from "../src/Core/XGeometry.js";
 import { XTypeConverter } from "../src/Data/XTypeConverter.js";
 
 describe("XTypeConverter Coverage Tests", () => {
@@ -268,6 +269,42 @@ describe("XTypeConverter Coverage Tests", () => {
             
             // pDefault has no Y, no Top, so ?? 0 applies, pValue.Y = 0
             expect(result).toBe(true);
+        });
+    });
+
+    describe("Point[] converter roundtrip", () => {
+        it("should parse Point[] from string and serialize back, validating all values", () => {
+            const input = "{X=1045;Y=470}|{X=1015;Y=470}|{X=1015;Y=149}|{X=1045;Y=149}";
+
+            const points = XTypeConverter.FromString<XPoint[]>(input, "Point[]");
+
+            expect(points).toHaveLength(4);
+            expect(points[0]).toBeInstanceOf(XPoint);
+            expect(points[1]).toBeInstanceOf(XPoint);
+            expect(points[2]).toBeInstanceOf(XPoint);
+            expect(points[3]).toBeInstanceOf(XPoint);
+
+            expect(points[0].X).toBe(1045);
+            expect(points[0].Y).toBe(470);
+            expect(points[1].X).toBe(1015);
+            expect(points[1].Y).toBe(470);
+            expect(points[2].X).toBe(1015);
+            expect(points[2].Y).toBe(149);
+            expect(points[3].X).toBe(1045);
+            expect(points[3].Y).toBe(149);
+
+            const serialized = XTypeConverter.ToString(points, "Point[]");
+            expect(serialized).toBe(input);
+
+            const roundTripped = XTypeConverter.FromString<XPoint[]>(serialized, "Point[]");
+            expect(roundTripped).toHaveLength(4);
+
+            for (let i = 0; i < points.length; i++)
+            {
+                expect(roundTripped[i]).toBeInstanceOf(XPoint);
+                expect(roundTripped[i].X).toBe(points[i].X);
+                expect(roundTripped[i].Y).toBe(points[i].Y);
+            }
         });
     });
 });

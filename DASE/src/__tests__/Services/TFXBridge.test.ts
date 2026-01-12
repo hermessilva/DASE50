@@ -1148,6 +1148,315 @@ describe('XTFXBridge', () => {
             expect(doc).toBe(mockDoc);
         });
 
+                it('should recover invalid reference points from XML and avoid routing', async () => {
+                        const xmlText = `<?xml version="1.0" encoding="utf-8"?>
+<XORMDocument>
+    <XORMDesign>
+        <XORMReference ID="ref-1" Name="FK_Test">
+            <XValues>
+                <XData Name="Points" Type="Point[]">{X=887;Y=394}|{X=779.5;Y=394}|{X=779.5;Y=170}|{X=672;Y=170}</XData>
+            </XValues>
+        </XORMReference>
+    </XORMDesign>
+</XORMDocument>`;
+
+                        const routeAllLines = jest.fn();
+                        const pointsArray = [{ X: 887, Y: 394 }, { X: Number.NaN, Y: 394 }];
+                        const ref = { ID: 'ref-1', Points: pointsArray };
+
+                        const mockDoc: any = {
+                                ID: 'mock-id',
+                                Name: 'Test Doc',
+                                ChildNodes: [],
+                                Initialize: jest.fn(),
+                                Design: {
+                                        ChildNodes: [],
+                                        GetReferences: jest.fn().mockReturnValue([ref]),
+                                        RouteAllLines: routeAllLines,
+                                },
+                        };
+
+                        bridge.Initialize();
+                        (bridge as any)._Engine = {
+                                Deserialize: jest.fn().mockReturnValue({ Success: true, Data: mockDoc }),
+                                Serialize: jest.fn().mockReturnValue({ Success: true, XmlOutput: '' }),
+                        };
+
+                        await bridge.LoadOrmModelFromText(xmlText);
+
+                        expect(mockDoc.Initialize).toHaveBeenCalled();
+                        expect(Array.isArray(ref.Points)).toBe(true);
+                        expect(ref.Points).toHaveLength(4);
+                        expect(ref.Points[1].X).toBe(779.5);
+                        expect(ref.Points[3].X).toBe(672);
+                        expect(routeAllLines).not.toHaveBeenCalled();
+                });
+
+                it('should route lines when reference points are missing and not recoverable', async () => {
+                        const xmlText = `<?xml version="1.0" encoding="utf-8"?>
+<XORMDocument>
+    <XORMDesign>
+        <XORMReference ID="ref-2" Name="FK_Test">
+            <XValues>
+                <XData Name="Points" Type="Point[]">not-a-point-list</XData>
+            </XValues>
+        </XORMReference>
+    </XORMDesign>
+</XORMDocument>`;
+
+                        const routeAllLines = jest.fn();
+                        const ref: any = { ID: 'ref-2', Points: [] };
+
+                        const mockDoc: any = {
+                                ID: 'mock-id',
+                                Name: 'Test Doc',
+                                ChildNodes: [],
+                                Initialize: jest.fn(),
+                                Design: {
+                                        ChildNodes: [],
+                                        GetReferences: jest.fn().mockReturnValue([ref]),
+                                        RouteAllLines: routeAllLines,
+                                },
+                        };
+
+                        bridge.Initialize();
+                        (bridge as any)._Engine = {
+                                Deserialize: jest.fn().mockReturnValue({ Success: true, Data: mockDoc }),
+                                Serialize: jest.fn().mockReturnValue({ Success: true, XmlOutput: '' }),
+                        };
+
+                        await bridge.LoadOrmModelFromText(xmlText);
+
+                        expect(routeAllLines).toHaveBeenCalledTimes(1);
+                });
+
+                it('should not override valid reference points', async () => {
+                        const xmlText = `<?xml version="1.0" encoding="utf-8"?>
+<XORMDocument>
+    <XORMDesign>
+        <XORMReference ID="ref-3" Name="FK_Test">
+            <XValues>
+                <XData Name="Points" Type="Point[]">{X=1;Y=2}|{X=3;Y=4}</XData>
+            </XValues>
+        </XORMReference>
+    </XORMDesign>
+</XORMDocument>`;
+
+                        const routeAllLines = jest.fn();
+                        const pointsArray = [{ X: 1, Y: 2 }, { X: 3, Y: 4 }];
+                        const ref: any = { ID: 'ref-3', Points: pointsArray };
+
+                        const mockDoc: any = {
+                                ID: 'mock-id',
+                                Name: 'Test Doc',
+                                ChildNodes: [],
+                                Initialize: jest.fn(),
+                                Design: {
+                                        ChildNodes: [],
+                                        GetReferences: jest.fn().mockReturnValue([ref]),
+                                        RouteAllLines: routeAllLines,
+                                },
+                        };
+
+                        bridge.Initialize();
+                        (bridge as any)._Engine = {
+                                Deserialize: jest.fn().mockReturnValue({ Success: true, Data: mockDoc }),
+                                Serialize: jest.fn().mockReturnValue({ Success: true, XmlOutput: '' }),
+                        };
+
+                        await bridge.LoadOrmModelFromText(xmlText);
+
+                        expect(ref.Points).toBe(pointsArray);
+                        expect(routeAllLines).not.toHaveBeenCalled();
+                });
+
+                it('should ignore references without Points XData in XML', async () => {
+                        const xmlText = `<?xml version="1.0" encoding="utf-8"?>
+<XORMDocument>
+    <XORMDesign>
+        <XORMReference ID="ref-4" Name="FK_Test">
+            <XValues>
+                <XData Name="ID" Type="String">ref-4</XData>
+            </XValues>
+        </XORMReference>
+    </XORMDesign>
+</XORMDocument>`;
+
+                        const mockDoc: any = {
+                                ID: 'mock-id',
+                                Name: 'Test Doc',
+                                ChildNodes: [],
+                                Initialize: jest.fn(),
+                                Design: {
+                                        ChildNodes: [],
+                                        GetReferences: jest.fn().mockReturnValue([]),
+                                        RouteAllLines: jest.fn(),
+                                },
+                        };
+
+                        bridge.Initialize();
+                        (bridge as any)._Engine = {
+                                Deserialize: jest.fn().mockReturnValue({ Success: true, Data: mockDoc }),
+                                Serialize: jest.fn().mockReturnValue({ Success: true, XmlOutput: '' }),
+                        };
+
+                        const doc = await bridge.LoadOrmModelFromText(xmlText);
+                        expect(doc).toBe(mockDoc);
+                });
+
+                it('should ignore empty Points and non-finite point coordinates in XML', async () => {
+                        const xmlText = `<?xml version="1.0" encoding="utf-8"?>
+<XORMDocument>
+    <XORMDesign>
+        <XORMReference ID="ref-5" Name="FK_Test">
+            <XValues>
+                <XData Name="Points" Type="Point[]">   </XData>
+            </XValues>
+        </XORMReference>
+        <XORMReference ID="ref-6" Name="FK_Test">
+            <XValues>
+                <XData Name="Points" Type="Point[]">{X=abc;Y=1}</XData>
+            </XValues>
+        </XORMReference>
+    </XORMDesign>
+</XORMDocument>`;
+
+                        const mockDoc: any = {
+                                ID: 'mock-id',
+                                Name: 'Test Doc',
+                                ChildNodes: [],
+                                Initialize: jest.fn(),
+                                Design: {
+                                        ChildNodes: [],
+                                        GetReferences: jest.fn().mockReturnValue([]),
+                                        RouteAllLines: jest.fn(),
+                                },
+                        };
+
+                        bridge.Initialize();
+                        (bridge as any)._Engine = {
+                                Deserialize: jest.fn().mockReturnValue({ Success: true, Data: mockDoc }),
+                                Serialize: jest.fn().mockReturnValue({ Success: true, XmlOutput: '' }),
+                        };
+
+                        const doc = await bridge.LoadOrmModelFromText(xmlText);
+                        expect(doc).toBe(mockDoc);
+                });
+
+                it('should skip fallback when reference ID is not found in XML points map', async () => {
+                        const xmlText = `<?xml version="1.0" encoding="utf-8"?>
+<XORMDocument>
+    <XORMDesign>
+        <XORMReference ID="ref-7" Name="FK_Test">
+            <XValues>
+                <XData Name="Points" Type="Point[]">{X=1;Y=2}|{X=3;Y=4}</XData>
+            </XValues>
+        </XORMReference>
+    </XORMDesign>
+</XORMDocument>`;
+
+                        const routeAllLines = jest.fn();
+                        const ref: any = { ID: 'ref-other', Points: [] };
+
+                        const mockDoc: any = {
+                                ID: 'mock-id',
+                                Name: 'Test Doc',
+                                ChildNodes: [],
+                                Initialize: jest.fn(),
+                                Design: {
+                                        ChildNodes: [],
+                                        GetReferences: jest.fn().mockReturnValue([ref]),
+                                        RouteAllLines: routeAllLines,
+                                },
+                        };
+
+                        bridge.Initialize();
+                        (bridge as any)._Engine = {
+                                Deserialize: jest.fn().mockReturnValue({ Success: true, Data: mockDoc }),
+                                Serialize: jest.fn().mockReturnValue({ Success: true, XmlOutput: '' }),
+                        };
+
+                        await bridge.LoadOrmModelFromText(xmlText);
+
+                        expect(routeAllLines).toHaveBeenCalledTimes(1);
+                });
+
+                it('should handle an empty <XData Name="Points"></XData> in XML', async () => {
+                        const xmlText = `<?xml version="1.0" encoding="utf-8"?>
+<XORMDocument>
+    <XORMDesign>
+        <XORMReference ID="ref-8" Name="FK_Test">
+            <XValues>
+                <XData Name="Points" Type="Point[]"></XData>
+            </XValues>
+        </XORMReference>
+    </XORMDesign>
+</XORMDocument>`;
+
+                        const mockDoc: any = {
+                                ID: 'mock-id',
+                                Name: 'Test Doc',
+                                ChildNodes: [],
+                                Initialize: jest.fn(),
+                                Design: {
+                                        ChildNodes: [],
+                                        GetReferences: jest.fn().mockReturnValue([]),
+                                        RouteAllLines: jest.fn(),
+                                },
+                        };
+
+                        bridge.Initialize();
+                        (bridge as any)._Engine = {
+                                Deserialize: jest.fn().mockReturnValue({ Success: true, Data: mockDoc }),
+                                Serialize: jest.fn().mockReturnValue({ Success: true, XmlOutput: '' }),
+                        };
+
+                        const doc = await bridge.LoadOrmModelFromText(xmlText);
+                        expect(doc).toBe(mockDoc);
+                });
+
+                it('should treat non-array reference Points as invalid and replace from XML', async () => {
+                        const xmlText = `<?xml version="1.0" encoding="utf-8"?>
+<XORMDocument>
+    <XORMDesign>
+        <XORMReference ID="ref-9" Name="FK_Test">
+            <XValues>
+                <XData Name="Points" Type="Point[]">{X=10;Y=20}|{X=30;Y=40}</XData>
+            </XValues>
+        </XORMReference>
+    </XORMDesign>
+</XORMDocument>`;
+
+                        const routeAllLines = jest.fn();
+                        const ref: any = { ID: 'ref-9', Points: null };
+
+                        const mockDoc: any = {
+                                ID: 'mock-id',
+                                Name: 'Test Doc',
+                                ChildNodes: [],
+                                Initialize: jest.fn(),
+                                Design: {
+                                        ChildNodes: [],
+                                        GetReferences: jest.fn().mockReturnValue([ref]),
+                                        RouteAllLines: routeAllLines,
+                                },
+                        };
+
+                        bridge.Initialize();
+                        (bridge as any)._Engine = {
+                                Deserialize: jest.fn().mockReturnValue({ Success: true, Data: mockDoc }),
+                                Serialize: jest.fn().mockReturnValue({ Success: true, XmlOutput: '' }),
+                        };
+
+                        await bridge.LoadOrmModelFromText(xmlText);
+
+                        expect(Array.isArray(ref.Points)).toBe(true);
+                        expect(ref.Points).toHaveLength(2);
+                        expect(ref.Points[0].X).toBe(10);
+                        expect(ref.Points[1].Y).toBe(40);
+                        expect(routeAllLines).not.toHaveBeenCalled();
+                });
+
         it('should load XML format when text starts with <', async () => {
             const xmlText = '<XORMDocument><Name>Test</Name></XORMDocument>';
             

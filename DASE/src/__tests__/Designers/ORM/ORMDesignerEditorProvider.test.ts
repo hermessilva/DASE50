@@ -1025,6 +1025,47 @@ describe('XORMDesignerEditorProvider', () => {
             expect(mockPanel.webview.postMessage).toHaveBeenCalled();
         });
 
+        it('should handle DesignerReady message when references are undefined', async () => {
+            mockState.GetModelData = jest.fn().mockResolvedValue({
+                Tables: []
+            });
+
+            await provider.HandleMessage(mockPanel, mockState, { Type: 'DesignerReady' });
+
+            expect(mockState.AlignLines).toHaveBeenCalled();
+            expect(mockState.GetModelData).toHaveBeenCalled();
+            expect(mockPanel.webview.postMessage).toHaveBeenCalled();
+        });
+
+        it('should handle DesignerReady message when references are null', async () => {
+            mockState.GetModelData = jest.fn().mockResolvedValue({
+                Tables: [],
+                References: null
+            });
+
+            await provider.HandleMessage(mockPanel, mockState, { Type: 'DesignerReady' });
+
+            expect(mockState.AlignLines).toHaveBeenCalled();
+            expect(mockState.GetModelData).toHaveBeenCalled();
+            expect(mockPanel.webview.postMessage).toHaveBeenCalled();
+        });
+
+        it('should handle DesignerReady message when reference points are missing', async () => {
+            mockState.GetModelData = jest.fn().mockResolvedValue({
+                Tables: [],
+                References: [
+                    { Name: 'FK_UndefinedPoints' },
+                    { Name: 'FK_NullPoints', Points: null }
+                ]
+            });
+
+            await provider.HandleMessage(mockPanel, mockState, { Type: 'DesignerReady' });
+
+            expect(mockState.AlignLines).toHaveBeenCalled();
+            expect(mockState.GetModelData).toHaveBeenCalled();
+            expect(mockPanel.webview.postMessage).toHaveBeenCalled();
+        });
+
         it('should handle SaveModel message', async () => {
             await provider.HandleMessage(mockPanel, mockState, { Type: 'SaveModel' });
 

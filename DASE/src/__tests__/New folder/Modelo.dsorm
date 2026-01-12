@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<XORMDocument ID="882ed50a-b60d-4d01-99af-97c1b29331b3" Name="ORM Model">
+  <XValues>
+    <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">882ed50a-b60d-4d01-99af-97c1b29331b3</XData>
+    <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">ORM Model</XData>
+  </XValues>
+  <XORMDesign>
+    <XORMTable ID="3e3593fa-d9c2-4d3c-9fed-9e79ad88c3ad" Name="NewTable">
+      <XValues>
+        <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">3e3593fa-d9c2-4d3c-9fed-9e79ad88c3ad</XData>
+        <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">NewTable</XData>
+        <XData Name="Bounds" ID="00000001-0001-0001-0003-000000000001" Type="Rect">{X=472;Y=95;Width=200;Height=150}</XData>
+      </XValues>
+    </XORMTable>
+    <XORMTable ID="ff9a6544-1f6f-4560-9b73-8143f7c49df8" Name="NewTable">
+      <XValues>
+        <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">ff9a6544-1f6f-4560-9b73-8143f7c49df8</XData>
+        <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">NewTable</XData>
+        <XData Name="Bounds" ID="00000001-0001-0001-0003-000000000001" Type="Rect">{X=887;Y=354;Width=200;Height=150}</XData>
+      </XValues>
+      <XORMField ID="78ef0a68-638c-4b98-811f-98f2eccfb207" Name="NewTableID">
+        <XValues>
+          <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">78ef0a68-638c-4b98-811f-98f2eccfb207</XData>
+          <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">NewTableID</XData>
+        </XValues>
+      </XORMField>
+    </XORMTable>
+    <XORMReference ID="d77d186e-51e3-4dc8-af9c-e9694531ccff" Name="FK_NewTable">
+      <XValues>
+        <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">d77d186e-51e3-4dc8-af9c-e9694531ccff</XData>
+        <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">FK_NewTable</XData>
+        <XLinkData Name="Source" ID="00000001-0001-0001-0004-000000000010" Type="String" ElementID="78ef0a68-638c-4b98-811f-98f2eccfb207" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">78ef0a68-638c-4b98-811f-98f2eccfb207</XLinkData>
+        <XLinkData Name="Target" ID="00000001-0001-0001-0004-000000000011" Type="String" ElementID="3e3593fa-d9c2-4d3c-9fed-9e79ad88c3ad" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">3e3593fa-d9c2-4d3c-9fed-9e79ad88c3ad</XLinkData>
+        <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="Point[]">{X=887;Y=394}|{X=779.5;Y=394}|{X=779.5;Y=170}|{X=672;Y=170}</XData>
+      </XValues>
+    </XORMReference>
+  </XORMDesign>
+</XORMDocument>

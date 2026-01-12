@@ -22,6 +22,35 @@ describe("XRect", () =>
             expect(rect.Width).toBe(100);
             expect(rect.Height).toBe(200);
         });
+
+        it("should expose X/Y aliases (enumerable) backed by Left/Top", () =>
+        {
+            const rect = new XRect(10, 20, 100, 200);
+
+            // Read aliases
+            expect(rect.X).toBe(10);
+            expect(rect.Y).toBe(20);
+
+            // Write aliases
+            rect.X = 30;
+            rect.Y = 40;
+            expect(rect.Left).toBe(30);
+            expect(rect.Top).toBe(40);
+
+            // Ensure deep equality / object inspection includes X/Y
+            const keys = Object.keys(rect);
+            expect(keys).toContain("X");
+            expect(keys).toContain("Y");
+
+            expect(rect).toMatchObject({
+                X: 30,
+                Y: 40,
+                Left: 30,
+                Top: 40,
+                Width: 100,
+                Height: 200
+            });
+        });
     });
 
     describe("Parse", () =>

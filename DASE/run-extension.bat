@@ -1,4 +1,4 @@
-@echo off
+echo off
 setlocal enabledelayedexpansion
 
 echo ========================================
@@ -11,6 +11,12 @@ cd /d "%~dp0"
 
 echo Current directory: %CD%
 echo.
+cd "%~dp0\..\TFX"
+echo Current directory: %CD%
+cmd /c npm run build
+cd "%~dp0\..\DASE"
+echo Current directory: %CD%
+
 
 echo [1/3] Compiling TypeScript...
 call npm run compile
