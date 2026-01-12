@@ -60,10 +60,23 @@ interface IReferenceData
 {
     ID: string;
     Name: string;
-    SourceID: string;
-    TargetID: string;
+    SourceFieldID: string;
+    TargetTableID: string;
     Description?: string;
     Points: Array<{ X: number; Y: number }>;
+}
+
+// Legacy interface for loading old JSON files (supports both old and new field names)
+interface ILegacyReferenceData
+{
+    ID?: string;
+    Name?: string;
+    SourceID?: string;
+    TargetID?: string;
+    SourceFieldID?: string;
+    TargetTableID?: string;
+    Description?: string;
+    Points?: Array<{ X: number; Y: number }>;
 }
 
 interface IModelData
@@ -76,7 +89,7 @@ interface IJsonData
 {
     Name?: string;
     Tables?: ITableData[];
-    References?: IReferenceData[];
+    References?: ILegacyReferenceData[];
 }
 
 export class XTFXBridge
@@ -228,36 +241,36 @@ export class XTFXBridge
         return result || { Success: false, Message: "Failed to add table." };
     }
 
-    AddReference(pSourceID: string, pTargetID: string, pName: string): XIOperationResult
+    AddReference(pSourceTableID: string, pTargetTableID: string, pName: string): XIOperationResult
     {
-        GetLogService().Info(`TFXBridge.AddReference: Source=${pSourceID}, Target=${pTargetID}, Name=${pName}`);
+        GetLogService().Info(`TFXBridge.AddReference: SourceTable=${pSourceTableID}, TargetTable=${pTargetTableID}, Name=${pName}`);
         
         // Get the target table to build the FK field name
-        const targetTable = this._Controller?.GetElementByID(pTargetID) as XORMTable | null;
+        const targetTable = this._Controller?.GetElementByID(pTargetTableID) as XORMTable | null;
         const targetName = targetTable?.Name || "Target";
         
-        // Add the reference using TFX interface
+        // First create the FK field in the source table
+        const fkFieldName = `${targetName}ID`;
+        GetLogService().Info(`Creating FK field: ${fkFieldName} in table ${pSourceTableID}`);
+        
+        const addFieldData: XIAddFieldData = {
+            TableID: pSourceTableID,
+            Name: fkFieldName
+        };
+        const fieldResult = this._Controller?.AddField(addFieldData);
+        GetLogService().Info(`FK field creation result: ${JSON.stringify(fieldResult)}`);
+        
+        if (!fieldResult?.Success || !fieldResult?.ElementID)
+            return { Success: false, Message: "Failed to create FK field." };
+        
+        // Now create the reference using the field ID as source
         const addRefData: XIAddReferenceData = {
-            SourceID: pSourceID,
-            TargetID: pTargetID,
+            SourceFieldID: fieldResult.ElementID,
+            TargetTableID: pTargetTableID,
             Name: pName || `FK_${targetName}`
         };
         const result: XIOperationResult = this._Controller?.AddReference(addRefData) || { Success: false };
         GetLogService().Info(`Controller.AddReference result: ${JSON.stringify(result)}`);
-        
-        // If reference was added successfully, create a FK field in the source table
-        if (result?.Success)
-        {
-            const fkFieldName = `${targetName}ID`;
-            GetLogService().Info(`Creating FK field: ${fkFieldName} in table ${pSourceID}`);
-            
-            const addFieldData: XIAddFieldData = {
-                TableID: pSourceID,
-                Name: fkFieldName
-            };
-            const fieldResult = this._Controller?.AddField(addFieldData);
-            GetLogService().Info(`FK field creation result: ${JSON.stringify(fieldResult)}`);
-        }
         
         return result;
     }
@@ -395,12 +408,12 @@ export class XTFXBridge
         });
 
         const refsData: IReferenceData[] = references.map((r: any) => {
-            GetLogService().Debug(`Reference: ID=${r.ID}, Name=${r.Name}, SourceID=${r.SourceID}, TargetID=${r.TargetID}, Source=${r.Source}, Target=${r.Target}`);
+            GetLogService().Debug(`Reference: ID=${r.ID}, Name=${r.Name}, Source=${r.Source}, Target=${r.Target}`);
             return {
                 ID: r.ID,
                 Name: r.Name,
-                SourceID: r.SourceID || r.Source,
-                TargetID: r.TargetID || r.Target,
+                SourceFieldID: r.Source,
+                TargetTableID: r.Target,
                 Points: r.Points?.map((p: any) => ({ X: p.X, Y: p.Y })) || []
             };
         });
@@ -440,10 +453,9 @@ export class XTFXBridge
                 {
                     for (const fData of tData.Fields)
                     {
-                        const defaultDataType = XORMFieldDataType?.String ?? "String";
                         const field = table.CreateField({
                             Name: fData.Name || "",
-                            DataType: (fData.DataType as XORMFieldDataType) || defaultDataType,
+                            DataType: (fData.DataType as XORMFieldDataType) || XORMFieldDataType.String,
                             Length: fData.Length || 0,
                             IsPrimaryKey: fData.IsPrimaryKey || false,
                             IsNullable: fData.IsNullable !== false,
@@ -467,8 +479,8 @@ export class XTFXBridge
                 try
                 {
                     const ref = design.CreateReference({
-                        SourceID: rData.SourceID || "",
-                        TargetID: rData.TargetID || "",
+                        SourceFieldID: rData.SourceFieldID || rData.SourceID || "",
+                        TargetTableID: rData.TargetTableID || rData.TargetID || "",
                         Name: rData.Name || ""
                     });
 
@@ -527,8 +539,8 @@ export class XTFXBridge
             References: references.map((r: any) => ({
                 ID: r.ID,
                 Name: r.Name,
-                SourceID: r.SourceID || r.Source,
-                TargetID: r.TargetID || r.Target,
+                SourceFieldID: r.SourceID || r.Source,
+                TargetTableID: r.TargetID || r.Target,
                 Description: r.Description,
                 Points: r.Points?.map((p: any) => ({ X: p.X, Y: p.Y })) || []
             }))

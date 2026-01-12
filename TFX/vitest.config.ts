@@ -15,7 +15,13 @@ export default defineConfig({
                 "**/*.d.ts",
                 "**/XTypes.ts",
                 "**/XORMController.ts"
-            ]
+            ],
+            thresholds: {
+                lines: 100,
+                branches: 100,
+                functions: 100,
+                statements: 100
+            }
         }
     }
 });

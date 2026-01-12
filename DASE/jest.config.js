@@ -23,10 +23,10 @@ module.exports = {
     ],
     coverageThreshold: {
         global: {
-            branches: 35,
-            functions: 75,
-            lines: 65,
-            statements: 65
+            branches: 100,
+            functions: 100,
+            lines: 100,
+            statements: 100
         }
     },
     setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],

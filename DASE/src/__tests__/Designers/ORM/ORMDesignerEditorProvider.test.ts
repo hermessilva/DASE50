@@ -993,6 +993,7 @@ describe('XORMDesignerEditorProvider', () => {
                 RenameSelected: jest.fn().mockReturnValue({ Success: true }),
                 MoveElement: jest.fn().mockReturnValue({ Success: true }),
                 UpdateProperty: jest.fn().mockReturnValue({ Success: true }),
+                AlignLines: jest.fn().mockReturnValue({ Success: true }),
                 GetProperties: jest.fn().mockResolvedValue([]),
                 IsDirty: false,
                 Document: { uri: Uri.file('/test/model.dsorm') },

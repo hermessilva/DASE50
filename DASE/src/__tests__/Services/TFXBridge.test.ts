@@ -194,15 +194,25 @@ describe('XTFXBridge', () => {
             await bridge.LoadOrmModelFromText('{}');
         });
 
-        it('should add reference between tables', () => {
+        it('should add reference between tables (creates FK field first)', () => {
+            const mockAddField = jest.fn().mockReturnValue({ Success: true, ElementID: 'new-fk-field-id' });
             const mockAddReference = jest.fn().mockReturnValue({ Success: true });
+            const mockGetElementByID = jest.fn().mockReturnValue({ Name: 'TargetTable' });
+            bridge.Controller.AddField = mockAddField;
             bridge.Controller.AddReference = mockAddReference;
+            bridge.Controller.GetElementByID = mockGetElementByID;
 
-            const result = bridge.AddReference('source-id', 'target-id', 'RefName');
+            const result = bridge.AddReference('source-table-id', 'target-table-id', 'RefName');
 
+            // First creates FK field
+            expect(mockAddField).toHaveBeenCalledWith({
+                TableID: 'source-table-id',
+                Name: 'TargetTableID'
+            });
+            // Then creates reference using field ID
             expect(mockAddReference).toHaveBeenCalledWith({
-                SourceID: 'source-id',
-                TargetID: 'target-id',
+                SourceFieldID: 'new-fk-field-id',
+                TargetTableID: 'target-table-id',
                 Name: 'RefName'
             });
         });
@@ -369,9 +379,7 @@ describe('XTFXBridge', () => {
             const mockReference = {
                 ID: 'ref-1',
                 Name: 'FK_Orders_Users',
-                SourceID: 'table-1',
-                TargetID: 'table-2',
-                Source: 'table-1',
+                Source: 'field-1',
                 Target: 'table-2',
                 Points: [{ X: 100, Y: 200 }, { X: 300, Y: 400 }]
             };
@@ -390,13 +398,13 @@ describe('XTFXBridge', () => {
             expect(data.References[0].Points.length).toBe(2);
         });
 
-        it('should handle references without SourceID/TargetID using Source/Target', async () => {
+        it('should handle references with Source/Target properties', async () => {
             await bridge.LoadOrmModelFromText('{}');
             
             const mockReference = {
                 ID: 'ref-1',
                 Name: 'FK_Test',
-                Source: 'src-table',
+                Source: 'src-field',
                 Target: 'tgt-table',
                 Points: null
             };
@@ -407,8 +415,8 @@ describe('XTFXBridge', () => {
 
             const data = await bridge.GetModelData();
 
-            expect(data.References[0].SourceID).toBe('src-table');
-            expect(data.References[0].TargetID).toBe('tgt-table');
+            expect(data.References[0].SourceFieldID).toBe('src-field');
+            expect(data.References[0].TargetTableID).toBe('tgt-table');
             expect(data.References[0].Points).toEqual([]);
         });
     });
@@ -550,13 +558,13 @@ describe('XTFXBridge', () => {
             expect(mockDoc.Tables[0].Schema).toBe('dbo');
         });
 
-        it('should load references from JSON', async () => {
+        it('should load references from JSON (supports legacy SourceID/TargetID)', async () => {
             const jsonData = {
                 References: [{
                     ID: 'ref-1',
                     Name: 'FK_Test',
-                    SourceID: 'table-1',
-                    TargetID: 'table-2',
+                    SourceID: 'field-1',  // Legacy format
+                    TargetID: 'table-2',  // Legacy format
                     Description: 'Foreign key',
                     Points: [{ X: 100, Y: 200 }, { X: 300, Y: 400 }]
                 }]
@@ -678,7 +686,7 @@ describe('XTFXBridge', () => {
             const jsonData = {
                 References: [{
                     Name: 'MinimalRef'
-                    // No ID, SourceID, TargetID, Description, Points
+                    // No ID, SourceFieldID, TargetTableID, Description, Points
                 }]
             };
 
@@ -693,8 +701,8 @@ describe('XTFXBridge', () => {
             const jsonData = {
                 References: [{
                     Name: 'RefWithPoints',
-                    SourceID: 'table-1',
-                    TargetID: 'table-2',
+                    SourceFieldID: 'field-1',
+                    TargetTableID: 'table-2',
                     Description: 'Test description',
                     Points: [{ X: 100, Y: 200 }, { X: 300, Y: 400 }]
                 }]
@@ -833,8 +841,8 @@ describe('XTFXBridge', () => {
         it('should use default Name "" when Reference Name is undefined', async () => {
             const jsonData = {
                 References: [{
-                    SourceID: 'table-1',
-                    TargetID: 'table-2',
+                    SourceFieldID: 'field-1',
+                    TargetTableID: 'table-2',
                     Name: undefined  // Explicitly undefined to test fallback branch
                 }]
             };
@@ -936,8 +944,8 @@ describe('XTFXBridge', () => {
             const mockReference = {
                 ID: 'ref-1',
                 Name: 'FK_Orders_Users',
-                SourceID: 'table-1',
-                TargetID: 'table-2',
+                Source: 'field-1',
+                Target: 'table-2',
                 Description: 'Foreign key',
                 Points: [{ X: 100, Y: 200 }]
             };
@@ -982,8 +990,8 @@ describe('XTFXBridge', () => {
             const mockReference = {
                 ID: 'ref-1',
                 Name: 'FK_Test',
-                SourceID: 'table-1',
-                TargetID: 'table-2',
+                Source: 'field-1',
+                Target: 'table-2',
                 Description: '',
                 Points: null
             };
@@ -1266,8 +1274,8 @@ describe('XTFXBridge', () => {
         it('should generate default reference name when name is empty', () => {
             const mockTargetTable = { Name: 'Orders' };
             bridge.Controller.GetElementByID = jest.fn().mockReturnValue(mockTargetTable);
+            bridge.Controller.AddField = jest.fn().mockReturnValue({ Success: true, ElementID: 'field-id' });
             bridge.Controller.AddReference = jest.fn().mockReturnValue({ Success: true });
-            bridge.Controller.AddField = jest.fn().mockReturnValue({ Success: true });
 
             bridge.AddReference('source-id', 'target-id', '');
 
@@ -1276,25 +1284,25 @@ describe('XTFXBridge', () => {
             }));
         });
 
-        it('should not create FK field when AddReference fails', () => {
+        it('should not create reference when AddField fails', () => {
             bridge.Controller.GetElementByID = jest.fn().mockReturnValue({ Name: 'Users' });
-            bridge.Controller.AddReference = jest.fn().mockReturnValue({ Success: false });
-            bridge.Controller.AddField = jest.fn();
+            bridge.Controller.AddField = jest.fn().mockReturnValue({ Success: false });
+            bridge.Controller.AddReference = jest.fn();
 
             bridge.AddReference('source-id', 'target-id', 'FK_Test');
 
-            expect(bridge.Controller.AddField).not.toHaveBeenCalled();
+            expect(bridge.Controller.AddReference).not.toHaveBeenCalled();
         });
 
-        it('should return fallback when Controller.AddReference returns null', () => {
+        it('should return fallback when AddField returns null', () => {
             bridge.Controller.GetElementByID = jest.fn().mockReturnValue({ Name: 'Users' });
-            bridge.Controller.AddReference = jest.fn().mockReturnValue(null);
-            bridge.Controller.AddField = jest.fn();
+            bridge.Controller.AddField = jest.fn().mockReturnValue(null);
+            bridge.Controller.AddReference = jest.fn();
 
             const result = bridge.AddReference('source-id', 'target-id', 'FK_Test');
 
-            expect(result).toEqual({ Success: false });
-            expect(bridge.Controller.AddField).not.toHaveBeenCalled();
+            expect(result).toEqual({ Success: false, Message: 'Failed to create FK field.' });
+            expect(bridge.Controller.AddReference).not.toHaveBeenCalled();
         });
     });
 
@@ -1387,7 +1395,7 @@ describe('XTFXBridge', () => {
         it('should log warning and continue when reference creation throws', async () => {
             const jsonData = {
                 References: [
-                    { Name: 'FailingRef', SourceID: 'table-1', TargetID: 'table-2' }
+                    { Name: 'FailingRef', SourceFieldID: 'field-1', TargetTableID: 'table-2' }
                 ]
             };
 
@@ -1409,8 +1417,8 @@ describe('XTFXBridge', () => {
 
             const jsonData = {
                 References: [
-                    { Name: 'FirstRef', SourceID: 'table-1', TargetID: 'table-2' },
-                    { Name: 'SecondRef', SourceID: 'table-2', TargetID: 'table-3' }
+                    { Name: 'FirstRef', SourceFieldID: 'field-1', TargetTableID: 'table-2' },
+                    { Name: 'SecondRef', SourceFieldID: 'field-2', TargetTableID: 'table-3' }
                 ]
             };
 
@@ -1549,16 +1557,14 @@ describe('XTFXBridge', () => {
         });
     });
 
-    describe('SaveToJson reference fallbacks', () => {
-        it('should use Source/Target when SourceID/TargetID are undefined', async () => {
+    describe('SaveToJson reference using Source/Target', () => {
+        it('should use Source/Target properties for SourceFieldID/TargetTableID', async () => {
             await bridge.LoadOrmModelFromText('{}');
             
             const mockReference = {
                 ID: 'ref-1',
                 Name: 'FK_Test',
-                SourceID: undefined,
-                TargetID: undefined,
-                Source: 'src-table',
+                Source: 'src-field',
                 Target: 'tgt-table',
                 Description: '',
                 Points: null
@@ -1570,8 +1576,8 @@ describe('XTFXBridge', () => {
 
             const result = (bridge as any).SaveToJson(bridge.Controller.Document);
 
-            expect(result.References[0].SourceID).toBe('src-table');
-            expect(result.References[0].TargetID).toBe('tgt-table');
+            expect(result.References[0].SourceFieldID).toBe('src-field');
+            expect(result.References[0].TargetTableID).toBe('tgt-table');
             expect(result.References[0].Points).toEqual([]);
         });
 
@@ -1581,8 +1587,8 @@ describe('XTFXBridge', () => {
             const mockReference = {
                 ID: 'ref-1',
                 Name: 'FK_Test',
-                SourceID: 'table-1',
-                TargetID: 'table-2',
+                Source: 'field-1',
+                Target: 'table-2',
                 Description: 'Test',
                 Points: [{ X: 10, Y: 20 }, { X: 30, Y: 40 }]
             };
@@ -1674,6 +1680,32 @@ describe('XTFXBridge', () => {
 
             expect(result.Tables[0].Fields).toHaveLength(1);
             expect(result.Tables[0].Fields[0].Name).toBe('ID');
+        });
+    });
+
+    describe('AddReference returns falsy result coverage (line 272)', () => {
+        beforeEach(async () => {
+            await bridge.LoadOrmModelFromText('{}');
+        });
+
+        it('should return fallback when Controller.AddReference returns null', () => {
+            bridge.Controller.GetElementByID = jest.fn().mockReturnValue({ Name: 'Users' });
+            bridge.Controller.AddField = jest.fn().mockReturnValue({ Success: true, ElementID: 'field-id' });
+            bridge.Controller.AddReference = jest.fn().mockReturnValue(null);
+
+            const result = bridge.AddReference('source-id', 'target-id', 'FK_Test');
+
+            expect(result).toEqual({ Success: false });
+        });
+
+        it('should return fallback when Controller.AddReference returns undefined', () => {
+            bridge.Controller.GetElementByID = jest.fn().mockReturnValue({ Name: 'Users' });
+            bridge.Controller.AddField = jest.fn().mockReturnValue({ Success: true, ElementID: 'field-id' });
+            bridge.Controller.AddReference = jest.fn().mockReturnValue(undefined);
+
+            const result = bridge.AddReference('source-id', 'target-id', 'FK_Test');
+
+            expect(result).toEqual({ Success: false });
         });
     });
 });

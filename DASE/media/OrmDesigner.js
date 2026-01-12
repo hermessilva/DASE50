@@ -351,8 +351,6 @@
                 pElement.setAttribute("transform", "translate(" + newX + "," + newY + ")");
                 pTable.X = newX;
                 pTable.Y = newY;
-
-                UpdateRelationEndpoints(pTable.ID);
             };
 
             const onMouseUp = function(e) {
@@ -467,6 +465,21 @@
         return null;
     }
 
+    function BuildPathFromPoints(pPoints)
+    {
+        if (!pPoints || pPoints.length < 2)
+            return "";
+
+        let path = `M ${pPoints[0].X} ${pPoints[0].Y}`;
+        
+        for (let i = 1; i < pPoints.length; i++)
+        {
+            path += ` L ${pPoints[i].X} ${pPoints[i].Y}`;
+        }
+        
+        return path;
+    }
+
     function RenderRelations()
     {
         _RelationsLayer.innerHTML = "";
@@ -481,8 +494,12 @@
 
     function CreateRelationElement(pRef)
     {
-        const sourceTable = _Model.Tables.find(t => t.ID === pRef.SourceID);
-        const targetTable = _Model.Tables.find(t => t.ID === pRef.TargetID);
+        // Source is a field ID - find the table that contains this field
+        const sourceTable = _Model.Tables.find(t => 
+            t.Fields && t.Fields.some(f => f.ID === pRef.SourceFieldID)
+        );
+        // Target is a table ID
+        const targetTable = _Model.Tables.find(t => t.ID === pRef.TargetTableID);
 
         if (!sourceTable || !targetTable)
             return null;
@@ -491,29 +508,57 @@
         g.setAttribute("class", "orm-reference");
         g.setAttribute("data-id", pRef.ID);
 
-        const x1 = sourceTable.X + (sourceTable.Width || 200);
-        const y1 = sourceTable.Y + (sourceTable.Height || 150) / 2;
-        const x2 = targetTable.X;
-        const y2 = targetTable.Y + (targetTable.Height || 150) / 2;
+        // Se há pontos de roteamento, use-os; caso contrário, calcule um caminho simples
+        const points = pRef.Points && pRef.Points.length >= 2 ? pRef.Points : [];
+        
+        if (points.length >= 2)
+        {
+            // Renderiza linha roteada com múltiplos segmentos
+            const pathData = BuildPathFromPoints(points);
+            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            path.setAttribute("class", "orm-reference-line");
+            path.setAttribute("d", pathData);
+            path.setAttribute("fill", "none");
+            g.appendChild(path);
 
-        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-        line.setAttribute("class", "orm-reference-line");
-        line.setAttribute("x1", x1);
-        line.setAttribute("y1", y1);
-        line.setAttribute("x2", x2);
-        line.setAttribute("y2", y2);
-        g.appendChild(line);
+            // Label no ponto médio
+            const midIdx = Math.floor(points.length / 2);
+            const midPoint = points[midIdx];
+            const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            label.setAttribute("class", "orm-reference-label");
+            label.setAttribute("x", midPoint.X);
+            label.setAttribute("y", midPoint.Y - 10);
+            label.setAttribute("text-anchor", "middle");
+            label.textContent = pRef.Name || "";
+            g.appendChild(label);
+        }
+        else
+        {
+            // Fallback: linha reta simples
+            const x1 = sourceTable.X + (sourceTable.Width || 200);
+            const y1 = sourceTable.Y + (sourceTable.Height || 150) / 2;
+            const x2 = targetTable.X;
+            const y2 = targetTable.Y + (targetTable.Height || 150) / 2;
 
-        const midX = (x1 + x2) / 2;
-        const midY = (y1 + y2) / 2 - 10;
+            const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            line.setAttribute("class", "orm-reference-line");
+            line.setAttribute("x1", x1);
+            line.setAttribute("y1", y1);
+            line.setAttribute("x2", x2);
+            line.setAttribute("y2", y2);
+            g.appendChild(line);
 
-        const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
-        label.setAttribute("class", "orm-reference-label");
-        label.setAttribute("x", midX);
-        label.setAttribute("y", midY);
-        label.setAttribute("text-anchor", "middle");
-        label.textContent = pRef.Name || "";
-        g.appendChild(label);
+            const midX = (x1 + x2) / 2;
+            const midY = (y1 + y2) / 2 - 10;
+
+            const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            label.setAttribute("class", "orm-reference-label");
+            label.setAttribute("x", midX);
+            label.setAttribute("y", midY);
+            label.setAttribute("text-anchor", "middle");
+            label.textContent = pRef.Name || "";
+            g.appendChild(label);
+        }
 
         g.addEventListener("click", function(e) {
             e.stopPropagation();
@@ -524,46 +569,6 @@
         });
 
         return g;
-    }
-
-    function UpdateRelationEndpoints(pTableID)
-    {
-        for (const ref of _Model.References)
-        {
-            if (ref.SourceID === pTableID || ref.TargetID === pTableID)
-            {
-                const sourceTable = _Model.Tables.find(t => t.ID === ref.SourceID);
-                const targetTable = _Model.Tables.find(t => t.ID === ref.TargetID);
-
-                if (!sourceTable || !targetTable)
-                    continue;
-
-                const g = _RelationsLayer.querySelector('[data-id="' + ref.ID + '"]');
-                if (!g)
-                    continue;
-
-                const line = g.querySelector(".orm-reference-line");
-                if (!line)
-                    continue;
-
-                const x1 = sourceTable.X + (sourceTable.Width || 200);
-                const y1 = sourceTable.Y + (sourceTable.Height || 150) / 2;
-                const x2 = targetTable.X;
-                const y2 = targetTable.Y + (targetTable.Height || 150) / 2;
-
-                line.setAttribute("x1", x1);
-                line.setAttribute("y1", y1);
-                line.setAttribute("x2", x2);
-                line.setAttribute("y2", y2);
-
-                const label = g.querySelector(".orm-reference-label");
-                if (label)
-                {
-                    label.setAttribute("x", (x1 + x2) / 2);
-                    label.setAttribute("y", (y1 + y2) / 2 - 10);
-                }
-            }
-        }
     }
 
     function UpdateSelectionVisuals()

@@ -38,8 +38,8 @@ export interface XIAddTableData
 
 export interface XIAddReferenceData
 {
-    SourceID: string;
-    TargetID: string;
+    SourceFieldID: string;
+    TargetTableID: string;
     Name?: string;
 }
 
@@ -157,8 +157,8 @@ export class XORMController
         try
         {
             const reference = this.Design.CreateReference({
-                SourceID: pData.SourceID,
-                TargetID: pData.TargetID,
+                SourceFieldID: pData.SourceFieldID,
+                TargetTableID: pData.TargetTableID,
                 Name: pData.Name
             });
 

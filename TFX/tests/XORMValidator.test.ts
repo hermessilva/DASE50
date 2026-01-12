@@ -216,7 +216,7 @@ describe("XORMValidator", () =>
 
     describe("Reference validation", () =>
     {
-        it("should error when reference has no source table", () =>
+        it("should error when reference has no source field", () =>
         {
             const doc = new XORMDocument();
             const table = new XORMTable();
@@ -231,7 +231,7 @@ describe("XORMValidator", () =>
             const validator = new XORMValidator();
             const issues = validator.Validate(doc);
 
-            const error = issues.find(i => i.Message.includes("Reference source table is not defined"));
+            const error = issues.find(i => i.Message.includes("Reference source field is not defined"));
             expect(error).toBeDefined();
             expect(error?.Severity).toBe(XDesignerErrorSeverity.Error);
         });
@@ -242,10 +242,14 @@ describe("XORMValidator", () =>
             const table = new XORMTable();
             table.Name = "Users";
             doc.Design.AppendChild(table);
+            
+            const field = new XORMField();
+            field.Name = "FK";
+            table.AppendChild(field);
 
             const ref = new XORMReference();
             ref.Name = "Ref1";
-            ref.Source = table.ID;
+            ref.Source = field.ID;
             doc.Design.AppendChild(ref);
 
             const validator = new XORMValidator();
@@ -256,7 +260,7 @@ describe("XORMValidator", () =>
             expect(error?.Severity).toBe(XDesignerErrorSeverity.Error);
         });
 
-        it("should error when reference source table does not exist", () =>
+        it("should error when reference source field does not exist", () =>
         {
             const doc = new XORMDocument();
             const table = new XORMTable();
@@ -272,7 +276,7 @@ describe("XORMValidator", () =>
             const validator = new XORMValidator();
             const issues = validator.Validate(doc);
 
-            const error = issues.find(i => i.Message.includes("Reference source table not found"));
+            const error = issues.find(i => i.Message.includes("Reference source field not found"));
             expect(error).toBeDefined();
             expect(error?.Severity).toBe(XDesignerErrorSeverity.Error);
         });
@@ -283,10 +287,14 @@ describe("XORMValidator", () =>
             const table = new XORMTable();
             table.Name = "Users";
             doc.Design.AppendChild(table);
+            
+            const field = new XORMField();
+            field.Name = "FK";
+            table.AppendChild(field);
 
             const ref = new XORMReference();
             ref.Name = "Ref1";
-            ref.Source = table.ID;
+            ref.Source = field.ID;
             ref.Target = XGuid.NewValue();
             doc.Design.AppendChild(ref);
 
@@ -305,11 +313,16 @@ describe("XORMValidator", () =>
             table.InitializeNew();
             table.Name = "Users";
             doc.Design.AppendChild(table);
+            
+            const field = new XORMField();
+            field.InitializeNew();
+            field.Name = "ParentID";
+            table.AppendChild(field);
 
             const ref = new XORMReference();
             ref.InitializeNew();
             ref.Name = "SelfRef";
-            ref.Source = table.ID;
+            ref.Source = field.ID;
             ref.Target = table.ID;
             doc.Design.AppendChild(ref);
 
@@ -322,7 +335,7 @@ describe("XORMValidator", () =>
             expect(warning?.ElementID).toBe(ref.ID);
         });
 
-        it("should pass when reference has valid source and target", () =>
+        it("should pass when reference has valid source field and target table", () =>
         {
             const doc = new XORMDocument();
             
@@ -335,12 +348,17 @@ describe("XORMValidator", () =>
             table2.InitializeNew();
             table2.Name = "Orders";
             doc.Design.AppendChild(table2);
+            
+            const fkField = new XORMField();
+            fkField.InitializeNew();
+            fkField.Name = "UserID";
+            table2.AppendChild(fkField);
 
             const ref = new XORMReference();
             ref.InitializeNew();
             ref.Name = "UserOrders";
-            ref.Source = table1.ID;
-            ref.Target = table2.ID;
+            ref.Source = fkField.ID;
+            ref.Target = table1.ID;
             doc.Design.AppendChild(ref);
 
             const validator = new XORMValidator();
@@ -348,6 +366,70 @@ describe("XORMValidator", () =>
 
             const error = issues.find(i => i.ElementID === ref.ID && i.Severity === XDesignerErrorSeverity.Error);
             expect(error).toBeUndefined();
+        });
+
+        it("should handle when sourceField has no ParentNode (orphan field)", () =>
+        {
+            const doc = new XORMDocument();
+            const table = new XORMTable();
+            table.InitializeNew();
+            table.Name = "Users";
+            doc.Design.AppendChild(table);
+            
+            // Create orphan field (not attached to any table)
+            const field = new XORMField();
+            field.InitializeNew();
+            field.Name = "OrphanField";
+
+            // Create reference using the orphan field
+            const ref = new XORMReference();
+            ref.InitializeNew();
+            ref.Name = "TestRef";
+            ref.Source = field.ID;
+            ref.Target = table.ID;
+            doc.Design.AppendChild(ref);
+
+            // Mock FindFieldByID to return the orphan field
+            const originalFindFieldByID = doc.Design.FindFieldByID;
+            doc.Design.FindFieldByID = (pID: string) => pID === field.ID ? field : originalFindFieldByID.call(doc.Design, pID);
+
+            const validator = new XORMValidator();
+            const issues = validator.Validate(doc);
+
+            // Should not warn about self-referencing because ParentNode is null/not XORMTable
+            const warning = issues.find(i => i.Message.includes("Self-referencing relation"));
+            expect(warning).toBeUndefined();
+
+            // Restore
+            doc.Design.FindFieldByID = originalFindFieldByID;
+        });
+
+        it("should handle when FindFieldByID returns null (line 118 else branch)", () =>
+        {
+            const doc = new XORMDocument();
+            const table = new XORMTable();
+            table.InitializeNew();
+            table.Name = "Users";
+            doc.Design.AppendChild(table);
+
+            // Create reference with source field ID that doesn't exist
+            const ref = new XORMReference();
+            ref.InitializeNew();
+            ref.Name = "TestRef";
+            ref.Source = XGuid.NewValue(); // Non-existent field
+            ref.Target = table.ID;
+            doc.Design.AppendChild(ref);
+
+            const validator = new XORMValidator();
+            const issues = validator.Validate(doc);
+
+            // Should not warn about self-referencing because sourceField is null
+            const warning = issues.find(i => i.Message.includes("Self-referencing relation"));
+            expect(warning).toBeUndefined();
+
+            // But should have error about source field not found
+            const error = issues.find(i => i.Message.includes("Reference source field not found"));
+            expect(error).toBeDefined();
         });
     });
 
@@ -393,8 +475,8 @@ describe("XORMValidator", () =>
             const ref = new XORMReference();
             ref.InitializeNew();
             ref.Name = "UserOrders";
-            ref.Source = usersTable.ID;
-            ref.Target = ordersTable.ID;
+            ref.Source = userIDField.ID;
+            ref.Target = usersTable.ID;
             doc.Design.AppendChild(ref);
 
             const validator = new XORMValidator();

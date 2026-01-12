@@ -374,8 +374,16 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         const result = pState.MoveElement(pPayload.ElementID, pPayload.X, pPayload.Y);
         if (result.Success)
         {
-            // Don't reload the model - the webview already has the updated position
-            // Just mark as dirty
+            // Route all lines to update connections after table movement
+            pState.AlignLines();
+            
+            // Reload model with updated line positions
+            const modelData = await pState.GetModelData();
+            pPanel.webview.postMessage({
+                Type: XDesignerMessageType.LoadModel,
+                Payload: modelData
+            });
+            
             this.NotifyDocumentChanged(pState);
         }
     }
@@ -408,6 +416,9 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
 
         if (result.Success)
         {
+            // Route all lines to apply proper alignment and collision avoidance
+            pState.AlignLines();
+            
             const modelData = await pState.GetModelData();
             pPanel.webview.postMessage({
                 Type: XDesignerMessageType.LoadModel,

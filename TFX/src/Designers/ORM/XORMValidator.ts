@@ -92,6 +92,10 @@ export class XORMValidator extends XValidator<XORMDocument, XORMDesign>
         const references = pDesign.GetChildrenOfType(XORMReference);
         const tables = pDesign.GetChildrenOfType(XORMTable);
         const tableIDs = new Set(tables.map(t => t.ID));
+        const fieldIDs = new Set<string>();
+        for (const table of tables)
+            for (const field of table.GetFields())
+                fieldIDs.add(field.ID);
 
         for (const ref of references)
         {
@@ -99,17 +103,25 @@ export class XORMValidator extends XValidator<XORMDocument, XORMDesign>
             const tgtID = ref.TargetID;
 
             if (!XGuid.IsFullValue(srcID))
-                this.AddError(ref.ID, ref.Name, "Reference source table is not defined.");
-            else if (!tableIDs.has(srcID))
-                this.AddError(ref.ID, ref.Name, "Reference source table not found.");
+                this.AddError(ref.ID, ref.Name, "Reference source field is not defined.");
+            else if (!fieldIDs.has(srcID))
+                this.AddError(ref.ID, ref.Name, "Reference source field not found.");
 
             if (!XGuid.IsFullValue(tgtID))
                 this.AddError(ref.ID, ref.Name, "Reference target table is not defined.");
             else if (!tableIDs.has(tgtID))
                 this.AddError(ref.ID, ref.Name, "Reference target table not found.");
 
-            if (srcID === tgtID && XGuid.IsFullValue(srcID))
-                this.AddWarning(ref.ID, ref.Name, "Self-referencing relation.");
+            if (XGuid.IsFullValue(srcID) && XGuid.IsFullValue(tgtID))
+            {
+                const sourceField = pDesign.FindFieldByID(srcID);
+                if (sourceField !== null)
+                {
+                    const sourceTable = sourceField.ParentNode as XORMTable;
+                    if (sourceTable instanceof XORMTable && sourceTable.ID === tgtID)
+                        this.AddWarning(ref.ID, ref.Name, "Self-referencing relation.");
+                }
+            }
         }
     }
 }

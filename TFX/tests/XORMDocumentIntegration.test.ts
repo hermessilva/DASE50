@@ -112,10 +112,13 @@ describe("XORMDocument Integration Tests", () => {
 
         const table1 = doc.Design!.CreateTable({ X: 50, Y: 100, Width: 200, Height: 150, Name: "Customers" });
         const table2 = doc.Design!.CreateTable({ X: 250, Y: 150, Width: 200, Height: 150, Name: "Orders" });
+        
+        // Create the FK field in Orders table
+        const fkField = table2.CreateField({ Name: "CustomerID" });
 
         const ref = doc.Design!.CreateReference({ 
-            SourceID: table1.ID, 
-            TargetID: table2.ID, 
+            SourceFieldID: fkField.ID, 
+            TargetTableID: table1.ID, 
             Name: "FK_Orders_Customers" 
         });
 
@@ -187,24 +190,25 @@ describe("XORMDocument Integration Tests", () => {
 
         // Add fields to orders
         orders.CreateField({ Name: "OrderID", DataType: "Int32", IsPrimaryKey: true });
-        orders.CreateField({ Name: "CustomerID", DataType: "Int32", IsNullable: false });
+        const orderCustomerID = orders.CreateField({ Name: "CustomerID", DataType: "Int32", IsNullable: false });
         orders.CreateField({ Name: "OrderDate", DataType: "DateTime", IsNullable: false });
+        const orderProductID = orders.CreateField({ Name: "ProductID", DataType: "Int32", IsNullable: false });
 
         // Add fields to products
         products.CreateField({ Name: "ProductID", DataType: "Int32", IsPrimaryKey: true });
         products.CreateField({ Name: "ProductName", DataType: "String", IsNullable: false });
         products.CreateField({ Name: "Price", DataType: "Decimal", IsNullable: false });
 
-        // Create references
+        // Create references - Source is FIELD, Target is TABLE
         const fkOrderCustomer = doc.Design!.CreateReference({
-            SourceID: orders.ID,
-            TargetID: customers.ID,
+            SourceFieldID: orderCustomerID.ID,
+            TargetTableID: customers.ID,
             Name: "FK_Orders_Customers"
         });
 
         const fkOrderProduct = doc.Design!.CreateReference({
-            SourceID: orders.ID,
-            TargetID: products.ID,
+            SourceFieldID: orderProductID.ID,
+            TargetTableID: products.ID,
             Name: "FK_Orders_Products"
         });
 
@@ -355,12 +359,12 @@ describe("XORMDocument Integration Tests", () => {
 
         // 9. Verify reference Source and Target are set
         expect(loadedFkOrderCustomer!.Source).toBeDefined();
-        expect(loadedFkOrderCustomer!.Source).toBe(orders.ID);
+        expect(loadedFkOrderCustomer!.Source).toBe(orderCustomerID.ID);
         expect(loadedFkOrderCustomer!.Target).toBeDefined();
         expect(loadedFkOrderCustomer!.Target).toBe(customers.ID);
 
         expect(loadedFkOrderProduct!.Source).toBeDefined();
-        expect(loadedFkOrderProduct!.Source).toBe(orders.ID);
+        expect(loadedFkOrderProduct!.Source).toBe(orderProductID.ID);
         expect(loadedFkOrderProduct!.Target).toBeDefined();
         expect(loadedFkOrderProduct!.Target).toBe(products.ID);
 
