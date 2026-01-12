@@ -221,8 +221,28 @@ export class XTypeConverter
             {
                 if (!pValue)
                     return "{X=0;Y=0;Width=0;Height=0}";
-                const x = ("X" in pValue ? pValue.X : (pValue as { Left?: number }).Left) ?? 0;
-                const y = ("Y" in pValue ? pValue.Y : (pValue as { Top?: number }).Top) ?? 0;
+                
+                // XRect uses Left/Top, XIRect uses X/Y
+                // Prioritize Left/Top if they exist (XRect), otherwise use X/Y (XIRect)
+                let x: number;
+                let y: number;
+                
+                if ("Left" in pValue && pValue.Left !== undefined) {
+                    x = pValue.Left;
+                } else if ("X" in pValue && pValue.X !== undefined) {
+                    x = pValue.X;
+                } else {
+                    x = 0;
+                }
+                
+                if ("Top" in pValue && pValue.Top !== undefined) {
+                    y = pValue.Top;
+                } else if ("Y" in pValue && pValue.Y !== undefined) {
+                    y = pValue.Y;
+                } else {
+                    y = 0;
+                }
+                
                 const w = pValue.Width ?? 0;
                 const h = pValue.Height ?? 0;
                 return `{X=${x};Y=${y};Width=${w};Height=${h}}`;
