@@ -180,6 +180,36 @@ jobs:
           minColorRange: 50
 
   # ====================
+  # Update README with real badge URLs
+  # ====================
+  update-readme:
+    name: Update README Badges
+    runs-on: ubuntu-latest
+    needs: badges
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push' && vars.BADGE_GIST_ID != ''
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update README with Gist ID
+        run: node scripts/update-readme-badges.js ${{ vars.BADGE_GIST_ID }}
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: update README badges with Gist ID [skip ci]"
+            git push
+          fi
+
+  # ====================
   # Package Extension (only on master push)
   # ====================
   package:

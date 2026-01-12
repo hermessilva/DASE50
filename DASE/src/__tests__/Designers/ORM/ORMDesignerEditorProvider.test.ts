@@ -222,7 +222,9 @@ describe('XORMDesignerEditorProvider', () => {
             
             await provider.saveCustomDocumentAs(mockDoc as any, newUri as any, token);
 
-            expect(state.IsDirty).toBe(false);
+            // VS Code automatically clears dirty state after successful save
+            // We don't manually set IsDirty = false anymore
+            // The document will be disposed and replaced by VS Code
         });
 
         it('should do nothing when state not found', async () => {
@@ -904,13 +906,11 @@ describe('XORMDesignerEditorProvider', () => {
             (provider as any)._Webviews.set(uri.toString(), mockPanel);
             (provider as any)._Documents.set(uri.toString(), mockDoc);
 
-            // Spy on the event emitter
-            const fireSpy = jest.spyOn((provider as any)._OnDidChangeCustomDocument, 'fire');
-
             // Call OnAddTable which calls NotifyDocumentChanged internally
             await (provider as any).OnAddTable(mockPanel, mockState, { X: 100, Y: 200, Name: 'Test' });
 
-            expect(fireSpy).toHaveBeenCalledWith({ document: mockDoc });
+            // Verify that state was marked as dirty
+            // The event is fired by the OnStateChanged listener registered in resolveCustomEditor
             expect(mockState.IsDirty).toBe(true);
         });
     });

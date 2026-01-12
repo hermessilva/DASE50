@@ -123,6 +123,15 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         this._Webviews.set(pDocument.uri.toString(), pWebviewPanel);
         this._Documents.set(pDocument.uri.toString(), pDocument);
 
+        // Listen to state changes to notify VS Code about dirty state
+        state.OnStateChanged((e) => {
+            if (e.IsDirty)
+            {
+                // Only fire when becoming dirty - VS Code handles clean state automatically after save
+                this._OnDidChangeCustomDocument.fire({ document: pDocument });
+            }
+        });
+
         pWebviewPanel.webview.options = {
             enableScripts: true,
             localResourceRoots: [
@@ -153,20 +162,35 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
 
     async saveCustomDocument(pDocument: ICustomDocument, _pCancellation: vscode.CancellationToken): Promise<void>
     {
+        GetLogService().Info(`saveCustomDocument called for: ${pDocument.uri.toString()}`);
         const state = this._States.get(pDocument.uri.toString());
         if (state)
+        {
             await state.Save();
+            GetLogService().Info(`Document saved successfully: ${pDocument.uri.toString()}`);
+        }
+        else
+        {
+            GetLogService().Error(`saveCustomDocument: State not found for ${pDocument.uri.toString()}`);
+        }
     }
 
     async saveCustomDocumentAs(pDocument: ICustomDocument, pDestination: vscode.Uri, _pCancellation: vscode.CancellationToken): Promise<void>
     {
+        GetLogService().Info(`saveCustomDocumentAs called: ${pDocument.uri.toString()} -> ${pDestination.toString()}`);
         const state = this._States.get(pDocument.uri.toString());
         if (state)
         {
             const text = state.Bridge.SaveOrmModelToText();
             const bytes = Buffer.from(text, "utf8");
             await vscode.workspace.fs.writeFile(pDestination, bytes);
-            state.IsDirty = false;
+            GetLogService().Info(`Document saved as successfully: ${pDestination.toString()}`);
+            // Note: Do not set IsDirty = false here. VS Code will close the old editor
+            // and open a new one for the destination URI.
+        }
+        else
+        {
+            GetLogService().Error(`saveCustomDocumentAs: State not found for ${pDocument.uri.toString()}`);
         }
     }
 
@@ -536,13 +560,8 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
 
     private NotifyDocumentChanged(pState: XORMDesignerState): void
     {
-        const key = pState.Document.uri.toString();
-        const document = this._Documents.get(key);
-        if (document)
-        {
-            pState.IsDirty = true;
-            this._OnDidChangeCustomDocument.fire({ document });
-        }
+        // Simply mark as dirty - the OnStateChanged listener will notify VS Code
+        pState.IsDirty = true;
     }
 
     async DeleteSelected(pUri: vscode.Uri): Promise<void>
