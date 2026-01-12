@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<XORMDocument ID="695d2535-bbd5-4fd9-ad62-ce1eabfc5761" Name="ORM Model">
+  <XValues>
+    <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">695d2535-bbd5-4fd9-ad62-ce1eabfc5761</XData>
+    <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">ORM Model</XData>
+  </XValues>
+  <XORMDesign>
+    <XORMTable ID="e8adeeb3-bd7b-4f01-a6aa-aa511375856a" Name="NewTable">
+      <XValues>
+        <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">e8adeeb3-bd7b-4f01-a6aa-aa511375856a</XData>
+        <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">NewTable</XData>
+        <XData Name="Bounds" ID="00000001-0001-0001-0003-000000000001" Type="Rect">{X=undefined;Y=undefined;Width=200;Height=150}</XData>
+      </XValues>
+    </XORMTable>
+  </XORMDesign>
+</XORMDocument>

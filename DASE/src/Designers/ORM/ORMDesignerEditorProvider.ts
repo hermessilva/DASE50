@@ -166,6 +166,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
             const text = state.Bridge.SaveOrmModelToText();
             const bytes = Buffer.from(text, "utf8");
             await vscode.workspace.fs.writeFile(pDestination, bytes);
+            state.IsDirty = false;
         }
     }
 

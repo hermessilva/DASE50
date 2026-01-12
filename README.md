@@ -1,10 +1,11 @@
 # DASE50 — Design-Aided Software Engineering
 
+[![CI](https://github.com/Tootega/DASE50/actions/workflows/ci.yml/badge.svg)](https://github.com/Tootega/DASE50/actions/workflows/ci.yml)
+
 ## TFX — Core Framework
 
-[![TFX CI](https://github.com/Tootega/DASE50/actions/workflows/tfx-ci.yml/badge.svg)](https://github.com/Tootega/DASE50/actions/workflows/tfx-ci.yml)
-![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
-![Tests](https://img.shields.io/badge/tests-1240%20passed-brightgreen)
+![TFX Tests](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Tootega/BADGE_GIST_ID/raw/tfx-tests.json)
+![TFX Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Tootega/BADGE_GIST_ID/raw/tfx-coverage.json)
 ![Node.js Version](https://img.shields.io/badge/node-%3E%3D%2020-blue.svg)
 ![Vitest](https://img.shields.io/badge/tested%20with-vitest-663399?logo=vitest)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-3178C6?logo=typescript&logoColor=white)
@@ -12,9 +13,8 @@
 
 ## DASE — VS Code Extension
 
-[![DASE CI](https://github.com/Tootega/DASE50/actions/workflows/dase-ci.yml/badge.svg)](https://github.com/Tootega/DASE50/actions/workflows/dase-ci.yml)
-![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
-![Tests](https://img.shields.io/badge/tests-341%20passed-brightgreen)
+![DASE Tests](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Tootega/BADGE_GIST_ID/raw/dase-tests.json)
+![DASE Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Tootega/BADGE_GIST_ID/raw/dase-coverage.json)
 ![Node.js Version](https://img.shields.io/badge/node-%3E%3D%2020-blue.svg)
 ![Jest](https://img.shields.io/badge/tested%20with-jest-C21325?logo=jest)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-3178C6?logo=typescript&logoColor=white)

@@ -1,0 +1,227 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  # ====================
+  # TFX Build and Test
+  # ====================
+  tfx:
+    name: TFX - Build and Test
+    runs-on: ubuntu-latest
+
+    outputs:
+      tests: ${{ steps.test-results.outputs.tests }}
+      coverage: ${{ steps.test-results.outputs.coverage }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: TFX/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: TFX
+
+      - name: Run build
+        run: npm run build
+        working-directory: TFX
+
+      - name: Run tests with coverage
+        run: npm run test:coverage
+        working-directory: TFX
+
+      - name: Extract test results
+        id: test-results
+        run: |
+          TESTS=$(cat TFX/test-results.json | jq '.numPassedTests')
+          COVERAGE=$(cat TFX/coverage/coverage-summary.json | jq '.total.lines.pct')
+          echo "tests=$TESTS" >> $GITHUB_OUTPUT
+          echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+
+      - name: Upload TFX coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfx-coverage-report
+          path: TFX/coverage/
+
+  # ====================
+  # DASE Build and Test (depends on TFX)
+  # ====================
+  dase:
+    name: DASE - Build and Test
+    runs-on: ubuntu-latest
+    needs: tfx
+
+    outputs:
+      tests: ${{ steps.test-results.outputs.tests }}
+      coverage: ${{ steps.test-results.outputs.coverage }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            TFX/package-lock.json
+            DASE/package-lock.json
+
+      - name: Install TFX dependencies
+        run: npm ci
+        working-directory: TFX
+
+      - name: Build TFX
+        run: npm run build
+        working-directory: TFX
+
+      - name: Install DASE dependencies
+        run: npm ci
+        working-directory: DASE
+
+      - name: Build DASE
+        run: npm run compile
+        working-directory: DASE
+
+      - name: Lint DASE
+        run: npm run lint
+        working-directory: DASE
+        continue-on-error: true
+
+      - name: Run tests with coverage
+        run: npm run test:coverage
+        working-directory: DASE
+
+      - name: Extract test results
+        id: test-results
+        run: |
+          TESTS=$(cat DASE/test-results.json | jq '.numPassedTests')
+          COVERAGE=$(cat DASE/coverage/coverage-summary.json | jq '.total.lines.pct')
+          echo "tests=$TESTS" >> $GITHUB_OUTPUT
+          echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+
+      - name: Upload DASE coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: dase-coverage-report
+          path: DASE/coverage/
+
+  # ====================
+  # Update Badges (only on master push)
+  # ====================
+  badges:
+    name: Update Badges
+    runs-on: ubuntu-latest
+    needs: [tfx, dase]
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+
+    steps:
+      - name: TFX Tests Badge
+        uses: schneegans/dynamic-badges-action@v1.7.0
+        with:
+          auth: ${{ secrets.GIST_SECRET }}
+          gistID: ${{ vars.BADGE_GIST_ID }}
+          filename: tfx-tests.json
+          label: TFX Tests
+          message: ${{ needs.tfx.outputs.tests }} passed
+          color: brightgreen
+
+      - name: TFX Coverage Badge
+        uses: schneegans/dynamic-badges-action@v1.7.0
+        with:
+          auth: ${{ secrets.GIST_SECRET }}
+          gistID: ${{ vars.BADGE_GIST_ID }}
+          filename: tfx-coverage.json
+          label: TFX Coverage
+          message: ${{ needs.tfx.outputs.coverage }}%
+          valColorRange: ${{ needs.tfx.outputs.coverage }}
+          maxColorRange: 100
+          minColorRange: 50
+
+      - name: DASE Tests Badge
+        uses: schneegans/dynamic-badges-action@v1.7.0
+        with:
+          auth: ${{ secrets.GIST_SECRET }}
+          gistID: ${{ vars.BADGE_GIST_ID }}
+          filename: dase-tests.json
+          label: DASE Tests
+          message: ${{ needs.dase.outputs.tests }} passed
+          color: brightgreen
+
+      - name: DASE Coverage Badge
+        uses: schneegans/dynamic-badges-action@v1.7.0
+        with:
+          auth: ${{ secrets.GIST_SECRET }}
+          gistID: ${{ vars.BADGE_GIST_ID }}
+          filename: dase-coverage.json
+          label: DASE Coverage
+          message: ${{ needs.dase.outputs.coverage }}%
+          valColorRange: ${{ needs.dase.outputs.coverage }}
+          maxColorRange: 100
+          minColorRange: 50
+
+  # ====================
+  # Package Extension (only on master push)
+  # ====================
+  package:
+    name: Package Extension
+    runs-on: ubuntu-latest
+    needs: dase
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            TFX/package-lock.json
+            DASE/package-lock.json
+
+      - name: Install TFX dependencies
+        run: npm ci
+        working-directory: TFX
+
+      - name: Build TFX
+        run: npm run build
+        working-directory: TFX
+
+      - name: Install DASE dependencies
+        run: npm ci
+        working-directory: DASE
+
+      - name: Build DASE
+        run: npm run compile
+        working-directory: DASE
+
+      - name: Install vsce
+        run: npm install -g @vscode/vsce
+
+      - name: Package extension
+        working-directory: DASE
+        run: vsce package --no-dependencies --out dase-${{ github.sha }}.vsix
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dase-vsix
+          path: DASE/dase-*.vsix

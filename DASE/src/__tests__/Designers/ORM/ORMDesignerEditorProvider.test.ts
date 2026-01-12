@@ -204,6 +204,27 @@ describe('XORMDesignerEditorProvider', () => {
             );
         });
 
+        it('should clear dirty state after save', async () => {
+            const uri = Uri.file('/test/model.dsorm');
+            const newUri = Uri.file('/test/model-copy.dsorm');
+            const mockDoc = { uri, dispose: jest.fn() };
+            const mockPanel = createMockWebviewPanel();
+            const token = {} as vscode.CancellationToken;
+
+            (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from('{}'));
+
+            await provider.resolveCustomEditor(mockDoc as any, mockPanel as any, token);
+            
+            // Get state and mark as dirty
+            const state = (provider as any)._States.get(uri.toString());
+            state.IsDirty = true;
+            expect(state.IsDirty).toBe(true);
+            
+            await provider.saveCustomDocumentAs(mockDoc as any, newUri as any, token);
+
+            expect(state.IsDirty).toBe(false);
+        });
+
         it('should do nothing when state not found', async () => {
             const uri = Uri.file('/test/unknown.dsorm');
             const newUri = Uri.file('/test/unknown-copy.dsorm');
