@@ -134,6 +134,11 @@ export class XTFXBridge
                     const result = this._Engine.Deserialize<XORMDocument>(pText);
                     if (result.Success && result.Data)
                     {
+                        // Initialize the document to consolidate multiple XORMDesign instances
+                        console.log('[TFXBridge] Before Initialize: ChildNodes count =', result.Data.ChildNodes?.length);
+                        result.Data.Initialize();
+                        console.log('[TFXBridge] After Initialize: ChildNodes count =', result.Data.ChildNodes?.length);
+                        console.log('[TFXBridge] Design children count =', result.Data.Design?.ChildNodes?.length);
                         this._Controller.Document = result.Data;
                         return result.Data;
                     }
