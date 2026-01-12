@@ -29,5 +29,6 @@ module.exports = {
             statements: 65
         }
     },
+    setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
     verbose: true
 };
