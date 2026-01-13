@@ -782,4 +782,122 @@ describe("XMath", () => {
             expect(rotated.Height).toBeGreaterThan(0);
         });
     });
+
+    describe("AddCorner", () => {
+        it("should calculate corner points for L-shaped orthogonal path (horizontal then vertical)", () => {
+            const corner = new XPoint(100, 50);
+            const before = new XPoint(50, 50);
+            const after = new XPoint(100, 100);
+
+            const result = XMath.AddCorner(corner, 10, before, after);
+
+            expect(result).not.toBeNull();
+            expect(result!.before.X).toBeLessThan(corner.X);
+            expect(result!.before.Y).toBe(corner.Y);
+            expect(result!.after.X).toBe(corner.X);
+            expect(result!.after.Y).toBeGreaterThan(corner.Y);
+            expect(result!.radius).toBe(10);
+        });
+
+        it("should calculate corner points for L-shaped orthogonal path (vertical then horizontal)", () => {
+            const corner = new XPoint(50, 100);
+            const before = new XPoint(50, 50);
+            const after = new XPoint(100, 100);
+
+            const result = XMath.AddCorner(corner, 10, before, after);
+
+            expect(result).not.toBeNull();
+            expect(result!.before.X).toBe(corner.X);
+            expect(result!.before.Y).toBeLessThan(corner.Y);
+            expect(result!.after.X).toBeGreaterThan(corner.X);
+            expect(result!.after.Y).toBe(corner.Y);
+            expect(result!.radius).toBe(10);
+        });
+
+        it("should reduce radius when segments are shorter than requested radius", () => {
+            const corner = new XPoint(100, 50);
+            const before = new XPoint(95, 50);
+            const after = new XPoint(100, 55);
+
+            const result = XMath.AddCorner(corner, 10, before, after);
+
+            expect(result).not.toBeNull();
+            expect(result!.radius).toBeLessThan(10);
+            expect(result!.radius).toBe(2.5);
+        });
+
+        it("should return null when corner equals before point", () => {
+            const corner = new XPoint(50, 50);
+            const before = new XPoint(50, 50);
+            const after = new XPoint(100, 50);
+
+            const result = XMath.AddCorner(corner, 10, before, after);
+
+            expect(result).toBeNull();
+        });
+
+        it("should return null when corner equals after point", () => {
+            const corner = new XPoint(100, 50);
+            const before = new XPoint(50, 50);
+            const after = new XPoint(100, 50);
+
+            const result = XMath.AddCorner(corner, 10, before, after);
+
+            expect(result).toBeNull();
+        });
+
+        it("should return null for non-orthogonal corners (diagonal)", () => {
+            const corner = new XPoint(50, 50);
+            const before = new XPoint(0, 0);
+            const after = new XPoint(100, 100);
+
+            const result = XMath.AddCorner(corner, 10, before, after);
+
+            expect(result).toBeNull();
+        });
+
+        it("should return null for collinear points", () => {
+            const corner = new XPoint(50, 50);
+            const before = new XPoint(0, 50);
+            const after = new XPoint(100, 50);
+
+            const result = XMath.AddCorner(corner, 10, before, after);
+
+            expect(result).toBeNull();
+        });
+
+        it("should return null when radius would be less than 1", () => {
+            const corner = new XPoint(100, 50);
+            const before = new XPoint(99.5, 50);
+            const after = new XPoint(100, 50.5);
+
+            const result = XMath.AddCorner(corner, 10, before, after);
+
+            expect(result).toBeNull();
+        });
+
+        it("should handle right angle going left-down", () => {
+            const corner = new XPoint(50, 50);
+            const before = new XPoint(100, 50);
+            const after = new XPoint(50, 100);
+
+            const result = XMath.AddCorner(corner, 10, before, after);
+
+            expect(result).not.toBeNull();
+            expect(result!.before.X).toBeGreaterThan(corner.X);
+            expect(result!.after.Y).toBeGreaterThan(corner.Y);
+        });
+
+        it("should handle right angle going up-right", () => {
+            const corner = new XPoint(50, 100);
+            const before = new XPoint(50, 150);
+            const after = new XPoint(100, 100);
+
+            const result = XMath.AddCorner(corner, 10, before, after);
+
+            expect(result).not.toBeNull();
+            expect(result!.before.Y).toBeGreaterThan(corner.Y);
+            expect(result!.after.X).toBeGreaterThan(corner.X);
+        });
+    });
 });

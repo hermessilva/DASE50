@@ -25,7 +25,8 @@ They live in the **same repository**, but they are **not** the same codebase, no
    - If something is unclear, search within the repository for the symbol/usages and follow the existing patterns.
 5. **When you mention an API/class/module**, always clarify which side it belongs to:
    - “(TFX) …” or “(DASE) …”
-6. **When changing behavior**, ensure you are not silently applying a DASE requirement inside TFX (or vice versa).
+6. **Never Portuguese** Any comments must be made exclusively in English.
+
 
 
 # TFX ORM Object Model Guidelines (Copilot Instructions)

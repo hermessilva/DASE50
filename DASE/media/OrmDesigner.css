@@ -141,20 +141,33 @@ body {
 }
 
 .orm-table-anchor {
-    fill: var(--vscode-focusBorder);
-    stroke: var(--vscode-panel-border);
-    stroke-width: 1;
+    fill: var(--vscode-editor-background);
+    stroke: white;
+    stroke-width: 0.25;
     opacity: 0;
     cursor: crosshair;
 }
 
 .orm-table:hover .orm-table-anchor {
-    opacity: 0.7;
+    opacity: 1;
 }
 
 .orm-table-anchor:hover {
-    opacity: 1 !important;
-    fill: var(--vscode-button-background);
+    fill: white;
+}
+
+/* Hover border (dashed) around table */
+.orm-table-hover-border {
+    fill: none;
+    stroke: white;
+    stroke-width: 0.25;
+    stroke-dasharray: 4 3;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.orm-table:hover .orm-table-hover-border {
+    opacity: 1;
 }
 
 .orm-reference {
@@ -164,7 +177,7 @@ body {
 .orm-reference-line {
     fill: none;
     stroke: var(--vscode-foreground);
-    stroke-width: 2;
+    stroke-width: 1;
     stroke-opacity: 0.7;
     marker-end: url(#arrowhead);
 }
@@ -176,6 +189,23 @@ body {
 
 .orm-reference.selected .orm-reference-line {
     stroke: var(--vscode-focusBorder);
+    stroke-width: 3;
+    stroke-opacity: 1;
+}
+
+/* FK Reference lines - not affected by table hover */
+.orm-fk-line {
+    fill: none;
+    stroke-width: 2;
+    stroke-opacity: 0.8;
+    marker-end: url(#arrowhead);
+}
+
+.orm-reference:hover .orm-fk-line {
+    stroke-opacity: 1;
+}
+
+.orm-reference.selected .orm-fk-line {
     stroke-width: 3;
     stroke-opacity: 1;
 }

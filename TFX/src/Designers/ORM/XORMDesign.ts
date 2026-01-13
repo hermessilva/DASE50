@@ -136,6 +136,7 @@ export class XORMDesign extends XDesign
 
     public CreateTable(pOptions?: XICreateTableOptions): XORMTable
     {
+        const headerHeight = 28;
         const table = new XORMTable();
         table.ID = XGuid.NewValue();
         table.Name = pOptions?.Name ?? this.GenerateTableName();
@@ -143,7 +144,7 @@ export class XORMDesign extends XDesign
             pOptions?.X ?? 0,
             pOptions?.Y ?? 0,
             pOptions?.Width ?? 200,
-            pOptions?.Height ?? 150
+            pOptions?.Height ?? headerHeight  // Empty table = header height only
         );
 
         // Adiciona listener para re-rotear quando Bounds mudar
@@ -159,6 +160,31 @@ export class XORMDesign extends XDesign
 
         this.AppendChild(table);
         return table;
+    }
+
+    /**
+     * Calculates the visual bounds of a table including dynamically calculated height.
+     * Visual height is calculated based on field count, matching the frontend rendering.
+     * @param pTable - The table to get visual bounds for
+     * @returns XRect with visual bounds (height is calculated, not stored value)
+     */
+    private GetVisualBounds(pTable: XORMTable): XRect
+    {
+        const headerHeight = 28;
+        const fieldHeight = 16;
+        const padding = 12;
+        
+        const fieldCount = pTable.GetFields().length;
+        const visualHeight = fieldCount > 0 
+            ? headerHeight + (fieldCount * fieldHeight) + padding
+            : headerHeight;
+        
+        return new XRect(
+            pTable.Bounds.Left,
+            pTable.Bounds.Top,
+            pTable.Bounds.Width,
+            visualHeight
+        );
     }
 
     public CreateReference(pOptions: XICreateReferenceOptions): XORMReference
@@ -320,6 +346,7 @@ export class XORMDesign extends XDesign
      * 4. Múltiplos segmentos ortogonais quando necessário
      * 5. NUNCA diagonal - sempre vertical ou horizontal
      * 6. Distribui pontos de conexão para evitar congestionamento
+     * 7. Espaça segmentos verticais quando múltiplas linhas vão para o mesmo target
      * 
      * @param pOptions - Opções de roteamento (ignoradas nesta implementação ORM)
      */
@@ -332,30 +359,40 @@ export class XORMDesign extends XDesign
         // Garante que listeners estão configurados (importante após load)
         this.SetupTableListeners();
 
-        // Contabiliza quantas conexões cada tabela recebe em cada lado
-        const connectionCounts = new Map<string, { Left: number; Right: number; Top: number; Bottom: number }>();
-        
-        // Inicializa contadores para cada tabela
-        for (const table of tables)
-        {
-            connectionCounts.set(table.ID, { Left: 0, Right: 0, Top: 0, Bottom: 0 });
-        }
-
+        // Agrupa referências por target para saber quantas linhas vão para cada destino
+        const refsByTarget = new Map<string, XORMReference[]>();
         for (const ref of references)
         {
-            console.log(`[XORMDesign.RouteAllLines] Routing reference ${ref.ID}, Source: ${ref.Source}, Target: ${ref.Target}`);
-            this.RouteReference(ref, tables, connectionCounts);
+            const targetID = ref.Target;
+            if (!refsByTarget.has(targetID))
+                refsByTarget.set(targetID, []);
+            refsByTarget.get(targetID)!.push(ref);
+        }
+
+        // Roteia cada referência, passando o índice da rota para aquele target
+        for (const ref of references)
+        {
+            const refsToSameTarget = refsByTarget.get(ref.Target)!;
+            const routeIndex = refsToSameTarget.indexOf(ref);
+            const totalRoutesToTarget = refsToSameTarget.length;
+            console.log(`[XORMDesign.RouteAllLines] Routing ref ${ref.ID.substring(0,8)}, Target: ${ref.Target.substring(0,8)}, routeIndex: ${routeIndex}, totalRoutes: ${totalRoutesToTarget}`);
+            this.RouteReference(ref, tables, routeIndex, totalRoutesToTarget);
         }
         console.log('[XORMDesign.RouteAllLines] Completed');
     }
 
     /**
      * Roteia uma referência específica com algoritmo ortogonal
+     * @param pRef - Referência a rotear
+     * @param pTables - Todas as tabelas do design
+     * @param pRouteIndex - Índice desta rota entre todas que vão para o mesmo target (0-based)
+     * @param pTotalRoutes - Total de rotas que vão para o mesmo target
      */
     private RouteReference(
         pRef: XORMReference, 
         pTables: XORMTable[],
-        pConnectionCounts: Map<string, { Left: number; Right: number; Top: number; Bottom: number }>
+        pRouteIndex: number,
+        pTotalRoutes: number
     ): void
     {
         console.log(`[RouteReference] Ref ID: ${pRef.ID}, Source: "${pRef.Source}", Target: "${pRef.Target}"`);
@@ -387,29 +424,40 @@ export class XORMDesign extends XDesign
         }
 
         // Calcula Y do campo source dentro da tabela
+        // ALINHADO com frontend: headerHeight=28, fieldHeight=16
+        // Frontend renders first field at y = headerHeight + 16 = 44 (relative to table)
+        // The line should connect at the center of the field row
         const fieldIndex = sourceTable.GetFields().findIndex(f => f.ID === sourceField.ID);
         if (fieldIndex < 0)
             return;
 
-        const headerHeight = 30;
-        const fieldHeight = 20;
-        const fieldY = sourceTable.Bounds.Top + headerHeight + (fieldIndex * fieldHeight) + (fieldHeight / 2);
+        const headerHeight = 28;
+        const fieldHeight = 16;
+        // First field text Y = headerHeight + 16, center of row = text Y - 4
+        // So first field center Y = headerHeight + 16 - 4 = headerHeight + 12
+        const firstFieldCenterY = headerHeight + 12;
+        const fieldY = sourceTable.Bounds.Top + firstFieldCenterY + (fieldIndex * fieldHeight);
+
+        // Use visual bounds (calculated height based on field count, not stored height)
+        const sourceBounds = this.GetVisualBounds(sourceTable);
+        const targetBounds = this.GetVisualBounds(targetTable);
 
         // Coleta obstáculos (todas as tabelas exceto source e target)
         const obstacles = pTables
             .filter(t => t.ID !== sourceTable.ID && t.ID !== targetTable.ID)
-            .map(t => t.Bounds);
+            .map(t => this.GetVisualBounds(t));
 
         // Calcula rota ortogonal evitando colisões
-        console.log(`[RouteReference] Source table at [${sourceTable.Bounds.Left},${sourceTable.Bounds.Top}], Target at [${targetTable.Bounds.Left},${targetTable.Bounds.Top}]`);
+        console.log(`[RouteReference] Source table at [${sourceBounds.Left},${sourceBounds.Top}], Target at [${targetBounds.Left},${targetBounds.Top}]`);
         console.log(`[RouteReference] Field Y: ${fieldY}`);
         
         const points = this.CalculateOrthogonalRoute(
-            sourceTable.Bounds,
-            targetTable.Bounds,
+            sourceBounds,
+            targetBounds,
             fieldY,
             obstacles,
-            pConnectionCounts.get(targetTable.ID) || { Left: 0, Right: 0, Top: 0, Bottom: 0 }
+            pRouteIndex,
+            pTotalRoutes
         );
         
         console.log(`[RouteReference] Calculated ${points.length} points:`);
@@ -430,18 +478,21 @@ export class XORMDesign extends XDesign
      * 4. Quando tabelas estão verticalmente alinhadas, usa rota em "C"
      * 5. NUNCA diagonal - sempre vertical ou horizontal
      * 6. Pontos de conexão são distribuídos para evitar congestionamento
+     * 7. Segmentos verticais intermediários são espaçados quando múltiplas linhas vão para o mesmo target
      */
     private CalculateOrthogonalRoute(
         pSourceBounds: XRect,
         pTargetBounds: XRect,
         pFieldY: number,
         pObstacles: XRect[],
-        pTargetConnections: { Left: number; Right: number; Top: number; Bottom: number }
+        pRouteIndex: number,
+        pTotalRoutes: number
     ): XPoint[]
     {
         const gap = 20; // Espaçamento mínimo das tabelas
         const minSegment = 30; // Tamanho mínimo do segmento inicial/final
-        const connectionSpacing = 15; // Espaçamento entre conexões no mesmo lado
+        const connectionSpacing = 25; // Espaçamento entre conexões no mesmo lado (aumentado para melhor visibilidade)
+        const verticalSegmentSpacing = 20; // Espaçamento entre segmentos verticais de rotas diferentes
         const points: XPoint[] = [];
 
         // Determina lado de saída do source baseado na posição relativa
@@ -461,21 +512,16 @@ export class XORMDesign extends XDesign
         console.log(`[CalculateOrthogonalRoute] Source bounds: [${pSourceBounds.Left},${pSourceBounds.Top},${pSourceBounds.Width}x${pSourceBounds.Height}]`);
         console.log(`[CalculateOrthogonalRoute] Target bounds: [${pTargetBounds.Left},${pTargetBounds.Top},${pTargetBounds.Width}x${pTargetBounds.Height}]`);
 
-        // Incrementa o contador de conexões para este lado
-        pTargetConnections[targetSide === XConnectionSide.Left ? 'Left' :
-                          targetSide === XConnectionSide.Right ? 'Right' :
-                          targetSide === XConnectionSide.Top ? 'Top' : 'Bottom']++;
-        
-        // Obtém o índice da conexão atual (1-based, após incrementar)
-        const connectionIndex = pTargetConnections[
-            targetSide === XConnectionSide.Left ? 'Left' :
-            targetSide === XConnectionSide.Right ? 'Right' :
-            targetSide === XConnectionSide.Top ? 'Top' : 'Bottom'
-        ];
-
-        // Calcula ponto de entrada no target com offset para evitar congestionamento
-        const targetEntry = this.GetTargetEntryPoint(pTargetBounds, targetSide, connectionIndex, connectionSpacing);
-        console.log(`[CalculateOrthogonalRoute] Target entry point: [${targetEntry.X},${targetEntry.Y}], connection index: ${connectionIndex}`);
+        // Calcula ponto de entrada no target distribuído simetricamente
+        // Usa routeIndex/totalRoutes para linhas que vão para o mesmo target
+        const targetEntry = this.GetTargetEntryPoint(
+            pTargetBounds, 
+            targetSide, 
+            pRouteIndex, 
+            pTotalRoutes, 
+            connectionSpacing
+        );
+        console.log(`[CalculateOrthogonalRoute] Target entry point: [${targetEntry.X},${targetEntry.Y}], routeIndex: ${pRouteIndex}/${pTotalRoutes}`);
 
         // Calcula rota ortogonal
         const routePoints = this.BuildOrthogonalPath(
@@ -487,7 +533,10 @@ export class XORMDesign extends XDesign
             pTargetBounds,
             pObstacles,
             gap,
-            minSegment
+            minSegment,
+            pRouteIndex,
+            pTotalRoutes,
+            verticalSegmentSpacing
         );
 
         console.log(`[CalculateOrthogonalRoute] Route points (${routePoints.length}):`);
@@ -571,24 +620,28 @@ export class XORMDesign extends XDesign
 
     /**
      * Obtém o ponto de entrada na tabela target baseado no lado
-     * O ponto é distribuído para evitar congestionamento quando há múltiplas conexões
+     * O ponto é distribuído simetricamente para linhas que vão para o mesmo target
      * @param pTargetBounds - Bounds da tabela target
      * @param pSide - Lado de entrada
-     * @param pConnectionIndex - Índice da conexão (1-based)
+     * @param pRouteIndex - Índice desta rota (0-based) entre rotas para o mesmo target
+     * @param pTotalRoutes - Total de rotas para o mesmo target
      * @param pSpacing - Espaçamento entre conexões
      */
     private GetTargetEntryPoint(
         pTargetBounds: XRect, 
         pSide: XConnectionSide,
-        pConnectionIndex: number,
+        pRouteIndex: number,
+        pTotalRoutes: number,
         pSpacing: number
     ): XPoint
     {
-        // Calcula offset baseado no índice da conexão
-        // Para a primeira conexão (index 1), usa o centro
-        // Para conexões subsequentes, alterna para cima/baixo ou esquerda/direita
-        const offset = pConnectionIndex === 1 ? 0 : 
-                       (pConnectionIndex % 2 === 0 ? -1 : 1) * Math.ceil(pConnectionIndex / 2) * pSpacing;
+        // Calcula offset simétrico baseado no índice da rota
+        // Distribui as rotas simetricamente em torno do centro
+        const offset = pTotalRoutes > 1
+            ? (pRouteIndex - (pTotalRoutes - 1) / 2) * pSpacing
+            : 0;
+        
+        console.log(`[GetTargetEntryPoint] routeIndex=${pRouteIndex}, totalRoutes=${pTotalRoutes}, spacing=${pSpacing}, OFFSET=${offset}`);
         
         const centerX = pTargetBounds.Left + pTargetBounds.Width / 2;
         const centerY = pTargetBounds.Top + pTargetBounds.Height / 2;
@@ -603,15 +656,19 @@ export class XORMDesign extends XDesign
         {
             case XConnectionSide.Left:
                 // Entra pela esquerda - varia Y
+                console.log(`[GetTargetEntryPoint] Side=LEFT, centerY=${centerY}, clampedOffsetY=${clampedOffsetY}, finalY=${centerY + clampedOffsetY}`);
                 return new XPoint(pTargetBounds.Left, centerY + clampedOffsetY);
             case XConnectionSide.Right:
                 // Entra pela direita - varia Y
+                console.log(`[GetTargetEntryPoint] Side=RIGHT, centerY=${centerY}, clampedOffsetY=${clampedOffsetY}, finalY=${centerY + clampedOffsetY}`);
                 return new XPoint(pTargetBounds.Right, centerY + clampedOffsetY);
             case XConnectionSide.Top:
                 // Entra por cima - varia X
+                console.log(`[GetTargetEntryPoint] Side=TOP, centerX=${centerX}, clampedOffsetX=${clampedOffsetX}, finalX=${centerX + clampedOffsetX}`);
                 return new XPoint(centerX + clampedOffsetX, pTargetBounds.Top);
             case XConnectionSide.Bottom:
                 // Entra por baixo - varia X
+                console.log(`[GetTargetEntryPoint] Side=BOTTOM, centerX=${centerX}, clampedOffsetX=${clampedOffsetX}, finalX=${centerX + clampedOffsetX}`);
                 return new XPoint(centerX + clampedOffsetX, pTargetBounds.Bottom);
         }
     }
@@ -619,6 +676,9 @@ export class XORMDesign extends XDesign
     /**
      * Constrói caminho ortogonal com segmentos mínimos garantidos
      * REGRA CRÍTICA: Nunca diagonal - sempre segmentos verticais ou horizontais
+     * @param pRouteIndex - Índice desta rota (0-based) entre rotas para o mesmo target
+     * @param pTotalRoutes - Total de rotas para o mesmo target
+     * @param pVerticalSpacing - Espaçamento entre segmentos verticais
      */
     private BuildOrthogonalPath(
         pStart: XPoint,
@@ -629,10 +689,19 @@ export class XORMDesign extends XDesign
         pTargetBounds: XRect,
         pObstacles: XRect[],
         pGap: number,
-        pMinSegment: number
+        pMinSegment: number,
+        pRouteIndex: number,
+        pTotalRoutes: number,
+        pVerticalSpacing: number
     ): XPoint[]
     {
         const points: XPoint[] = [];
+
+        // Calcula offset para espaçar segmentos verticais quando há múltiplas rotas
+        // Distribui as rotas simetricamente em torno do ponto médio
+        const routeOffset = pTotalRoutes > 1
+            ? (pRouteIndex - (pTotalRoutes - 1) / 2) * pVerticalSpacing
+            : 0;
 
         // Calcula X do primeiro segmento horizontal (com tamanho mínimo)
         const firstSegmentX = pSourceExitsRight 
@@ -646,9 +715,10 @@ export class XORMDesign extends XDesign
         if (isCRoute)
         {
             // Rota em C - contorna por fora (usado quando tabelas estão verticalmente alinhadas)
+            // Aplica offset para espaçar múltiplas rotas
             const outerX = pSourceExitsRight
-                ? Math.max(pSourceBounds.Right, pTargetBounds.Right) + pMinSegment + pGap
-                : Math.min(pSourceBounds.Left, pTargetBounds.Left) - pMinSegment - pGap;
+                ? Math.max(pSourceBounds.Right, pTargetBounds.Right) + pMinSegment + pGap + Math.abs(routeOffset)
+                : Math.min(pSourceBounds.Left, pTargetBounds.Left) - pMinSegment - pGap - Math.abs(routeOffset);
             
             // Primeiro segmento horizontal
             points.push(new XPoint(outerX, pStart.Y));
@@ -680,13 +750,21 @@ export class XORMDesign extends XDesign
             {
                 // Source sai pela direita, target recebe pela esquerda
                 // midX deve ser >= firstSegmentX e <= targetApproachX
-                midX = Math.max(firstSegmentX, Math.min(targetApproachX, (firstSegmentX + targetApproachX) / 2));
+                const baseMidX = Math.max(firstSegmentX, Math.min(targetApproachX, (firstSegmentX + targetApproachX) / 2));
+                // Aplica offset para espaçar múltiplas rotas
+                midX = baseMidX + routeOffset;
+                // Garante que não ultrapassa os limites
+                midX = Math.max(firstSegmentX, Math.min(targetApproachX, midX));
             }
             else
             {
                 // Source sai pela esquerda, target recebe pela direita
                 // midX deve ser <= firstSegmentX e >= targetApproachX
-                midX = Math.min(firstSegmentX, Math.max(targetApproachX, (firstSegmentX + targetApproachX) / 2));
+                const baseMidX = Math.min(firstSegmentX, Math.max(targetApproachX, (firstSegmentX + targetApproachX) / 2));
+                // Aplica offset para espaçar múltiplas rotas (inverte direção)
+                midX = baseMidX - routeOffset;
+                // Garante que não ultrapassa os limites
+                midX = Math.min(firstSegmentX, Math.max(targetApproachX, midX));
             }
             
             // Verifica se há colisão no caminho
@@ -705,6 +783,8 @@ export class XORMDesign extends XDesign
                     pSourceExitsRight,
                     pSourceBounds, pTargetBounds, pObstacles, pGap, pMinSegment
                 );
+                // Aplica offset mesmo após recalcular para evitar colisão
+                midX = pSourceExitsRight ? midX + routeOffset : midX - routeOffset;
             }
 
             // Primeiro segmento horizontal (garante tamanho mínimo)
@@ -728,12 +808,21 @@ export class XORMDesign extends XDesign
             // 4. Vertical (entra no target com segmento mínimo)
             
             // Calcula Y de approach (distância mínima do target)
-            const approachY = pTargetSide === XConnectionSide.Top
+            // Aplica offset para espaçar múltiplas rotas
+            const baseApproachY = pTargetSide === XConnectionSide.Top
                 ? pTargetBounds.Top - pMinSegment
                 : pTargetBounds.Bottom + pMinSegment;
+            const approachY = pTargetSide === XConnectionSide.Top
+                ? baseApproachY - Math.abs(routeOffset)
+                : baseApproachY + Math.abs(routeOffset);
+            
+            // Aplica offset ao firstSegmentX para espaçar múltiplas rotas
+            const adjustedFirstSegmentX = pSourceExitsRight
+                ? firstSegmentX + Math.abs(routeOffset)
+                : firstSegmentX - Math.abs(routeOffset);
             
             // Ponto 1: Segmento horizontal mínimo saindo do source
-            points.push(new XPoint(firstSegmentX, pStart.Y));
+            points.push(new XPoint(adjustedFirstSegmentX, pStart.Y));
             
             // Ponto 2: Segmento vertical até altura de approach
             // Escolhe ir para o approach Y ou ficar no mesmo Y se já está perto
@@ -742,10 +831,10 @@ export class XORMDesign extends XDesign
             );
             
             if (Math.abs(pStart.Y - intermediateY) > 1)
-                points.push(new XPoint(firstSegmentX, intermediateY));
+                points.push(new XPoint(adjustedFirstSegmentX, intermediateY));
             
             // Ponto 3: Segmento horizontal até alinhar com X do target entry
-            if (Math.abs(firstSegmentX - pEnd.X) > 1)
+            if (Math.abs(adjustedFirstSegmentX - pEnd.X) > 1)
                 points.push(new XPoint(pEnd.X, intermediateY));
             
             // Ponto 4: Segmento vertical de approach até target entry

@@ -803,4 +803,44 @@ export class XMath {
         const y = Math.abs(pSize.Width * Math.cos(pDegree)) + Math.abs(pSize.Height * Math.sin(pDegree));
         return { Width: x, Height: y };
     }
+
+    /**
+     * Calcula os pontos para criar um canto arredondado em uma linha ortogonal.
+     * Usado para criar curvas Bezier suaves nos cantos de linhas de roteamento.
+     * @param pCorner - Ponto do canto (vértice)
+     * @param pRound - Raio máximo de arredondamento desejado
+     * @param pBefore - Ponto antes do canto (na mesma linha)
+     * @param pAfter - Ponto depois do canto (na mesma linha)
+     * @returns Objeto com os pontos ajustados { before, after, radius } ou null se não há canto válido
+     */
+    static AddCorner(
+        pCorner: XPoint,
+        pRound: number,
+        pBefore: XPoint,
+        pAfter: XPoint
+    ): { before: XPoint; after: XPoint; radius: number } | null {
+        const p1 = new XPoint(XMath.Round(pBefore.X, 1), XMath.Round(pBefore.Y, 1));
+        const p2 = new XPoint(XMath.Round(pAfter.X, 1), XMath.Round(pAfter.Y, 1));
+        const c = new XPoint(XMath.Round(pCorner.X, 1), XMath.Round(pCorner.Y, 1));
+
+        if (c.X === p1.X && c.Y === p1.Y) return null;
+        if (c.X === p2.X && c.Y === p2.Y) return null;
+
+        const isOrthogonal = (p1.Y === c.Y && c.X === p2.X) || (p1.X === c.X && c.Y === p2.Y);
+        if (!isOrthogonal) return null;
+
+        const x1 = c.X === p1.X ? pRound * 2 : Math.abs(c.X - p1.X);
+        const y1 = c.Y === p1.Y ? pRound * 2 : Math.abs(c.Y - p1.Y);
+        const x2 = c.X === p2.X ? pRound * 2 : Math.abs(c.X - p2.X);
+        const y2 = c.Y === p2.Y ? pRound * 2 : Math.abs(c.Y - p2.Y);
+        const size = Math.min(Math.min(x1, y1), Math.min(x2, y2));
+        const radius = size / 2;
+
+        if (radius < 1) return null;
+
+        const before = XMath.PointCircle(pCorner, pBefore, radius);
+        const after = XMath.PointCircle(pCorner, pAfter, radius);
+
+        return { before, after, radius };
+    }
 }

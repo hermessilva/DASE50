@@ -598,9 +598,11 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
         function AttachEventHandlers()
         {
             // Handle regular inputs and selects
+            // Use "input" for real-time updates, "change" for selects and checkboxes
             const inputs = document.querySelectorAll("input, select");
             inputs.forEach(function(input) {
-                input.addEventListener("change", function() {
+                const eventType = (input.tagName === "SELECT" || input.type === "checkbox") ? "change" : "input";
+                input.addEventListener(eventType, function() {
                     const key = this.getAttribute("data-key");
                     let value;
                     
@@ -1097,9 +1099,11 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
         function AttachEventHandlers()
         {
             // Handle regular inputs and selects
+            // Use "input" for real-time updates, "change" for selects and checkboxes
             const inputs = document.querySelectorAll("input, select");
             inputs.forEach(function(input) {
-                input.addEventListener("change", function() {
+                const eventType = (input.tagName === "SELECT" || input.type === "checkbox") ? "change" : "input";
+                input.addEventListener(eventType, function() {
                     const key = this.getAttribute("data-key");
                     let value;
                     

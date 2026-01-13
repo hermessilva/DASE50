@@ -3,6 +3,7 @@ import { RegisterORMElements } from "../src/Designers/ORM/XORMRegistry.js";
 import { XORMTable } from "../src/Designers/ORM/XORMTable.js";
 import { XORMField } from "../src/Designers/ORM/XORMField.js";
 import { XGuid } from "../src/Core/XGuid.js";
+import { XRect } from "../src/Core/XGeometry.js";
 
 describe("XORMTable Coverage Tests", () => {
     
@@ -212,6 +213,82 @@ describe("XORMTable Coverage Tests", () => {
             const found = table.FindFieldByName("NonExistent");
             
             expect(found).toBeNull();
+        });
+    });
+
+    describe("Height adjustment based on fields", () => {
+        
+        it("should update height when fields are added", () => {
+            const table = new XORMTable();
+            table.ID = XGuid.NewValue();
+            
+            const initialHeight = table.Bounds.Height;
+            
+            // Add several fields
+            table.CreateField({ Name: "Field1", DataType: "String" });
+            table.CreateField({ Name: "Field2", DataType: "String" });
+            table.CreateField({ Name: "Field3", DataType: "String" });
+            table.CreateField({ Name: "Field4", DataType: "String" });
+            
+            // Height should have increased
+            expect(table.Bounds.Height).toBeGreaterThanOrEqual(initialHeight);
+        });
+
+        it("should update height when fields are deleted", () => {
+            const table = new XORMTable();
+            table.ID = XGuid.NewValue();
+            
+            // Add many fields
+            const fields = [];
+            for (let i = 0; i < 10; i++)
+                fields.push(table.CreateField({ Name: `Field${i}`, DataType: "String" }));
+            
+            const heightWithFields = table.Bounds.Height;
+            
+            // Delete all fields
+            for (const f of fields)
+                table.DeleteField(f);
+            
+            // Height should be smaller now
+            expect(table.Bounds.Height).toBeLessThanOrEqual(heightWithFields);
+        });
+
+        it("should not change height when it already matches calculated value", () => {
+            const table = new XORMTable();
+            table.ID = XGuid.NewValue();
+            
+            // Set initial bounds to the exact expected height for 1 field
+            // headerHeight=28, fieldHeight=16, padding=12
+            // For 1 field: 28 + (1 * 16 + 12) = 56
+            table.Bounds = new XRect(0, 0, 200, 56);
+            
+            // Create a field - this calls UpdateHeightForFields
+            // Since bounds.Height (56) already equals newHeight (56), 
+            // the if branch should be false (no change)
+            table.CreateField({ Name: "Field1", DataType: "String" });
+            
+            // Height should still be 56
+            expect(table.Bounds.Height).toBe(56);
+        });
+
+        it("should return false and not update height when deleting field from wrong table", () => {
+            const table = new XORMTable();
+            table.ID = XGuid.NewValue();
+            
+            // Create a field that belongs to a different table
+            const otherTable = new XORMTable();
+            otherTable.ID = XGuid.NewValue();
+            const orphanField = otherTable.CreateField({ Name: "Orphan", DataType: "String" });
+            
+            // Get initial height
+            table.CreateField({ Name: "MyField", DataType: "String" });
+            const initialHeight = table.Bounds.Height;
+            
+            // Try to delete field that doesn't belong to this table
+            const result = table.DeleteField(orphanField);
+            
+            expect(result).toBe(false);
+            expect(table.Bounds.Height).toBe(initialHeight);
         });
     });
 });

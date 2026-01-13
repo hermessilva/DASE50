@@ -1,4 +1,5 @@
 import { XRectangle } from "../../Design/XRectangle.js";
+import { XRect } from "../../Core/XGeometry.js";
 import { XProperty } from "../../Core/XProperty.js";
 import { XGuid } from "../../Core/XGuid.js";
 import { XORMField } from "./XORMField.js";
@@ -122,6 +123,7 @@ export class XORMTable extends XRectangle
         field.DefaultValue = pOptions?.DefaultValue ?? "";
 
         this.AppendChild(field);
+        this.UpdateHeightForFields();
         return field;
     }
 
@@ -133,7 +135,30 @@ export class XORMTable extends XRectangle
         if (!pField.CanDelete)
             return false;
 
-        return this.RemoveChild(pField);
+        this.RemoveChild(pField);
+        this.UpdateHeightForFields();
+        return true;
+    }
+
+    /**
+     * Updates the table height based on the number of fields
+     * headerHeight=28, fieldHeight=16, minBodyHeight=40
+     */
+    private UpdateHeightForFields(): void
+    {
+        const headerHeight = 28;
+        const fieldHeight = 16;
+        const padding = 12;
+        
+        // Empty table = only header height
+        // Table with fields = header + (fieldCount * fieldHeight) + padding
+        const fieldCount = this.GetFields().length;
+        const bodyHeight = fieldCount > 0 ? fieldCount * fieldHeight + padding : 0;
+        const newHeight = headerHeight + bodyHeight;
+        
+        const bounds = this.Bounds;
+        if (bounds.Height !== newHeight)
+            this.Bounds = new XRect(bounds.Left, bounds.Top, bounds.Width, newHeight);
     }
 
     public GetFields(): XORMField[]

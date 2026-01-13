@@ -238,8 +238,16 @@
         g.setAttribute("transform", "translate(" + pTable.X + "," + pTable.Y + ")");
 
         const width = pTable.Width || 200;
-        const height = pTable.Height || 150;
         const headerHeight = 28;
+        const fieldHeight = 16;
+        
+        // Calculate height based on number of fields
+        // Empty table = only header height (just the title bar)
+        // Table with fields = header + (fieldCount * fieldHeight) + padding
+        // ALWAYS calculate - never use pTable.Height to ensure consistency
+        const fieldCount = (pTable.Fields && pTable.Fields.length) || 0;
+        const bodyHeight = fieldCount > 0 ? fieldCount * fieldHeight + 12 : 0;
+        const height = headerHeight + bodyHeight;
 
         const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
         rect.setAttribute("class", "orm-table-rect");
@@ -247,6 +255,9 @@
         rect.setAttribute("height", height);
         rect.setAttribute("rx", 4);
         rect.setAttribute("ry", 4);
+        // Border color matches header color
+        if (pTable.FillProp)
+            rect.style.stroke = pTable.FillProp;
         g.appendChild(rect);
 
         const header = document.createElementNS("http://www.w3.org/2000/svg", "rect");
@@ -320,26 +331,43 @@
             }
         }
 
-        const anchorSize = 12;
-        const rightAnchor = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-        rightAnchor.setAttribute("class", "orm-table-anchor");
-        rightAnchor.setAttribute("x", width - anchorSize/2);
-        rightAnchor.setAttribute("y", height/2 - anchorSize/2);
-        rightAnchor.setAttribute("width", anchorSize);
-        rightAnchor.setAttribute("height", anchorSize);
-        rightAnchor.setAttribute("rx", 2);
-        rightAnchor.setAttribute("data-anchor", "right");
-        g.appendChild(rightAnchor);
+        // Hover border (dashed rectangle around table)
+        const hoverPadding = 10;
+        const hoverBorder = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        hoverBorder.setAttribute("class", "orm-table-hover-border");
+        hoverBorder.setAttribute("x", -hoverPadding);
+        hoverBorder.setAttribute("y", -hoverPadding);
+        hoverBorder.setAttribute("width", width + hoverPadding * 2);
+        hoverBorder.setAttribute("height", height + hoverPadding * 2);
+        g.appendChild(hoverBorder);
 
-        const leftAnchor = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-        leftAnchor.setAttribute("class", "orm-table-anchor");
-        leftAnchor.setAttribute("x", -anchorSize/2);
-        leftAnchor.setAttribute("y", height/2 - anchorSize/2);
-        leftAnchor.setAttribute("width", anchorSize);
-        leftAnchor.setAttribute("height", anchorSize);
-        leftAnchor.setAttribute("rx", 2);
-        leftAnchor.setAttribute("data-anchor", "left");
-        g.appendChild(leftAnchor);
+        // Anchor points - 8 points: 4 corners + 4 edge centers
+        // Anchors are centered on the hover border line
+        const anchorSize = 12;
+        const anchorPositions = [
+            // Corners - centered on hover border corners
+            { x: -hoverPadding - anchorSize/2, y: -hoverPadding - anchorSize/2, anchor: "top-left" },
+            { x: width + hoverPadding - anchorSize/2, y: -hoverPadding - anchorSize/2, anchor: "top-right" },
+            { x: -hoverPadding - anchorSize/2, y: height + hoverPadding - anchorSize/2, anchor: "bottom-left" },
+            { x: width + hoverPadding - anchorSize/2, y: height + hoverPadding - anchorSize/2, anchor: "bottom-right" },
+            // Edge centers - centered on hover border edges
+            { x: width/2 - anchorSize/2, y: -hoverPadding - anchorSize/2, anchor: "top" },
+            { x: width/2 - anchorSize/2, y: height + hoverPadding - anchorSize/2, anchor: "bottom" },
+            { x: -hoverPadding - anchorSize/2, y: height/2 - anchorSize/2, anchor: "left" },
+            { x: width + hoverPadding - anchorSize/2, y: height/2 - anchorSize/2, anchor: "right" }
+        ];
+
+        for (const pos of anchorPositions)
+        {
+            const anchor = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            anchor.setAttribute("class", "orm-table-anchor");
+            anchor.setAttribute("x", pos.x);
+            anchor.setAttribute("y", pos.y);
+            anchor.setAttribute("width", anchorSize);
+            anchor.setAttribute("height", anchorSize);
+            anchor.setAttribute("data-anchor", pos.anchor);
+            g.appendChild(anchor);
+        }
 
         SetupTableEvents(g, pTable);
 
@@ -447,8 +475,62 @@
         const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
         line.setAttribute("class", "relation-drag-line");
         
-        const startX = pSourceTable.X + (pSourceTable.Width || 200);
-        const startY = pSourceTable.Y + (pSourceTable.Height || 150) / 2;
+        // Get anchor position from clicked element
+        const anchor = pEvent.target;
+        const anchorType = anchor.getAttribute("data-anchor");
+        
+        // Calculate visual height (same as CreateTableElement)
+        const headerHeight = 28;
+        const fieldHeight = 16;
+        const padding = 12;
+        const fieldCount = pSourceTable.Fields ? pSourceTable.Fields.length : 0;
+        const visualHeight = fieldCount > 0 
+            ? headerHeight + (fieldCount * fieldHeight) + padding
+            : headerHeight;
+        const width = pSourceTable.Width || 200;
+        
+        // Calculate start position based on anchor type
+        let startX, startY;
+        switch (anchorType)
+        {
+            case "right":
+                startX = pSourceTable.X + width;
+                startY = pSourceTable.Y + visualHeight / 2;
+                break;
+            case "left":
+                startX = pSourceTable.X;
+                startY = pSourceTable.Y + visualHeight / 2;
+                break;
+            case "top":
+                startX = pSourceTable.X + width / 2;
+                startY = pSourceTable.Y;
+                break;
+            case "bottom":
+                startX = pSourceTable.X + width / 2;
+                startY = pSourceTable.Y + visualHeight;
+                break;
+            case "top-left":
+                startX = pSourceTable.X;
+                startY = pSourceTable.Y;
+                break;
+            case "top-right":
+                startX = pSourceTable.X + width;
+                startY = pSourceTable.Y;
+                break;
+            case "bottom-left":
+                startX = pSourceTable.X;
+                startY = pSourceTable.Y + visualHeight;
+                break;
+            case "bottom-right":
+                startX = pSourceTable.X + width;
+                startY = pSourceTable.Y + visualHeight;
+                break;
+            default:
+                // Fallback to right side
+                startX = pSourceTable.X + width;
+                startY = pSourceTable.Y + visualHeight / 2;
+                break;
+        }
         
         line.setAttribute("x1", startX);
         line.setAttribute("y1", startY);
@@ -507,12 +589,21 @@
 
     function FindTableAtPoint(pX, pY)
     {
+        const headerHeight = 28;
+        const fieldHeight = 16;
+        const padding = 12;
+        
         for (const table of _Model.Tables)
         {
             const x = table.X;
             const y = table.Y;
             const w = table.Width || 200;
-            const h = table.Height || 150;
+            
+            // Calculate visual height based on field count
+            const fieldCount = table.Fields ? table.Fields.length : 0;
+            const h = fieldCount > 0 
+                ? headerHeight + (fieldCount * fieldHeight) + padding
+                : headerHeight;
 
             if (pX >= x && pX <= x + w && pY >= y && pY <= y + h)
                 return table;
@@ -525,29 +616,93 @@
         if (!pPoints || pPoints.length < 2)
             return "";
 
+        const CORNER_RADIUS = 15;
+
+        // Helper: arredondar valor
+        function round(v) { return Math.round(v * 10) / 10; }
+
+        // Helper: calcula ponto no círculo (mesmo algoritmo do XMath.PointCircle)
+        function pointCircle(pCenter, pPoint, pRadius)
+        {
+            const dx = pPoint.X - pCenter.X;
+            const dy = pPoint.Y - pCenter.Y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 0.001) return { X: pCenter.X, Y: pCenter.Y };
+            const ratio = pRadius / dist;
+            return { X: pCenter.X + dx * ratio, Y: pCenter.Y + dy * ratio };
+        }
+
+        // Helper: calcula os pontos do canto arredondado (mesmo algoritmo do XMath.AddCorner)
+        function addCorner(pCorner, pMaxRadius, pBefore, pAfter)
+        {
+            const p1 = { X: round(pBefore.X), Y: round(pBefore.Y) };
+            const p2 = { X: round(pAfter.X), Y: round(pAfter.Y) };
+            const c = { X: round(pCorner.X), Y: round(pCorner.Y) };
+
+            if (c.X === p1.X && c.Y === p1.Y) return null;
+            if (c.X === p2.X && c.Y === p2.Y) return null;
+
+            const isOrthogonal = (p1.Y === c.Y && c.X === p2.X) || (p1.X === c.X && c.Y === p2.Y);
+            if (!isOrthogonal) return null;
+
+            // Calculate distance to previous and next points
+            const distBefore = Math.sqrt(Math.pow(c.X - p1.X, 2) + Math.pow(c.Y - p1.Y, 2));
+            const distAfter = Math.sqrt(Math.pow(c.X - p2.X, 2) + Math.pow(c.Y - p2.Y, 2));
+            
+            // Radius must not exceed half of the shortest adjacent segment
+            const maxBySegments = Math.min(distBefore, distAfter) / 2;
+            const radius = Math.min(pMaxRadius, maxBySegments);
+
+            if (radius < 1) return null;
+
+            const before = pointCircle(pCorner, pBefore, radius);
+            const after = pointCircle(pCorner, pAfter, radius);
+
+            return { before, after, corner: pCorner };
+        }
+
         let path = `M ${pPoints[0].X} ${pPoints[0].Y}`;
-        
+
         for (let i = 1; i < pPoints.length; i++)
         {
-            path += ` L ${pPoints[i].X} ${pPoints[i].Y}`;
+            const prev = pPoints[i - 1];
+            const curr = pPoints[i];
+            const next = i < pPoints.length - 1 ? pPoints[i + 1] : null;
+
+            if (next)
+            {
+                // Tenta criar canto arredondado
+                const corner = addCorner(curr, CORNER_RADIUS, prev, next);
+                if (corner)
+                {
+                    // Linha até o ponto antes da curva
+                    path += ` L ${corner.before.X} ${corner.before.Y}`;
+                    // Curva Bezier quadrática (Q) usando o canto como ponto de controle
+                    path += ` Q ${corner.corner.X} ${corner.corner.Y} ${corner.after.X} ${corner.after.Y}`;
+                }
+                else
+                {
+                    // Sem canto válido, linha reta normal
+                    path += ` L ${curr.X} ${curr.Y}`;
+                }
+            }
+            else
+            {
+                // Último ponto, linha reta
+                path += ` L ${curr.X} ${curr.Y}`;
+            }
         }
-        
+
         return path;
     }
 
     function SimplifyReferencePoints(pPoints, pSourceTable, pTargetTable)
     {
         // ══════════════════════════════════════════════════════════════════════════════
-        // REGRAS DE ROTEAMENTO DE LINHAS (REFERÊNCIAS) - XORMDesign.ts
+        // ROTEAMENTO É FEITO PELO TFX (XORMDesign.ts)
+        // Esta função apenas valida e limpa os pontos recebidos
+        // NÃO recalcular rotas - respeitar os pontos enviados pelo backend
         // ══════════════════════════════════════════════════════════════════════════════
-        // 1. SOURCE: SEMPRE sai HORIZONTALMENTE (esquerda ou direita)
-        // 2. TARGET: Pode receber de QUALQUER lado (Left, Right, Top, Bottom)
-        // 3. SEGMENTOS: NUNCA diagonal - sempre vertical OU horizontal
-        // 4. Segmento mínimo: 30px no source e no target
-        // 5. TIPOS DE ROTA: L (2 segmentos), Z/C (3 segmentos)
-        // ══════════════════════════════════════════════════════════════════════════════
-        
-        const MIN_SEGMENT = 30;
         
         if (!pPoints || pPoints.length < 2)
             return [];
@@ -557,117 +712,16 @@
         if (valid.length < 2)
             return [];
 
-        const start = { X: valid[0].X, Y: valid[0].Y };
-        const end = { X: valid[valid.length - 1].X, Y: valid[valid.length - 1].Y };
-
-        // Se não temos tabelas, apenas garantir ortogonalidade básica
-        if (!pSourceTable || !pTargetTable)
-        {
-            // Converter em L simples se for diagonal
-            if (Math.abs(end.X - start.X) > 2 && Math.abs(end.Y - start.Y) > 2)
-            {
-                return [start, { X: end.X, Y: start.Y }, end];
-            }
-            return [start, end];
-        }
-
-        // Calcular bounds das tabelas
-        const srcLeft = pSourceTable.X;
-        const srcRight = pSourceTable.X + (pSourceTable.Width || 200);
-        const srcTop = pSourceTable.Y;
-        const srcBottom = pSourceTable.Y + (pSourceTable.Height || 150);
-        
-        const tgtLeft = pTargetTable.X;
-        const tgtRight = pTargetTable.X + (pTargetTable.Width || 200);
-        const tgtTop = pTargetTable.Y;
-        const tgtBottom = pTargetTable.Y + (pTargetTable.Height || 150);
-        const tgtCenterX = tgtLeft + (pTargetTable.Width || 200) / 2;
-        const tgtCenterY = tgtTop + (pTargetTable.Height || 150) / 2;
-
-        // Determinar lado de saída do source (baseado na posição do ponto inicial)
-        const exitingRight = Math.abs(start.X - srcRight) < Math.abs(start.X - srcLeft);
-        
-        // Determinar lado de entrada no target (baseado na posição do ponto final)
-        const distToLeft = Math.abs(end.X - tgtLeft);
-        const distToRight = Math.abs(end.X - tgtRight);
-        const distToTop = Math.abs(end.Y - tgtTop);
-        const distToBottom = Math.abs(end.Y - tgtBottom);
-        const minDist = Math.min(distToLeft, distToRight, distToTop, distToBottom);
-        
-        let targetSide;
-        if (minDist === distToLeft) targetSide = 'left';
-        else if (minDist === distToRight) targetSide = 'right';
-        else if (minDist === distToTop) targetSide = 'top';
-        else targetSide = 'bottom';
-
-        // ══════════════════════════════════════════════════════════════════════════════
-        // CRIAR ROTA ORTOGONAL OTIMIZADA (L ou Z/C)
-        // ══════════════════════════════════════════════════════════════════════════════
-        
-        const result = [start];
-
-        if (targetSide === 'left' || targetSide === 'right')
-        {
-            // Target recebe pela lateral - ROTA EM L (horizontal → vertical → horizontal)
-            // Mas se source Y == target entry Y, é uma linha reta horizontal
-            if (Math.abs(start.Y - end.Y) < 2)
-            {
-                // Linha horizontal direta
-                result.push(end);
-            }
-            else
-            {
-                // Rota em L: horizontal até alinhar com entry, depois vertical, depois horizontal até target
-                // Para L simples: horizontal → vertical (2 segmentos)
-                const turnX = end.X + (targetSide === 'left' ? -MIN_SEGMENT : MIN_SEGMENT);
-                
-                // Se o turnX está entre source e target, usar L simples
-                if ((exitingRight && turnX > start.X) || (!exitingRight && turnX < start.X))
-                {
-                    // L simples: horizontal até turnX, depois vertical até end
-                    result.push({ X: turnX, Y: start.Y });
-                    result.push({ X: turnX, Y: end.Y });
-                    result.push(end);
-                }
-                else
-                {
-                    // Z route: precisa de ponto intermediário
-                    const midX = exitingRight 
-                        ? Math.max(srcRight + MIN_SEGMENT, (start.X + end.X) / 2)
-                        : Math.min(srcLeft - MIN_SEGMENT, (start.X + end.X) / 2);
-                    result.push({ X: midX, Y: start.Y });
-                    result.push({ X: midX, Y: end.Y });
-                    result.push(end);
-                }
-            }
-        }
-        else
-        {
-            // Target recebe por cima ou por baixo - ROTA EM L (horizontal → vertical)
-            if (Math.abs(start.X - end.X) < 2)
-            {
-                // Linha vertical direta (raro, source deveria sair horizontal)
-                result.push(end);
-            }
-            else
-            {
-                // Rota em L: horizontal até alinhar com target X, depois vertical
-                // Este é o L mais simples: 2 segmentos
-                result.push({ X: end.X, Y: start.Y });
-                result.push(end);
-            }
-        }
-
         // Remover pontos duplicados consecutivos
-        const cleaned = [result[0]];
-        for (let i = 1; i < result.length; i++)
+        const cleaned = [valid[0]];
+        for (let i = 1; i < valid.length; i++)
         {
             const prev = cleaned[cleaned.length - 1];
-            if (Math.abs(result[i].X - prev.X) > 1 || Math.abs(result[i].Y - prev.Y) > 1)
-                cleaned.push(result[i]);
+            if (Math.abs(valid[i].X - prev.X) > 1 || Math.abs(valid[i].Y - prev.Y) > 1)
+                cleaned.push(valid[i]);
         }
 
-        // Remover pontos colineares
+        // Remover pontos colineares intermediários
         if (cleaned.length > 2)
         {
             const final = [cleaned[0]];
@@ -733,7 +787,7 @@
             // Renderiza linha roteada com múltiplos segmentos
             const pathData = BuildPathFromPoints(points);
             const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-            path.setAttribute("class", "orm-reference-line");
+            path.setAttribute("class", "orm-fk-line");
             path.setAttribute("d", pathData);
             path.setAttribute("fill", "none");
             path.setAttribute("stroke", GetTableColor(pRef.TargetTableID));
@@ -750,7 +804,7 @@
             const y2 = targetTable.Y + (targetTable.Height || 150) / 2;
 
             const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-            line.setAttribute("class", "orm-reference-line");
+            line.setAttribute("class", "orm-fk-line");
             line.setAttribute("x1", x1);
             line.setAttribute("y1", y1);
             line.setAttribute("x2", x2);

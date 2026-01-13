@@ -323,6 +323,34 @@ describe("XORMDesign internal coverage", () =>
         expect(collided).toBe(false);
     });
 
+    it("CheckLRouteCollision should check X overlap but return false when no collision (line 917 false branch)", () =>
+    {
+        const design = new XORMDesign();
+
+        const source = new XRect(0, 0, 10, 10);
+        const target = new XRect(200, 0, 10, 10);
+        // Obstacle at Y overlap range but X is completely outside the horizontal segment
+        // Horizontal segment: from startX=0 to turnX=100, at Y=5
+        // Obstacle: Left=300, Top=0, Width=10, Height=10 (Right=310, Bottom=10)
+        // Y check: pStartY=5, obs.Top=0, obs.Bottom=10 -> 5 >= 0 && 5 <= 10 -> true (enters outer if)
+        // X check: minX=0, maxX=100, obs.Left=300, obs.Right=310
+        //   !(maxX < obs.Left || minX > obs.Right) = !(100 < 300 || 0 > 310) = !(true || false) = !true = false
+        // So inner if is false, no collision returned
+        const obstacle = new XRect(300, 0, 10, 10);
+
+        const collided = (design as any).CheckLRouteCollision(
+            0,
+            5,
+            100,
+            50,
+            source,
+            target,
+            [obstacle]
+        ) as boolean;
+
+        expect(collided).toBe(false);
+    });
+
     it("CalculateMidX should cover both obstacle and no-obstacle branches", () =>
     {
         const design = new XORMDesign();
@@ -390,7 +418,7 @@ describe("XORMDesign internal coverage", () =>
         expect(withObsLeftExit).toBeLessThanOrEqual(200);
     });
 
-    it("RouteReference should cover linked-element vs fallback resolution and missing connectionCounts entry", () =>
+    it("RouteReference should cover linked-element vs fallback resolution", () =>
     {
         const design = new XORMDesign();
 
@@ -418,8 +446,7 @@ describe("XORMDesign internal coverage", () =>
         (refLinked as any).GetSourceElement = () => sourceField;
         (refLinked as any).GetTargetElement = () => targetTable;
 
-        // Use an empty map so RouteReference must fall back to the default connection-counts object
-        ;(design as any).RouteReference(refLinked, [sourceTable, targetTable], new Map());
+        ;(design as any).RouteReference(refLinked, [sourceTable, targetTable], 0, 1);
 
         // Case 2: GetLinkedElement fails -> fallback FindFieldByID/FindTableByID (if conditions are true)
         const refFallback = new XORMReference();
@@ -429,30 +456,39 @@ describe("XORMDesign internal coverage", () =>
         (refFallback as any).GetSourceElement = () => null;
         (refFallback as any).GetTargetElement = () => null;
 
-        const counts = new Map<string, { Left: number; Right: number; Top: number; Bottom: number }>([
-            [targetTable.ID, { Left: 0, Right: 0, Top: 0, Bottom: 0 }],
-        ]);
-        ;(design as any).RouteReference(refFallback, [sourceTable, targetTable], counts);
+        ;(design as any).RouteReference(refFallback, [sourceTable, targetTable], 0, 1);
 
         expect(refLinked.Points.length).toBeGreaterThan(0);
         expect(refFallback.Points.length).toBeGreaterThan(0);
     });
 
-    it("GetTargetEntryPoint should compute offsets for connection indexes 1, 2, and 3", () =>
+    it("GetTargetEntryPoint should compute symmetric offsets based on routeIndex and totalRoutes", () =>
     {
         const design = new XORMDesign();
 
         const targetBounds = new XRect(0, 0, 100, 200);
-        const spacing = 10;
+        const spacing = 15;
         const centerY = targetBounds.Top + targetBounds.Height / 2;
 
-        const idx1 = (design as any).GetTargetEntryPoint(targetBounds, 1, 1, spacing) as XPoint; // Right
-        const idx2 = (design as any).GetTargetEntryPoint(targetBounds, 1, 2, spacing) as XPoint;
-        const idx3 = (design as any).GetTargetEntryPoint(targetBounds, 1, 3, spacing) as XPoint;
+        // Single route - should be centered (offset = 0)
+        const single = (design as any).GetTargetEntryPoint(targetBounds, 1, 0, 1, spacing) as XPoint;
+        expect(single.Y).toBe(centerY);
 
-        expect(idx1.Y).toBe(centerY);
-        expect(idx2.Y).toBe(centerY - spacing);
-        expect(idx3.Y).toBe(centerY + (2 * spacing));
+        // Two routes - should be distributed symmetrically
+        // routeIndex 0: offset = (0 - 0.5) * 15 = -7.5
+        // routeIndex 1: offset = (1 - 0.5) * 15 = +7.5
+        const two0 = (design as any).GetTargetEntryPoint(targetBounds, 1, 0, 2, spacing) as XPoint;
+        const two1 = (design as any).GetTargetEntryPoint(targetBounds, 1, 1, 2, spacing) as XPoint;
+        expect(two0.Y).toBe(centerY - 7.5);
+        expect(two1.Y).toBe(centerY + 7.5);
+
+        // Three routes - distributed: -15, 0, +15
+        const three0 = (design as any).GetTargetEntryPoint(targetBounds, 1, 0, 3, spacing) as XPoint;
+        const three1 = (design as any).GetTargetEntryPoint(targetBounds, 1, 1, 3, spacing) as XPoint;
+        const three2 = (design as any).GetTargetEntryPoint(targetBounds, 1, 2, 3, spacing) as XPoint;
+        expect(three0.Y).toBe(centerY - spacing);
+        expect(three1.Y).toBe(centerY);
+        expect(three2.Y).toBe(centerY + spacing);
     });
 
     it("SegmentHasCollision should return true when a segment intersects an obstacle", () =>
