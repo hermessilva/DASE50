@@ -99,6 +99,8 @@ export class XORMTable extends XRectangle
 
         // Insere o PKField como primeiro filho
         this.InsertChildAt(pkField, 0);
+        this.UpdateFieldIndexes();
+        this.UpdateHeightForFields();
         return pkField;
     }
 
@@ -123,6 +125,7 @@ export class XORMTable extends XRectangle
         field.DefaultValue = pOptions?.DefaultValue ?? "";
 
         this.AppendChild(field);
+        this.UpdateFieldIndexes();
         this.UpdateHeightForFields();
         return field;
     }
@@ -136,8 +139,58 @@ export class XORMTable extends XRectangle
             return false;
 
         this.RemoveChild(pField);
+        this.UpdateFieldIndexes();
         this.UpdateHeightForFields();
         return true;
+    }
+
+    /**
+     * Moves a field to a new index position within the table.
+     * PKFields cannot be moved (they are always at index 0).
+     * @param pField The field to move
+     * @param pNewIndex The target index (0-based, but PKField always occupies 0)
+     * @returns true if move was successful
+     */
+    public MoveFieldToIndex(pField: XORMField, pNewIndex: number): boolean
+    {
+        if (pField.ParentNode !== this)
+            return false;
+
+        // PKField cannot be moved - it's always first
+        if (pField instanceof XORMPKField)
+            return false;
+
+        const fields = this.GetFields();
+        const currentIndex = fields.indexOf(pField);
+        if (currentIndex < 0)
+            return false;
+
+        // PKField is always at index 0 in children, so adjust target
+        const hasPK = this.HasPKField();
+        const minIndex = hasPK ? 1 : 0;
+        const maxIndex = fields.length - 1;
+
+        // Clamp to valid range
+        const targetIndex = Math.max(minIndex, Math.min(pNewIndex, maxIndex));
+        if (targetIndex === currentIndex)
+            return false;
+
+        // Calculate actual child index (PKField shifts everything by 1)
+        const childIndex = hasPK ? targetIndex : targetIndex;
+        this.InsertChildAt(pField, childIndex);
+        this.UpdateFieldIndexes();
+
+        return true;
+    }
+
+    /**
+     * Updates the Index property of all fields to match their position
+     */
+    public UpdateFieldIndexes(): void
+    {
+        const fields = this.GetFields();
+        for (let i = 0; i < fields.length; i++)
+            fields[i].Index = i;
     }
 
     /**

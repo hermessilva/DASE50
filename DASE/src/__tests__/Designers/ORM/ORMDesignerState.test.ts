@@ -324,6 +324,39 @@ describe('XORMDesignerState', () => {
         });
     });
 
+    describe('ReorderField', () => {
+        beforeEach(async () => {
+            (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from('{}'));
+            await state.Load();
+            state.Bridge.ReorderField = jest.fn().mockReturnValue({ Success: true });
+        });
+
+        it('should reorder field and mark dirty', () => {
+            const result = state.ReorderField('field-1', 2);
+
+            expect(result.Success).toBe(true);
+            expect(state.IsDirty).toBe(true);
+        });
+
+        it('should not mark dirty when reorder fails', () => {
+            state.Bridge.ReorderField = jest.fn().mockReturnValue({ Success: false });
+            
+            const result = state.ReorderField('field-1', 2);
+
+            expect(result.Success).toBe(false);
+            expect(state.IsDirty).toBe(false);
+        });
+
+        it('should handle null result from Bridge.ReorderField', () => {
+            state.Bridge.ReorderField = jest.fn().mockReturnValue(null);
+            
+            const result = state.ReorderField('field-1', 2);
+
+            expect(result).toEqual({ Success: false });
+            expect(state.IsDirty).toBe(false);
+        });
+    });
+
     describe('UpdateProperty', () => {
         beforeEach(async () => {
             (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from('{}'));

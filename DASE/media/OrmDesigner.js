@@ -13,6 +13,7 @@
         AddTable: "AddTable",
         AddField: "AddField",
         MoveElement: "MoveElement",
+        ReorderField: "ReorderField",
         DragDropAddRelation: "DragDropAddRelation",
         DeleteSelected: "DeleteSelected",
         RenameSelected: "RenameSelected",
@@ -29,6 +30,7 @@
     let _SelectedIDs = [];
     let _DragState = null;
     let _RelationDragState = null;
+    let _FieldDragState = null;
     let _ContextMenuPosition = { X: 0, Y: 0 };
     let _ContextMenuTarget = null;
 
@@ -324,7 +326,7 @@
                 fieldText.textContent = prefix + (field.Name || field.FieldName || "field") + nullable;
                 fieldGroup.appendChild(fieldText);
 
-                SetupFieldEvents(fieldGroup, field);
+                SetupFieldEvents(fieldGroup, field, pTable);
                 g.appendChild(fieldGroup);
                 
                 y += 16;
@@ -448,16 +450,61 @@
         });
     }
 
-    function SetupFieldEvents(pElement, pField)
+    function SetupFieldEvents(pElement, pField, pTable)
     {
+        let isDragging = false;
+        let dragStartY = 0;
+        let dragThreshold = 5;
+
         pElement.addEventListener("mousedown", function(e) {
             e.preventDefault();
             e.stopPropagation();
             
-            if (!e.ctrlKey)
-                SendMessage(XMessageType.SelectElement, { ElementID: pField.ID });
-            else
-                SendMessage(XMessageType.SelectElement, { ElementID: pField.ID, Toggle: true });
+            // PKFields cannot be reordered
+            if (pField.IsPrimaryKey)
+            {
+                if (!e.ctrlKey)
+                    SendMessage(XMessageType.SelectElement, { ElementID: pField.ID });
+                else
+                    SendMessage(XMessageType.SelectElement, { ElementID: pField.ID, Toggle: true });
+                return;
+            }
+
+            dragStartY = e.clientY;
+            isDragging = false;
+
+            const onMouseMove = function(me) {
+                const dy = Math.abs(me.clientY - dragStartY);
+                
+                if (!isDragging && dy > dragThreshold)
+                {
+                    isDragging = true;
+                    StartFieldDrag(pField, pTable, pElement, me);
+                }
+
+                if (isDragging && _FieldDragState)
+                    UpdateFieldDrag(me);
+            };
+
+            const onMouseUp = function(me) {
+                if (isDragging && _FieldDragState)
+                    EndFieldDrag();
+                else
+                {
+                    // Simple click - select field
+                    if (!e.ctrlKey)
+                        SendMessage(XMessageType.SelectElement, { ElementID: pField.ID });
+                    else
+                        SendMessage(XMessageType.SelectElement, { ElementID: pField.ID, Toggle: true });
+                }
+
+                isDragging = false;
+                document.removeEventListener("mousemove", onMouseMove);
+                document.removeEventListener("mouseup", onMouseUp);
+            };
+
+            document.addEventListener("mousemove", onMouseMove);
+            document.addEventListener("mouseup", onMouseUp);
         });
 
         pElement.addEventListener("dblclick", function(e) {
@@ -465,6 +512,184 @@
             e.stopPropagation();
             ShowRenameInput(pField.ID);
         });
+    }
+
+    function StartFieldDrag(pField, pTable, pElement, pEvent)
+    {
+        // Find field index within the table
+        const fieldIndex = pTable.Fields.findIndex(f => f.ID === pField.ID);
+        if (fieldIndex < 0)
+            return;
+
+        // Create drag ghost as a separate group that follows mouse
+        const ghost = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        ghost.classList.add("orm-field-drag-ghost");
+        ghost.setAttribute("data-drag-ghost", "true");
+
+        // Get the original field's bounding box in screen coordinates
+        const bbox = pElement.getBBox();
+        const fieldWidth = bbox.width;
+        const fieldHeight = bbox.height;
+
+        // Create background for visibility (positioned at 0,0 in ghost's local coords)
+        const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        bg.setAttribute("x", -2);
+        bg.setAttribute("y", -1);
+        bg.setAttribute("width", fieldWidth + 4);
+        bg.setAttribute("height", fieldHeight + 2);
+        bg.setAttribute("class", "orm-field-drag-ghost-bg");
+        ghost.appendChild(bg);
+
+        // Clone the field content and reset its position to (0,0)
+        const fieldClone = pElement.cloneNode(true);
+        fieldClone.classList.remove("orm-field-drag-source");
+        // Remove the original transform/position - set to origin
+        fieldClone.setAttribute("transform", `translate(${-bbox.x}, ${-bbox.y})`);
+        ghost.appendChild(fieldClone);
+
+        // Calculate mouse offset from field's center for smooth dragging
+        const rect = _CanvasContainer.getBoundingClientRect();
+        const mouseX = pEvent.clientX - rect.left + _CanvasContainer.scrollLeft;
+        const mouseY = pEvent.clientY - rect.top + _CanvasContainer.scrollTop;
+        
+        // Position ghost centered on mouse
+        ghost.setAttribute("transform", `translate(${mouseX - fieldWidth / 2}, ${mouseY - fieldHeight / 2})`);
+
+        _TablesLayer.appendChild(ghost);
+
+        // Add dragging class to original
+        pElement.classList.add("orm-field-drag-source");
+
+        _FieldDragState = {
+            Field: pField,
+            Table: pTable,
+            OriginalElement: pElement,
+            Ghost: ghost,
+            OriginalIndex: fieldIndex,
+            CurrentIndex: fieldIndex,
+            TableElement: pElement.closest(".orm-table"),
+            GhostWidth: fieldWidth,
+            GhostHeight: fieldHeight
+        };
+
+        // Show drop indicators
+        UpdateFieldDropIndicators();
+    }
+
+    function UpdateFieldDrag(pEvent)
+    {
+        if (!_FieldDragState)
+            return;
+
+        const table = _FieldDragState.Table;
+        const tableElement = _FieldDragState.TableElement;
+        if (!tableElement)
+            return;
+
+        // Get mouse position relative to canvas
+        const rect = _CanvasContainer.getBoundingClientRect();
+        const mouseX = pEvent.clientX - rect.left + _CanvasContainer.scrollLeft;
+        const mouseY = pEvent.clientY - rect.top + _CanvasContainer.scrollTop;
+
+        // Update ghost position to follow mouse
+        if (_FieldDragState.Ghost)
+        {
+            const ghostWidth = _FieldDragState.GhostWidth || 100;
+            const ghostHeight = _FieldDragState.GhostHeight || 16;
+            _FieldDragState.Ghost.setAttribute("transform", `translate(${mouseX - ghostWidth / 2}, ${mouseY - ghostHeight / 2})`);
+        }
+
+        // Calculate which field slot the mouse is over
+        const headerHeight = 28;
+        const fieldHeight = 16;
+        const tableY = table.Y;
+
+        // Calculate relative Y within the table's field area
+        const relY = mouseY - tableY - headerHeight - 4;
+        let targetIndex = Math.floor(relY / fieldHeight);
+
+        // Skip PK field (index 0 if present)
+        const hasPK = table.Fields.some(f => f.IsPrimaryKey);
+        const minIndex = hasPK ? 1 : 0;
+        const maxIndex = table.Fields.length - 1;
+
+        targetIndex = Math.max(minIndex, Math.min(targetIndex, maxIndex));
+
+        if (targetIndex !== _FieldDragState.CurrentIndex)
+        {
+            _FieldDragState.CurrentIndex = targetIndex;
+            UpdateFieldDropIndicators();
+        }
+    }
+
+    function UpdateFieldDropIndicators()
+    {
+        if (!_FieldDragState)
+            return;
+
+        const tableElement = _FieldDragState.TableElement;
+        if (!tableElement)
+            return;
+
+        // Remove existing indicators
+        const existing = tableElement.querySelectorAll(".orm-field-drop-indicator");
+        existing.forEach(el => el.remove());
+
+        // Don't show indicator if we're at the original position
+        if (_FieldDragState.CurrentIndex === _FieldDragState.OriginalIndex)
+            return;
+
+        // Create drop indicator line
+        const headerHeight = 28;
+        const fieldHeight = 16;
+        const table = _FieldDragState.Table;
+        const width = table.Width || 200;
+
+        // Calculate Y position for the indicator
+        const indicatorY = headerHeight + 4 + (_FieldDragState.CurrentIndex * fieldHeight);
+
+        const indicator = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        indicator.setAttribute("class", "orm-field-drop-indicator");
+        indicator.setAttribute("x1", 4);
+        indicator.setAttribute("y1", indicatorY);
+        indicator.setAttribute("x2", width - 4);
+        indicator.setAttribute("y2", indicatorY);
+        tableElement.appendChild(indicator);
+    }
+
+    function EndFieldDrag()
+    {
+        if (!_FieldDragState)
+            return;
+
+        const origIndex = _FieldDragState.OriginalIndex;
+        const newIndex = _FieldDragState.CurrentIndex;
+        const fieldID = _FieldDragState.Field.ID;
+        const tableElement = _FieldDragState.TableElement;
+
+        // Clean up ghost and indicators
+        if (_FieldDragState.Ghost)
+            _FieldDragState.Ghost.remove();
+
+        if (_FieldDragState.OriginalElement)
+            _FieldDragState.OriginalElement.classList.remove("orm-field-drag-source");
+
+        if (tableElement)
+        {
+            const indicators = tableElement.querySelectorAll(".orm-field-drop-indicator");
+            indicators.forEach(el => el.remove());
+        }
+
+        // If position changed, send reorder message
+        if (newIndex !== origIndex)
+        {
+            SendMessage(XMessageType.ReorderField, {
+                FieldID: fieldID,
+                NewIndex: newIndex
+            });
+        }
+
+        _FieldDragState = null;
     }
 
     function StartRelationDrag(pSourceTable, pEvent)

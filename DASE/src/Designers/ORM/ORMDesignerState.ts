@@ -229,6 +229,14 @@ export class XORMDesignerState
         return result || { Success: false };
     }
 
+    ReorderField(pFieldID: string, pNewIndex: number): XIOperationResult
+    {
+        const result = this._Bridge.ReorderField(pFieldID, pNewIndex);
+        if (result?.Success)
+            this.IsDirty = true;
+        return result || { Success: false };
+    }
+
     UpdateProperty(pElementID: string, pPropertyKey: string, pValue: unknown): XIOperationResult
     {
         const result = this._Bridge.UpdateProperty(pElementID, pPropertyKey, pValue);

@@ -55,6 +55,12 @@ interface IRenamePayload
     NewName: string;
 }
 
+interface IReorderFieldPayload
+{
+    FieldID: string;
+    NewIndex: number;
+}
+
 interface IDesignerMessage
 {
     Type: string;
@@ -277,6 +283,10 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
                 await this.OnMoveElement(pPanel, pState, payload as IMoveElementPayload);
                 break;
 
+            case XDesignerMessageType.ReorderField:
+                await this.OnReorderField(pPanel, pState, payload as IReorderFieldPayload);
+                break;
+
             case XDesignerMessageType.DeleteSelected:
                 await this.OnDeleteSelected(pPanel, pState);
                 break;
@@ -368,6 +378,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
                 Payload: modelData
             });
 
+            await this.SendIssuesUpdate(pPanel, pState);
             this.NotifyDocumentChanged(pState);
         }
     }
@@ -387,6 +398,24 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
                 Payload: modelData
             });
             
+            await this.SendIssuesUpdate(pPanel, pState);
+            this.NotifyDocumentChanged(pState);
+        }
+    }
+
+    async OnReorderField(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: IReorderFieldPayload): Promise<void>
+    {
+        const result = pState.ReorderField(pPayload.FieldID, pPayload.NewIndex);
+        if (result.Success)
+        {
+            pState.AlignLines();
+            const modelData = await pState.GetModelData();
+            pPanel.webview.postMessage({
+                Type: XDesignerMessageType.LoadModel,
+                Payload: modelData
+            });
+            
+            await this.SendIssuesUpdate(pPanel, pState);
             this.NotifyDocumentChanged(pState);
         }
     }
@@ -401,6 +430,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
                 Type: XDesignerMessageType.LoadModel,
                 Payload: modelData
             });
+            await this.SendIssuesUpdate(pPanel, pState);
             this.NotifyDocumentChanged(pState);
         }
     }
@@ -424,6 +454,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
                 Payload: modelData
             });
 
+            await this.SendIssuesUpdate(pPanel, pState);
             this.NotifyDocumentChanged(pState);
         }
     }
@@ -481,6 +512,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
                 Payload: modelData
             });
 
+            await this.SendIssuesUpdate(pPanel, pState);
             this.NotifyDocumentChanged(pState);
         }
     }
@@ -497,6 +529,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
                 Payload: modelData
             });
 
+            await this.SendIssuesUpdate(pPanel, pState);
             this.NotifyDocumentChanged(pState);
         }
     }
@@ -523,6 +556,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
                 Payload: { Properties: props }
             });
 
+            await this.SendIssuesUpdate(pPanel, pState);
             this.NotifyDocumentChanged(pState);
         }
     }
@@ -556,6 +590,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
                 Type: XDesignerMessageType.LoadModel,
                 Payload: modelData
             });
+            await this.SendIssuesUpdate(pPanel, pState);
             this.NotifyDocumentChanged(pState);
         }
     }
@@ -591,6 +626,15 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         pState.IsDirty = true;
     }
 
+    private async SendIssuesUpdate(pPanel: vscode.WebviewPanel, pState: XORMDesignerState): Promise<void>
+    {
+        const issues = await pState.Validate();
+        pPanel.webview.postMessage({
+            Type: XDesignerMessageType.IssuesChanged,
+            Payload: { Issues: issues }
+        });
+    }
+
     async DeleteSelected(pUri: vscode.Uri): Promise<void>
     {
         const key = pUri.toString();
@@ -608,6 +652,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
                 Type: XDesignerMessageType.LoadModel,
                 Payload: modelData
             });
+            await this.SendIssuesUpdate(panel, state);
             await state.Save();
         }
     }

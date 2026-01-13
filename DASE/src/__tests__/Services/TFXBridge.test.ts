@@ -270,6 +270,32 @@ describe('XTFXBridge', () => {
         });
     });
 
+    describe('ReorderField', () => {
+        beforeEach(async () => {
+            await bridge.LoadOrmModelFromText('{}');
+        });
+
+        it('should reorder field to new index', () => {
+            const mockReorderField = jest.fn().mockReturnValue({ Success: true });
+            bridge.Controller.ReorderField = mockReorderField;
+
+            const result = bridge.ReorderField('field-1', 2);
+
+            expect(mockReorderField).toHaveBeenCalledWith({
+                FieldID: 'field-1',
+                NewIndex: 2
+            });
+            expect(result.Success).toBe(true);
+        });
+
+        it('should return false when Controller is null', () => {
+            const newBridge = new XTFXBridge();
+            const result = newBridge.ReorderField('field-1', 2);
+
+            expect(result).toEqual({ Success: false });
+        });
+    });
+
     describe('UpdateProperty', () => {
         beforeEach(async () => {
             await bridge.LoadOrmModelFromText('{}');

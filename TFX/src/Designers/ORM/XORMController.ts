@@ -23,6 +23,7 @@ export enum XORMOperationType
     RemoveReference = "RemoveReference",
     AddField = "AddField",
     RemoveField = "RemoveField",
+    ReorderField = "ReorderField",
     UpdateProperty = "UpdateProperty",
     MoveElement = "MoveElement",
     RenameElement = "RenameElement"
@@ -66,6 +67,12 @@ export interface XIRenameElementData
 {
     ElementID: string;
     NewName: string;
+}
+
+export interface XIReorderFieldData
+{
+    FieldID: string;
+    NewIndex: number;
 }
 
 export interface XIOperationResult
@@ -118,6 +125,9 @@ export class XORMController
 
             case XORMOperationType.RemoveField:
                 return this.RemoveElement(pOperation.ElementID!);
+
+            case XORMOperationType.ReorderField:
+                return this.ReorderField(pOperation.Data as XIReorderFieldData);
 
             case XORMOperationType.UpdateProperty:
                 return this.UpdateProperty(pOperation.Data as XIUpdatePropertyData);
@@ -180,6 +190,29 @@ export class XORMController
         });
 
         return { Success: true, ElementID: field.ID };
+    }
+
+    public ReorderField(pData: XIReorderFieldData): XIOperationResult
+    {
+        if (this.Design === null)
+            return { Success: false, Message: "No design loaded." };
+
+        const element = this.GetElementByID(pData.FieldID);
+        if (element === null)
+            return { Success: false, Message: "Field not found." };
+
+        if (!(element instanceof XORMField))
+            return { Success: false, Message: "Element is not a field." };
+
+        const table = element.ParentNode;
+        if (!(table instanceof XORMTable))
+            return { Success: false, Message: "Field has no parent table." };
+
+        const success = table.MoveFieldToIndex(element, pData.NewIndex);
+        if (!success)
+            return { Success: false, Message: "Failed to move field." };
+
+        return { Success: true, ElementID: pData.FieldID };
     }
 
     public RemoveElement(pElementID: string): XIOperationResult

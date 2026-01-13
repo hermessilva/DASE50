@@ -716,6 +716,7 @@ describe('XORMDesignerEditorProvider', () => {
                 AddTable: jest.fn().mockReturnValue({ Success: true }),
                 GetModelData: jest.fn().mockResolvedValue({ Tables: [], References: [] }),
                 Save: jest.fn().mockResolvedValue(undefined),
+                Validate: jest.fn().mockResolvedValue([]),
                 Document: { uri }
             };
 
@@ -790,6 +791,7 @@ describe('XORMDesignerEditorProvider', () => {
                 DeleteSelected: jest.fn().mockReturnValue({ Success: true }),
                 GetModelData: jest.fn().mockResolvedValue({ Tables: [], References: [] }),
                 Save: jest.fn().mockResolvedValue(undefined),
+                Validate: jest.fn().mockResolvedValue([]),
                 Document: { uri }
             };
 
@@ -914,6 +916,7 @@ describe('XORMDesignerEditorProvider', () => {
                 AddField: jest.fn().mockReturnValue({ Success: true }),
                 GetModelData: jest.fn().mockResolvedValue({ Tables: [], References: [] }),
                 Save: jest.fn().mockResolvedValue(undefined),
+                Validate: jest.fn().mockResolvedValue([]),
                 Document: { uri }
             };
 
@@ -1157,6 +1160,7 @@ describe('XORMDesignerEditorProvider', () => {
             const mockState = {
                 AddTable: jest.fn().mockReturnValue({ Success: true }),
                 GetModelData: jest.fn().mockResolvedValue({ Tables: [], References: [] }),
+                Validate: jest.fn().mockResolvedValue([]),
                 IsDirty: false,
                 Document: { uri }
             };
@@ -1388,6 +1392,30 @@ describe('XORMDesignerEditorProvider', () => {
             await provider.HandleMessage(mockPanel, mockState, { 
                 Type: 'MoveElement', 
                 Payload: { ElementID: 'elem-1', X: 300, Y: 400 } 
+            });
+
+            expect(mockState.IsDirty).toBeFalsy();
+        });
+
+        it('should handle ReorderField message', async () => {
+            mockState.ReorderField = jest.fn().mockReturnValue({ Success: true });
+            mockState.AlignLines = jest.fn().mockReturnValue(true);
+
+            await provider.HandleMessage(mockPanel, mockState, { 
+                Type: 'ReorderField', 
+                Payload: { FieldID: 'field-1', NewIndex: 2 } 
+            });
+
+            expect(mockState.ReorderField).toHaveBeenCalledWith('field-1', 2);
+            expect(mockState.AlignLines).toHaveBeenCalled();
+        });
+
+        it('should not notify when ReorderField fails', async () => {
+            mockState.ReorderField = jest.fn().mockReturnValue({ Success: false });
+
+            await provider.HandleMessage(mockPanel, mockState, { 
+                Type: 'ReorderField', 
+                Payload: { FieldID: 'field-1', NewIndex: 2 } 
             });
 
             expect(mockState.IsDirty).toBeFalsy();
@@ -1724,6 +1752,7 @@ describe('XORMDesignerEditorProvider', () => {
             mockState = {
                 AlignLines: jest.fn().mockReturnValue({ Success: true }),
                 GetModelData: jest.fn().mockResolvedValue({ Tables: [], References: [] }),
+                Validate: jest.fn().mockResolvedValue([]),
                 IsDirty: false,
                 Document: { uri: Uri.file('/test/model.dsorm') }
             };
@@ -1761,6 +1790,7 @@ describe('XORMDesignerEditorProvider', () => {
             mockState = {
                 AddField: jest.fn().mockReturnValue({ Success: true }),
                 GetModelData: jest.fn().mockResolvedValue({ Tables: [], References: [] }),
+                Validate: jest.fn().mockResolvedValue([]),
                 IsDirty: false,
                 Document: { uri: Uri.file('/test/model.dsorm') }
             };
@@ -1795,6 +1825,7 @@ describe('XORMDesignerEditorProvider', () => {
             mockState = {
                 AddField: jest.fn().mockReturnValue({ Success: true }),
                 GetModelData: jest.fn().mockResolvedValue({ Tables: [], References: [] }),
+                Validate: jest.fn().mockResolvedValue([]),
                 IsDirty: false,
                 Document: { uri: Uri.file('/test/model.dsorm') }
             };

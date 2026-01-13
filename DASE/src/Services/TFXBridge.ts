@@ -13,6 +13,7 @@ import {
     XIMoveElementData,
     XIUpdatePropertyData,
     XIRenameElementData,
+    XIReorderFieldData,
     XIOperationResult,
     XORMDocument,
     XORMDesign,
@@ -481,6 +482,15 @@ export class XTFXBridge
             Y: pY
         };
         return this._Controller?.MoveElement(moveData) || { Success: false };
+    }
+
+    ReorderField(pFieldID: string, pNewIndex: number): XIOperationResult
+    {
+        const reorderData: XIReorderFieldData = {
+            FieldID: pFieldID,
+            NewIndex: pNewIndex
+        };
+        return this._Controller?.ReorderField(reorderData) || { Success: false };
     }
 
     UpdateProperty(pElementID: string, pPropertyKey: string, pValue: unknown): XIOperationResult

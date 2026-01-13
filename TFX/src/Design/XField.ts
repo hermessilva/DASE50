@@ -3,6 +3,14 @@ import { XProperty } from "../Core/XProperty.js";
 
 export abstract class XField extends XRectangle
 {
+    public static readonly IndexProp = XProperty.Register<XField, number>(
+        (p: XField) => p.Index,
+        "00000001-0001-0001-0004-000000000000",
+        "Index",
+        "Index",
+        0
+    );
+
     public static readonly DataTypeProp = XProperty.Register<XField, string>(
         (p: XField) => p.DataType,
         "00000001-0001-0001-0004-000000000001",
@@ -46,6 +54,16 @@ export abstract class XField extends XRectangle
     public constructor()
     {
         super();
+    }
+
+    public get Index(): number
+    {
+        return this.GetValue(XField.IndexProp) as number;
+    }
+
+    public set Index(pValue: number)
+    {
+        this.SetValue(XField.IndexProp, pValue);
     }
 
     public get DataType(): string

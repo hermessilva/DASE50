@@ -342,4 +342,217 @@ describe("XORMTable", () =>
             expect(newField.Name).toBe("Field4"); // Uses count + 1
         });
     });
+
+    describe("MoveFieldToIndex", () =>
+    {
+        it("should move field to new position", () =>
+        {
+            const table = new XORMTable();
+            const field1 = table.CreateField({ Name: "Field1" });
+            const field2 = table.CreateField({ Name: "Field2" });
+            const field3 = table.CreateField({ Name: "Field3" });
+
+            const result = table.MoveFieldToIndex(field3, 0);
+
+            expect(result).toBe(true);
+            const fields = table.GetFields();
+            expect(fields[0]).toBe(field3);
+            expect(fields[1]).toBe(field1);
+            expect(fields[2]).toBe(field2);
+        });
+
+        it("should return false for field not in table", () =>
+        {
+            const table1 = new XORMTable();
+            const table2 = new XORMTable();
+            const field = table1.CreateField({ Name: "Field1" });
+
+            const result = table2.MoveFieldToIndex(field, 0);
+
+            expect(result).toBe(false);
+        });
+
+        it("should return false for PKField (cannot be moved)", () =>
+        {
+            const table = new XORMTable();
+            const pkField = table.CreatePKField();
+            table.CreateField({ Name: "Field1" });
+
+            const result = table.MoveFieldToIndex(pkField, 1);
+
+            expect(result).toBe(false);
+            // PKField should remain at index 0
+            expect(table.GetFields()[0]).toBe(pkField);
+        });
+
+        it("should not move PKField below position 0", () =>
+        {
+            const table = new XORMTable();
+            const pkField = table.CreatePKField();
+            const field1 = table.CreateField({ Name: "Field1" });
+            const field2 = table.CreateField({ Name: "Field2" });
+
+            // Try to move field2 to position 0 (but PKField is there)
+            const result = table.MoveFieldToIndex(field2, 0);
+
+            // With PKField present, minIndex is 1, so it clamps to 1
+            expect(result).toBe(true);
+            const fields = table.GetFields();
+            expect(fields[0]).toBe(pkField);
+            expect(fields[1]).toBe(field2);
+            expect(fields[2]).toBe(field1);
+        });
+
+        it("should clamp to valid range", () =>
+        {
+            const table = new XORMTable();
+            const field1 = table.CreateField({ Name: "Field1" });
+            const field2 = table.CreateField({ Name: "Field2" });
+
+            // Try to move beyond array bounds
+            const result = table.MoveFieldToIndex(field1, 100);
+
+            expect(result).toBe(true);
+            const fields = table.GetFields();
+            expect(fields[0]).toBe(field2);
+            expect(fields[1]).toBe(field1);
+        });
+
+        it("should return false if already at target position", () =>
+        {
+            const table = new XORMTable();
+            const field1 = table.CreateField({ Name: "Field1" });
+            table.CreateField({ Name: "Field2" });
+
+            const result = table.MoveFieldToIndex(field1, 0);
+
+            expect(result).toBe(false);
+        });
+
+        it("should return false if field is not in children but has correct parent (defensive check)", () =>
+        {
+            const table = new XORMTable();
+            // Create a fake field that claims to be a child of 'table' but isn't in its ChildNodes
+            const fakeField = new XORMField();
+            Object.defineProperty(fakeField, 'ParentNode', { get: () => table });
+
+            const result = table.MoveFieldToIndex(fakeField, 0);
+
+            expect(result).toBe(false);
+        });
+    });
+
+    describe("UpdateFieldIndexes", () =>
+    {
+        it("should update Index property of all fields", () =>
+        {
+            const table = new XORMTable();
+            const field1 = table.CreateField({ Name: "Field1" });
+            const field2 = table.CreateField({ Name: "Field2" });
+            const field3 = table.CreateField({ Name: "Field3" });
+
+            // Manually reset indexes to verify they get updated
+            field1.Index = 99;
+            field2.Index = 99;
+            field3.Index = 99;
+
+            table.UpdateFieldIndexes();
+
+            expect(field1.Index).toBe(0);
+            expect(field2.Index).toBe(1);
+            expect(field3.Index).toBe(2);
+        });
+
+        it("should update indexes after reordering", () =>
+        {
+            const table = new XORMTable();
+            const field1 = table.CreateField({ Name: "Field1" });
+            const field2 = table.CreateField({ Name: "Field2" });
+            const field3 = table.CreateField({ Name: "Field3" });
+
+            table.MoveFieldToIndex(field3, 0);
+
+            // Indexes should be updated automatically
+            expect(field3.Index).toBe(0);
+            expect(field1.Index).toBe(1);
+            expect(field2.Index).toBe(2);
+        });
+
+        it("should set correct indexes with PKField present", () =>
+        {
+            const table = new XORMTable();
+            const pkField = table.CreatePKField();
+            const field1 = table.CreateField({ Name: "Field1" });
+            const field2 = table.CreateField({ Name: "Field2" });
+
+            expect(pkField.Index).toBe(0);
+            expect(field1.Index).toBe(1);
+            expect(field2.Index).toBe(2);
+        });
+
+        it("should update all indices when PK is created late", () =>
+        {
+            const table = new XORMTable();
+            const f1 = table.CreateField({ Name: "F1" });
+            const f2 = table.CreateField({ Name: "F2" });
+            
+            expect(f1.Index).toBe(0);
+            expect(f2.Index).toBe(1);
+
+            const pk = table.CreatePKField();
+            expect(pk.Index).toBe(0);
+            expect(f1.Index).toBe(1);
+            expect(f2.Index).toBe(2);
+        });
+
+        it("should handle multiple reorders correctly", () =>
+        {
+            const table = new XORMTable();
+            const f1 = table.CreateField({ Name: "F1" });
+            const f2 = table.CreateField({ Name: "F2" });
+            const f3 = table.CreateField({ Name: "F3" });
+
+            table.MoveFieldToIndex(f3, 0); // [f3, f1, f2]
+            expect(f3.Index).toBe(0);
+            expect(f1.Index).toBe(1);
+            expect(f2.Index).toBe(2);
+
+            table.MoveFieldToIndex(f1, 2); // [f3, f2, f1]
+            expect(f3.Index).toBe(0);
+            expect(f2.Index).toBe(1);
+            expect(f1.Index).toBe(2);
+        });
+
+        it("should update indices when a field is deleted", () =>
+        {
+            const table = new XORMTable();
+            const f1 = table.CreateField({ Name: "F1" });
+            const f2 = table.CreateField({ Name: "F2" });
+            const f3 = table.CreateField({ Name: "F3" });
+
+            table.DeleteField(f2);
+
+            const fields = table.GetFields();
+            expect(fields.length).toBe(2);
+            expect(fields[0]).toBe(f1);
+            expect(fields[1]).toBe(f3);
+            expect(f1.Index).toBe(0);
+            expect(f3.Index).toBe(1);
+        });
+
+        it("should maintain zero-based consecutive indices", () =>
+        {
+            const table = new XORMTable();
+            const f1 = table.CreateField();
+            const f2 = table.CreateField();
+            const pk = table.CreatePKField();
+            const f3 = table.CreateField();
+
+            const fields = table.GetFields();
+            for (let i = 0; i < fields.length; i++)
+            {
+                expect(fields[i].Index).toBe(i);
+            }
+        });
+    });
 });

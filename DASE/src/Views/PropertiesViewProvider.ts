@@ -120,8 +120,9 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
 
         state.UpdateProperty(this._ElementID, pPropertyKey, pValue);
         
+        // Update internal properties cache but do NOT refresh the view
+        // The user is actively typing in the input - refreshing would cause focus loss
         this._Properties = await state.GetProperties(this._ElementID);
-        this.UpdateView();
 
         const modelData = await state.GetModelData();
         panel.webview.postMessage({

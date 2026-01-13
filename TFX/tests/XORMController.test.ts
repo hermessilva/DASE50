@@ -432,4 +432,71 @@ describe("XORMController", () => {
         expect(result.Success).toBe(false);
         expect(result.Message).toBe("Unknown element type.");
     });
-});
+
+    describe("ReorderField", () => {
+        it("should reorder field to new position", () => {
+            const t1 = controller.AddTable({ X: 100, Y: 100, Name: "T1" });
+            const f1 = controller.AddField({ TableID: t1.ElementID!, Name: "Field1" });
+            const f2 = controller.AddField({ TableID: t1.ElementID!, Name: "Field2" });
+            const f3 = controller.AddField({ TableID: t1.ElementID!, Name: "Field3" });
+
+            const result = controller.ApplyOperation({
+                Type: XORMOperationType.ReorderField,
+                Data: { FieldID: f3.ElementID!, NewIndex: 0 }
+            });
+
+            expect(result.Success).toBe(true);
+            expect(result.ElementID).toBe(f3.ElementID);
+
+            const table = controller.GetTableByID(t1.ElementID!);
+            const fields = table!.GetFields();
+            expect(fields[0].ID).toBe(f3.ElementID);
+            expect(fields[1].ID).toBe(f1.ElementID);
+            expect(fields[2].ID).toBe(f2.ElementID);
+        });
+
+        it("should return false for non-existent field", () => {
+            const result = controller.ReorderField({ FieldID: "non-existent", NewIndex: 0 });
+            expect(result.Success).toBe(false);
+            expect(result.Message).toBe("Field not found.");
+        });
+
+        it("should return false for non-field element", () => {
+            const t1 = controller.AddTable({ X: 100, Y: 100, Name: "T1" });
+            
+            const result = controller.ReorderField({ FieldID: t1.ElementID!, NewIndex: 0 });
+            expect(result.Success).toBe(false);
+            expect(result.Message).toBe("Element is not a field.");
+        });
+
+        it("should return false when field has no parent table", () => {
+            const t1 = controller.AddTable({ X: 100, Y: 100, Name: "T1" });
+            const f1 = controller.AddField({ TableID: t1.ElementID!, Name: "Field1" });
+            
+            const field = controller.GetElementByID(f1.ElementID!) as XORMField;
+            vi.spyOn(field, "ParentNode", "get").mockReturnValueOnce(null);
+
+            const result = controller.ReorderField({ FieldID: f1.ElementID!, NewIndex: 0 });
+            expect(result.Success).toBe(false);
+            expect(result.Message).toBe("Field has no parent table.");
+        });
+
+        it("should return false when move fails", () => {
+            const t1 = controller.AddTable({ X: 100, Y: 100, Name: "T1" });
+            const f1 = controller.AddField({ TableID: t1.ElementID!, Name: "Field1" });
+            
+            const table = controller.GetTableByID(t1.ElementID!)!;
+            vi.spyOn(table, "MoveFieldToIndex").mockReturnValueOnce(false);
+
+            const result = controller.ReorderField({ FieldID: f1.ElementID!, NewIndex: 5 });
+            expect(result.Success).toBe(false);
+            expect(result.Message).toBe("Failed to move field.");
+        });
+
+        it("should handle null design", () => {
+            controller.Document = null;
+            const result = controller.ReorderField({ FieldID: "some-id", NewIndex: 0 });
+            expect(result.Success).toBe(false);
+            expect(result.Message).toBe("No design loaded.");
+        });
+    });});

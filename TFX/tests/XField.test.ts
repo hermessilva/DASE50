@@ -14,6 +14,22 @@ describe("XField", () =>
         expect(field).toBeInstanceOf(XRectangle);
     });
 
+    describe("Index property", () =>
+    {
+        it("should have default value 0", () =>
+        {
+            const field = new XMockField();
+            expect(field.Index).toBe(0);
+        });
+
+        it("should get and set Index", () =>
+        {
+            const field = new XMockField();
+            field.Index = 5;
+            expect(field.Index).toBe(5);
+        });
+    });
+
     describe("DataType property", () =>
     {
         it("should have default value String", () =>

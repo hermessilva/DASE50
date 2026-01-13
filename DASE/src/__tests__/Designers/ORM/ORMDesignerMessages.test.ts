@@ -34,6 +34,10 @@ describe('XDesignerMessageType', () => {
             expect(XDesignerMessageType.MoveElement).toBe('MoveElement');
         });
 
+        it('should have ReorderField message type', () => {
+            expect(XDesignerMessageType.ReorderField).toBe('ReorderField');
+        });
+
         it('should have DragDropAddRelation message type', () => {
             expect(XDesignerMessageType.DragDropAddRelation).toBe('DragDropAddRelation');
         });
@@ -86,6 +90,7 @@ describe('XDesignerMessageType', () => {
                 'SelectionChanged',
                 'AddTable',
                 'MoveElement',
+                'ReorderField',
                 'DragDropAddRelation',
                 'DeleteSelected',
                 'RenameSelected',

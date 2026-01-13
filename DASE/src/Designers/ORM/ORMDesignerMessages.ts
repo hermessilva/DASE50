@@ -8,6 +8,7 @@ export const XDesignerMessageType = {
     AddTable: "AddTable",
     AddField: "AddField",
     MoveElement: "MoveElement",
+    ReorderField: "ReorderField",
     DragDropAddRelation: "DragDropAddRelation",
     DeleteSelected: "DeleteSelected",
     RenameSelected: "RenameSelected",
