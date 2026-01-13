@@ -1,5 +1,6 @@
 import { XVsCodeFileSystemAdapter } from "../../Services/VsCodeFileSystemAdapter";
 import * as vscode from "vscode";
+import * as path from "path";
 import { FileType } from "../__mocks__/vscode";
 
 jest.mock("vscode");
@@ -18,7 +19,7 @@ describe("VsCodeFileSystemAdapter", () => {
                 type: FileType.File
             });
 
-            const result = await adapter.FileExists("C:\\test\\file.txt");
+            const result = await adapter.FileExists("/test/file.txt");
 
             expect(result).toBe(true);
         });
@@ -28,7 +29,7 @@ describe("VsCodeFileSystemAdapter", () => {
                 type: FileType.Directory
             });
 
-            const result = await adapter.FileExists("C:\\test");
+            const result = await adapter.FileExists("/test");
 
             expect(result).toBe(false);
         });
@@ -36,7 +37,7 @@ describe("VsCodeFileSystemAdapter", () => {
         it("should return false when file does not exist", async () => {
             (vscode.workspace.fs.stat as jest.Mock).mockRejectedValue(new Error("Not found"));
 
-            const result = await adapter.FileExists("C:\\nonexistent.txt");
+            const result = await adapter.FileExists("/nonexistent.txt");
 
             expect(result).toBe(false);
         });
@@ -48,7 +49,7 @@ describe("VsCodeFileSystemAdapter", () => {
                 type: FileType.Directory
             });
 
-            const result = await adapter.DirectoryExists("C:\\test");
+            const result = await adapter.DirectoryExists("/test");
 
             expect(result).toBe(true);
         });
@@ -58,7 +59,7 @@ describe("VsCodeFileSystemAdapter", () => {
                 type: FileType.File
             });
 
-            const result = await adapter.DirectoryExists("C:\\test\\file.txt");
+            const result = await adapter.DirectoryExists("/test/file.txt");
 
             expect(result).toBe(false);
         });
@@ -66,7 +67,7 @@ describe("VsCodeFileSystemAdapter", () => {
         it("should return false when directory does not exist", async () => {
             (vscode.workspace.fs.stat as jest.Mock).mockRejectedValue(new Error("Not found"));
 
-            const result = await adapter.DirectoryExists("C:\\nonexistent");
+            const result = await adapter.DirectoryExists("/nonexistent");
 
             expect(result).toBe(false);
         });
@@ -78,7 +79,7 @@ describe("VsCodeFileSystemAdapter", () => {
             const buffer = Buffer.from(content, "utf-8");
             (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(buffer);
 
-            const result = await adapter.ReadFile("C:\\test\\file.txt");
+            const result = await adapter.ReadFile("/test/file.txt");
 
             expect(result).toBe(content);
         });
@@ -88,7 +89,7 @@ describe("VsCodeFileSystemAdapter", () => {
         it("should write content to file", async () => {
             (vscode.workspace.fs.writeFile as jest.Mock).mockResolvedValue(undefined);
 
-            await adapter.WriteFile("C:\\test\\file.txt", "test content");
+            await adapter.WriteFile("/test/file.txt", "test content");
 
             expect(vscode.workspace.fs.writeFile).toHaveBeenCalled();
         });
@@ -98,7 +99,7 @@ describe("VsCodeFileSystemAdapter", () => {
         it("should create directory", async () => {
             (vscode.workspace.fs.createDirectory as jest.Mock).mockResolvedValue(undefined);
 
-            await adapter.CreateDirectory("C:\\test\\newdir");
+            await adapter.CreateDirectory("/test/newdir");
 
             expect(vscode.workspace.fs.createDirectory).toHaveBeenCalled();
         });
@@ -106,33 +107,39 @@ describe("VsCodeFileSystemAdapter", () => {
 
     describe("GetParentDirectory", () => {
         it("should return parent directory", () => {
-            const result = adapter.GetParentDirectory("C:\\test\\subdir\\file.txt");
-            expect(result).toBe("C:\\test\\subdir");
+            const testPath = path.join("/test", "subdir", "file.txt");
+            const expected = path.join("/test", "subdir");
+            const result = adapter.GetParentDirectory(testPath);
+            expect(result).toBe(expected);
         });
     });
 
     describe("JoinPath", () => {
         it("should join path segments", () => {
-            const result = adapter.JoinPath("C:\\test", "subdir", "file.txt");
-            expect(result).toBe("C:\\test\\subdir\\file.txt");
+            const result = adapter.JoinPath("/test", "subdir", "file.txt");
+            const expected = path.join("/test", "subdir", "file.txt");
+            expect(result).toBe(expected);
         });
     });
 
     describe("GetDirectoryName", () => {
         it("should return directory name", () => {
-            const result = adapter.GetDirectoryName("C:\\test\\subdir\\file.txt");
-            expect(result).toBe("C:\\test\\subdir");
+            const testPath = path.join("/test", "subdir", "file.txt");
+            const expected = path.join("/test", "subdir");
+            const result = adapter.GetDirectoryName(testPath);
+            expect(result).toBe(expected);
         });
     });
 
     describe("IsRootPath", () => {
         it("should return true for drive root", () => {
-            const result = adapter.IsRootPath("C:\\");
+            const result = adapter.IsRootPath("/");
             expect(result).toBe(true);
         });
 
         it("should return false for non-root path", () => {
-            const result = adapter.IsRootPath("C:\\test\\subdir");
+            const testPath = path.join("/test", "subdir");
+            const result = adapter.IsRootPath(testPath);
             expect(result).toBe(false);
         });
     });

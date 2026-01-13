@@ -597,12 +597,21 @@ export class XTFXBridge
         "General": 99
     };
 
+    private GetGroupOrder(pGroup: string | undefined): number
+    {
+        const groupName = pGroup ?? "General";
+        const order = XTFXBridge._GroupOrder[groupName];
+        if (order === undefined)
+            return 99;
+        return order;
+    }
+
     private SortProperties(pProps: XPropertyItem[]): XPropertyItem[]
     {
         return pProps.sort((a, b) =>
         {
-            const grpA = XTFXBridge._GroupOrder[a.Group ?? "General"] ?? 99;
-            const grpB = XTFXBridge._GroupOrder[b.Group ?? "General"] ?? 99;
+            const grpA = this.GetGroupOrder(a.Group);
+            const grpB = this.GetGroupOrder(b.Group);
             if (grpA !== grpB)
                 return grpA - grpB;
             return a.Name.localeCompare(b.Name);

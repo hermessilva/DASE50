@@ -3,7 +3,7 @@ jest.mock('vscode');
 
 import { XTFXBridge } from '../../Services/TFXBridge';
 import { XIssueItem } from '../../Models/IssueItem';
-import { XPropertyItem } from '../../Models/PropertyItem';
+import { XPropertyItem, XPropertyType } from '../../Models/PropertyItem';
 
 // Import real TFX library
 import * as tfx from '@tootega/tfx';
@@ -1635,6 +1635,25 @@ describe('XTFXBridge', () => {
             expect(pkTypeProp?.Options).toEqual(["Guid", "Int32", "Int64"]);
         });
 
+        it('should use loaded PKTypes when _PKDataTypes has values', async () => {
+            // Load model with a table
+            const json = JSON.stringify({
+                Name: "TestModel",
+                Tables: [{ ID: "table-1", Name: "TestTable", X: 100, Y: 100, Width: 150, Height: 200 }]
+            });
+            await bridge.LoadOrmModelFromText(json);
+
+            // Set _PKDataTypes to custom values
+            (bridge as any)._PKDataTypes = ["Int32", "Int64", "Guid", "BigInt"];
+
+            const props = bridge.GetProperties('table-1');
+            const pkTypeProp = props.find(p => p.Key === 'PKType');
+
+            expect(pkTypeProp).toBeDefined();
+            // Custom types should be used
+            expect(pkTypeProp?.Options).toEqual(["Int32", "Int64", "Guid", "BigInt"]);
+        });
+
         it('should use fallback AllTypes when _AllDataTypes is empty', async () => {
             // Create a mock field element
             const mockField = new tfx.XORMField();
@@ -1654,6 +1673,143 @@ describe('XTFXBridge', () => {
             expect(dataTypeProp).toBeDefined();
             // Fallback types should be used (alphabetically sorted)
             expect(dataTypeProp?.Options).toEqual(["Boolean", "DateTime", "Guid", "Int32", "String"]);
+        });
+
+        it('should use loaded AllTypes when _AllDataTypes has values', async () => {
+            // Create a mock field element
+            const mockField = new tfx.XORMField();
+            mockField.ID = 'field-1';
+            mockField.Name = 'TestField';
+            mockField.DataType = 'String' as any;
+
+            // Mock GetElementByID to return the field
+            bridge.Controller.GetElementByID = jest.fn().mockReturnValue(mockField);
+
+            // Set _AllDataTypes to custom values
+            (bridge as any)._AllDataTypes = ["String", "Int32", "Decimal", "Binary"];
+
+            const props = bridge.GetProperties('field-1');
+            const dataTypeProp = props.find(p => p.Key === 'DataType');
+
+            expect(dataTypeProp).toBeDefined();
+            // Custom types should be used
+            expect(dataTypeProp?.Options).toEqual(["String", "Int32", "Decimal", "Binary"]);
+        });
+
+        it('should sort properties with unknown group using fallback order 99', async () => {
+            // Access private SortProperties method
+            const sortProps = (bridge as any).SortProperties.bind(bridge);
+
+            // Create properties with known and unknown groups
+            const props = [
+                new XPropertyItem("B", "B", "val", XPropertyType.String, undefined, "UnknownGroup"),
+                new XPropertyItem("A", "A", "val", XPropertyType.String, undefined, "Data"),
+                new XPropertyItem("C", "C", "val", XPropertyType.String, undefined, "AnotherUnknown")
+            ];
+
+            const sorted = sortProps(props);
+
+            // Data (order 2) should come first, then unknown groups (order 99) sorted by name
+            expect(sorted[0].Key).toBe("A"); // Data group = 2
+            expect(sorted[1].Key).toBe("B"); // UnknownGroup = 99, name "B"
+            expect(sorted[2].Key).toBe("C"); // AnotherUnknown = 99, name "C"
+        });
+
+        it('should handle properties with null group using General fallback', async () => {
+            const sortProps = (bridge as any).SortProperties.bind(bridge);
+
+            const props = [
+                new XPropertyItem("Z", "Z", "val", XPropertyType.String, undefined, null as any),
+                new XPropertyItem("A", "A", "val", XPropertyType.String, undefined, "Data")
+            ];
+
+            const sorted = sortProps(props);
+
+            // Data (2) should come first, null treated as General (99)
+            expect(sorted[0].Key).toBe("A");
+            expect(sorted[1].Key).toBe("Z");
+        });
+
+        it('should handle properties with undefined group using General fallback', async () => {
+            const sortProps = (bridge as any).SortProperties.bind(bridge);
+
+            // Create property with undefined group (no group parameter)
+            const props = [
+                new XPropertyItem("Z", "Z", "val", XPropertyType.String), // No group = undefined
+                new XPropertyItem("A", "A", "val", XPropertyType.String, undefined, "Data")
+            ];
+
+            const sorted = sortProps(props);
+
+            // Data (2) should come first, undefined treated as General (99)
+            expect(sorted[0].Key).toBe("A");
+            expect(sorted[1].Key).toBe("Z");
+        });
+
+        it('should use fallback order 99 for grpB when second element has unknown group', async () => {
+            const sortProps = (bridge as any).SortProperties.bind(bridge);
+
+            // First element has known group, second has unknown group
+            const props = [
+                new XPropertyItem("A", "A", "val", XPropertyType.String, undefined, "Data"),
+                new XPropertyItem("B", "B", "val", XPropertyType.String, undefined, "UnknownGroupB")
+            ];
+
+            const sorted = sortProps(props);
+
+            // Data (order 2) should come first, unknown group (order 99) should come second
+            expect(sorted[0].Key).toBe("A"); // Data group = 2
+            expect(sorted[1].Key).toBe("B"); // UnknownGroupB = 99
+        });
+
+        it('should use fallback order 99 for both grpA and grpB when both have unknown groups', async () => {
+            const sortProps = (bridge as any).SortProperties.bind(bridge);
+
+            // Both elements have unknown groups - will trigger ?? 99 for both
+            const props = [
+                new XPropertyItem("X", "X", "val", XPropertyType.String, undefined, "UnknownGroupX"),
+                new XPropertyItem("Y", "Y", "val", XPropertyType.String, undefined, "UnknownGroupY")
+            ];
+
+            const sorted = sortProps(props);
+
+            // Both have same group order (99), so sorted by name
+            expect(sorted[0].Key).toBe("X");
+            expect(sorted[1].Key).toBe("Y");
+        });
+    });
+
+    describe('GetGroupOrder', () => {
+        it('should return correct order for known groups', async () => {
+            const getGroupOrder = (bridge as any).GetGroupOrder.bind(bridge);
+
+            expect(getGroupOrder("Tenanttity")).toBe(1);
+            expect(getGroupOrder("Data")).toBe(2);
+            expect(getGroupOrder("Behaviour")).toBe(3);
+            expect(getGroupOrder("Appearance")).toBe(4);
+            expect(getGroupOrder("Design")).toBe(5);
+            expect(getGroupOrder("Control")).toBe(6);
+            expect(getGroupOrder("Test")).toBe(7);
+            expect(getGroupOrder("General")).toBe(99);
+        });
+
+        it('should return 99 for unknown group', async () => {
+            const getGroupOrder = (bridge as any).GetGroupOrder.bind(bridge);
+
+            expect(getGroupOrder("UnknownGroup")).toBe(99);
+            expect(getGroupOrder("AnotherUnknown")).toBe(99);
+        });
+
+        it('should return 99 when group is undefined', async () => {
+            const getGroupOrder = (bridge as any).GetGroupOrder.bind(bridge);
+
+            expect(getGroupOrder(undefined)).toBe(99);
+        });
+
+        it('should return 99 when group is null', async () => {
+            const getGroupOrder = (bridge as any).GetGroupOrder.bind(bridge);
+
+            expect(getGroupOrder(null as any)).toBe(99);
         });
     });
 
