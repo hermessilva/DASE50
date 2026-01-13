@@ -1,3 +1,7 @@
+**Languages:** English | [Português (Brasil)](README.pt-BR.md)
+
+---
+
 ## TFX — Core Framework
 
 [![CI](https://github.com/Tootega/DASE50/actions/workflows/ci.yml/badge.svg)](https://github.com/HermesSilva/DASE50/actions/workflows/ci.yml)
@@ -111,7 +115,7 @@ DASE50/
 ├── .github/
 │   ├── copilot-instructions.md    # AI coding standards
 │   └── workflows/
-│       └── tfx-ci.yml             # CI/CD pipeline
+│       └── ci.yml                 # CI/CD pipeline
 ├── TFX/                           # Core Framework
 │   ├── src/
 │   │   ├── Core/                  # Foundation classes
@@ -122,12 +126,12 @@ DASE50/
 ├── DASE/                          # VS Code Extension
 │   ├── src/
 │   │   ├── Commands/              # Extension commands
-│   │   ├── Views/                 # Panel views
-│   │   ├── Designer/              # ORM designer
+│   │   ├── Designers/ORM/         # ORM designer
+│   │   ├── Models/                # Data models
 │   │   ├── Services/              # Business services
-│   │   └── Models/                # Data models
+│   │   └── Views/                 # Panel views
 │   ├── media/                     # Webview assets
-│   └── tests/                     # Unit tests
+│   └── src/__tests__/             # Unit tests
 └── README.md                      # This file
 ```
 
@@ -165,25 +169,25 @@ DASE aims to be a comprehensive visual design environment supporting:
 DASE/src/
 ├── ExtensionMain.ts                  # Extension entry point
 ├── Commands/
-│   ├── OpenORMDesignerCommand.ts     # Open designer command
-│   ├── ValidateORMModelCommand.ts    # Validation command
 │   ├── DeleteSelectedCommand.ts      # Delete elements command
+│   ├── ReloadDataTypesCommand.ts     # Reload data types command
 │   └── RenameSelectedCommand.ts      # Rename element command
-├── Views/
-│   ├── IssuesViewProvider.ts         # Issues panel
-│   └── PropertiesViewProvider.ts     # Properties panel
-├── Designer/
+├── Designers/ORM/
 │   ├── ORMDesignerEditorProvider.ts  # Custom editor provider
 │   ├── ORMDesignerMessages.ts        # Message protocol types
-│   └── ORMDesignerState.ts           # In-memory state management
+│   ├── ORMDesignerState.ts           # In-memory state management
+│   └── Commands/                     # ORM-specific commands
+├── Models/
+│   ├── DesignerSelection.ts          # Selection data structures
+│   ├── IssueItem.ts                  # Issue representation
+│   └── PropertyItem.ts               # Property representation
 ├── Services/
 │   ├── IssueService.ts               # Issue management
 │   ├── SelectionService.ts           # Selection state
 │   └── TFXBridge.ts                  # TFX framework integration
-└── Models/
-    ├── DesignerSelection.ts          # Selection data structures
-    ├── IssueItem.ts                  # Issue representation
-    └── PropertyItem.ts               # Property representation
+└── Views/
+    ├── IssuesViewProvider.ts         # Issues panel
+    └── PropertiesViewProvider.ts     # Properties panel
 ```
 
 ### Message Protocol
@@ -290,7 +294,10 @@ Domain-specific designer implementations:
 | `XORMDesign` | ORM design surface |
 | `XORMTable` | Database table representation |
 | `XORMField` | Table column/field definition |
+| `XORMPKField` | Primary key field definition |
 | `XORMReference` | Table relationship/foreign key |
+| `XORMController` | ORM operations controller |
+| `XORMValidator` | ORM model validation |
 
 ## Key Design Patterns
 
@@ -492,13 +499,13 @@ cd ../DASE && npm run test:coverage
 
 ---
 
-## 🚀 CI/CD Pipelines
+## 🚀 CI/CD Pipeline
 
-The repository maintains two independent CI/CD workflows:
+The repository uses a single unified CI/CD workflow that builds and tests both components:
 
-### TFX Framework Pipeline
+### TFX Framework
 
-**Workflow:** [.github/workflows/tfx-ci.yml](.github/workflows/tfx-ci.yml)
+**Workflow:** [.github/workflows/ci.yml](.github/workflows/ci.yml)
 
 **Triggers:**
 - Push to `master` branch (TFX/** changes)
@@ -519,9 +526,9 @@ The repository maintains two independent CI/CD workflows:
 - ✅ No TypeScript compilation errors
 - ✅ Zero-allocation patterns enforced
 
-### DASE Extension Pipeline
+### DASE Extension
 
-**Workflow:** [.github/workflows/dase-ci.yml](.github/workflows/dase-ci.yml)
+**Workflow:** [.github/workflows/ci.yml](.github/workflows/ci.yml)
 
 **Triggers:**
 - Push to `master` branch (DASE/** or TFX/** changes)
