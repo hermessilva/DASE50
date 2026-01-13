@@ -1,4 +1,4 @@
-<p align="center">
+<p>
   <a href="README.md"><img src="https://img.shields.io/badge/lang-English-blue?style=for-the-badge" alt="English">
     <img src="https://flagcdn.com/48x36/gb.png" alt="English" title="English">
 </a>

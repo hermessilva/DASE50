@@ -117,3 +117,5 @@ if ($OpenStarts.Count -gt 0) {
         Write-Host "Active for: $(Format-TimeSpan $TimeOpen)"
     }
 }
+
+Read-Host "Press Enter to continue."
