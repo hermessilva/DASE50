@@ -24,7 +24,7 @@ export abstract class XField extends XRectangle
         "00000001-0001-0001-0004-000000000002",
         "IsRequired",
         "Is Required",
-        false
+        true
     );
 
     public static readonly DefaultValueProp = XProperty.Register<XField, string>(
@@ -103,6 +103,8 @@ export abstract class XField extends XRectangle
 
     public set Length(pValue: number)
     {
+        if (pValue < 0)
+            pValue = 0;
         this.SetValue(XField.LengthProp, pValue);
     }
 
@@ -113,6 +115,8 @@ export abstract class XField extends XRectangle
 
     public set Scale(pValue: number)
     {
+        if (pValue < 0)
+            pValue = 0;
         this.SetValue(XField.ScaleProp, pValue);
     }
 }

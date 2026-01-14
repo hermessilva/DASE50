@@ -13,8 +13,8 @@
  *    - Obrigatório
  *    - Validação: identificador válido
  * 
- * 3. ISNULLABLE
- *    - Não visível (PK nunca é nullable)
+ * 3. ISREQUIRED
+ *    - Não visível (PK sempre é required)
  * 
  * 4. ISAUTOINCREMENT
  *    - Visível apenas para Int32 e Int64
@@ -161,10 +161,10 @@ export class XORMPKFieldMetadataProvider extends XPropertyMetadataProvider<XORMP
      */
     private RegisterHiddenProperties(): void
     {
-        // IsNullable - PK nunca é nullable
-        this.AddPropertyRule("IsNullable", "Is Nullable", {
+        // IsRequired - PK sempre é required
+        this.AddPropertyRule("IsRequired", "Is Required", {
             IsVisible: () => false,
-            HintProvider: () => "Primary key fields cannot be nullable"
+            HintProvider: () => "Primary key fields are always required"
         });
 
         // Length - não aplicável a tipos PK
@@ -183,6 +183,12 @@ export class XORMPKFieldMetadataProvider extends XPropertyMetadataProvider<XORMP
         this.AddPropertyRule("IsPrimaryKey", "Is Primary Key", {
             IsVisible: () => false,
             HintProvider: () => "This is a primary key field"
+        });
+
+        // IsNullable - PK nunca pode ser nulo
+        this.AddPropertyRule("IsNullable", "Is Nullable", {
+            IsVisible: () => false,
+            HintProvider: () => "Primary key fields cannot be nullable"
         });
     }
 
@@ -219,8 +225,8 @@ export class XORMPKFieldMetadataProvider extends XPropertyMetadataProvider<XORMP
             case "Length": return pElement.Length;
             case "Scale": return pElement.Scale;
             case "IsPrimaryKey": return pElement.IsPrimaryKey;
-            case "IsNullable": return pElement.IsNullable;
             case "IsAutoIncrement": return pElement.IsAutoIncrement;
+            case "IsNullable": return pElement.IsNullable;
             case "IsRequired": return pElement.IsRequired;
             case "DefaultValue": return pElement.DefaultValue;
             case "IsDataTypeLocked": return pElement.IsDataTypeLocked;
@@ -238,6 +244,7 @@ export class XORMPKFieldMetadataProvider extends XPropertyMetadataProvider<XORMP
             case "Name": return "Name";
             case "DataType": return "Data Type";
             case "IsAutoIncrement": return "Is Auto Increment";
+            case "IsNullable": return "Is Nullable";
             case "IsPrimaryKey": return "Is Primary Key";
             default: return pPropertyID;
         }
@@ -251,7 +258,14 @@ export class XORMPKFieldMetadataProvider extends XPropertyMetadataProvider<XORMP
         return [
             "Name",
             "DataType",
-            "IsAutoIncrement"
+            "Length",
+            "Scale",
+            "IsPrimaryKey",
+            "IsAutoIncrement",
+            "IsNullable",
+            "IsRequired",
+            "DefaultValue",
+            "IsDataTypeLocked"
         ];
     }
 }

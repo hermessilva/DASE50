@@ -42,7 +42,13 @@ describe("ORM Metadata Providers Coverage", () => {
             expect(provider.IsPropertyVisible(pkField, "IsAutoIncrement")).toBe(false);
             
             const meta = provider.GetMetadata(pkField, "IsAutoIncrement");
-            expect(meta.Hint).toBeDefined();
+            expect(meta.Hint).toBe("Guid fields do not support auto-increment");
+        });
+
+        it("should return generic hint for IsAutoIncrement when not Guid", () => {
+             pkField.DataType = "Int32";
+             const meta = provider.GetMetadata(pkField, "IsAutoIncrement");
+             expect(meta.Hint).toBe("Automatically generate incremental values for the primary key");
         });
 
         it("should hide IsNullable", () => {
@@ -272,6 +278,60 @@ describe("ORM Metadata Providers Coverage", () => {
             pkField.InitializeNew();
             // Access protected method directly via type assertion
             expect((pkProvider as any).GetPropertyValue(pkField, "Name")).toBe(pkField.Name);
+        });
+
+        it("should cover property IDs and more branches", () => {
+            const pkField = new XORMPKField();
+            pkField.InitializeNew();
+            const props = XORMPKFieldMetadataProvider.GetAllPropertyIDs();
+            props.forEach(p => {
+                const meta = pkProvider.GetMetadata(pkField, p);
+                expect(meta).toBeDefined();
+                expect(pkProvider.GetPropertyName(p)).toBeDefined();
+            });
+            // Unknown property branches
+            expect(XORMPKFieldMetadataProvider.GetPKFieldPropertyValue(pkField, "Unknown")).toBeUndefined();
+            expect(pkProvider.GetPropertyName("Unknown")).toBe("Unknown");
+        });
+
+        it("should cover XORMPKFieldPropertyContext.GetPropertyValue", () => {
+            const pkField = new XORMPKField();
+            pkField.InitializeNew();
+            const meta = pkProvider.GetMetadata(pkField, "Name");
+            // Metadata creation internally uses context, but we can verify it indirectly
+            expect(meta.PropertyID).toBe("Name");
+        });
+
+        it("should cover hidden properties rules (IsVisible, HintProvider)", () => {
+            const pkField = new XORMPKField();
+            pkField.InitializeNew();
+            
+            const hiddenProps = ["IsRequired", "Length", "Scale", "IsPrimaryKey", "IsNullable"];
+            hiddenProps.forEach(prop => {
+                const meta = pkProvider.GetMetadata(pkField, prop);
+                expect(meta.IsVisible).toBe(false);
+                expect(meta.Hint).toBeDefined();
+                expect(typeof meta.Hint).toBe("string");
+            });
+        });
+
+        it("should cover IsAutoIncrement visibility rules", () => {
+            const pkField = new XORMPKField();
+            pkField.InitializeNew();
+            
+            pkField.DataType = "Int32";
+            expect(pkProvider.GetMetadata(pkField, "IsAutoIncrement").IsVisible).toBe(true);
+            expect(pkProvider.GetMetadata(pkField, "IsAutoIncrement").Hint).toBe("Automatically generate incremental values for the primary key");
+            
+            pkField.DataType = "Guid";
+            expect(pkProvider.GetMetadata(pkField, "IsAutoIncrement").IsVisible).toBe(false);
+            expect(pkProvider.GetMetadata(pkField, "IsAutoIncrement").Hint).toBe("Guid fields do not support auto-increment");
+        });
+
+        it("should reset instance", () => {
+            XORMPKFieldMetadataProvider.ResetInstance();
+            const instance = XORMPKFieldMetadataProvider.Instance;
+            expect(instance).toBeDefined();
         });
     });
 });

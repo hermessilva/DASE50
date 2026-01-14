@@ -277,7 +277,7 @@ describe("XORMValidator", () =>
             expect(warning).toBeDefined();
         });
 
-        it("should warn when String field has no length defined", () =>
+        it("should error when Decimal field has no length defined", () =>
         {
             const doc = new XORMDocument();
             const table = new XORMTable();
@@ -286,19 +286,20 @@ describe("XORMValidator", () =>
             table.CreatePKField();
 
             const field = new XORMField();
-            field.Name = "Email";
-            field.DataType = "String";
+            field.Name = "Amount";
+            field.DataType = "Decimal";
             field.Length = 0;
             table.AppendChild(field);
 
             const validator = new XORMValidator();
             const issues = validator.Validate(doc);
 
-            const warning = issues.find(i => i.Message.includes("String field has no length"));
-            expect(warning).toBeDefined();
+            const error = issues.find(i => i.Message.includes("Decimal field must have a Length"));
+            expect(error).toBeDefined();
+            expect(error!.Severity).toBe(XDesignerErrorSeverity.Error);
         });
 
-        it("should not warn when String field has length defined", () =>
+        it("should not error when Decimal field has length defined", () =>
         {
             const doc = new XORMDocument();
             const table = new XORMTable();
@@ -307,16 +308,16 @@ describe("XORMValidator", () =>
             table.CreatePKField();
 
             const field = new XORMField();
-            field.Name = "Email";
-            field.DataType = "String";
-            field.Length = 255;
+            field.Name = "Amount";
+            field.DataType = "Decimal";
+            field.Length = 18;
             table.AppendChild(field);
 
             const validator = new XORMValidator();
             const issues = validator.Validate(doc);
 
-            const warning = issues.find(i => i.Message.includes("String field has no length"));
-            expect(warning).toBeUndefined();
+            const error = issues.find(i => i.Message.includes("Decimal field must have a Length"));
+            expect(error).toBeUndefined();
         });
 
         it("should warn when Scale is set on non-Decimal field", () =>
@@ -361,23 +362,30 @@ describe("XORMValidator", () =>
             expect(warning).toBeUndefined();
         });
 
-        it("should error when table has no primary key field", () =>
+        it("should auto-create primary key field when table has none", () =>
         {
             const doc = new XORMDocument();
             const table = new XORMTable();
             table.Name = "Users";
             doc.Design.AppendChild(table);
 
+            expect(table.HasPKField()).toBe(false);
+
             const validator = new XORMValidator();
             const issues = validator.Validate(doc);
 
+            // Should not have error - PK field auto-created
             const error = issues.find(i => i.Message.includes("must have a primary key field"));
-            expect(error).toBeDefined();
-            expect(error?.Severity).toBe(XDesignerErrorSeverity.Error);
-            expect(error?.ElementID).toBe(table.ID);
+            expect(error).toBeUndefined();
+
+            // PK field should now exist
+            expect(table.HasPKField()).toBe(true);
+            const pkField = table.GetPKField();
+            expect(pkField).not.toBeNull();
+            expect(pkField!.DataType).toBe(table.PKType);
         });
 
-        it("should error when FK field DataType does not match target table PKType", () =>
+        it("should auto-correct FK field DataType when it does not match target table PKType", () =>
         {
             const doc = new XORMDocument();
             doc.Design.Name = "TestDB";
@@ -410,8 +418,12 @@ describe("XORMValidator", () =>
             const validator = new XORMValidator();
             const issues = validator.Validate(doc);
 
+            // Should not have error - DataType auto-corrected
             const error = issues.find(i => i.Message.includes("FK field DataType must match target table PKType"));
-            expect(error).toBeDefined();
+            expect(error).toBeUndefined();
+
+            // FK field DataType should now match target PKType
+            expect(fkField.DataType).toBe("Guid");
         });
 
         it("should not error when FK field DataType matches target table PKType", () =>

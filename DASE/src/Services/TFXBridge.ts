@@ -43,7 +43,8 @@ interface IFieldData
     Name: string;
     DataType: string;
     IsPrimaryKey: boolean;
-    IsNullable: boolean;
+    IsForeignKey?: boolean;
+    IsRequired?: boolean;
     Length?: number;
     IsAutoIncrement?: boolean;
     DefaultValue?: string;
@@ -60,6 +61,7 @@ interface ITableData
     Height: number;
     Description?: string;
     FillProp?: string;
+    PKType?: string;
     Fields: IFieldData[];
 }
 
@@ -570,9 +572,6 @@ export class XTFXBridge
                     break;
                 case "IsPrimaryKey":
                     return { Success: false, Message: "Primary key is structural (XORMPKField) and cannot be edited." };
-                case "IsNullable":
-                    element.IsNullable = pValue as boolean;
-                    break;
                 case "IsAutoIncrement":
                     element.IsAutoIncrement = pValue as boolean;
                     break;
@@ -690,7 +689,6 @@ export class XTFXBridge
             const pkProp = new XPropertyItem("IsPrimaryKey", "Primary Key", element.IsPrimaryKey, XPropertyType.Boolean, undefined, "Data");
             pkProp.IsReadOnly = true;
             props.push(pkProp);
-            props.push(new XPropertyItem("IsNullable", "Nullable", element.IsNullable, XPropertyType.Boolean, undefined, "Behaviour"));
             props.push(new XPropertyItem("IsAutoIncrement", "Auto Increment", element.IsAutoIncrement, XPropertyType.Boolean, undefined, "Behaviour"));
             props.push(new XPropertyItem("DefaultValue", "Default Value", element.DefaultValue, XPropertyType.String, undefined, "Data"));
             props.push(new XPropertyItem("Description", "Description", element.Description, XPropertyType.String, undefined, "Data"));
@@ -764,12 +762,14 @@ export class XTFXBridge
                 Width: t.Bounds.Width,
                 Height: t.Bounds.Height,
                 FillProp: fillColor,
+                PKType: t.PKType,
                 Fields: fields.map((f: any) => ({
                     ID: f.ID,
                     Name: f.Name,
                     DataType: f.DataType,
                     IsPrimaryKey: f.IsPrimaryKey,
-                    IsNullable: f.IsNullable
+                    IsForeignKey: f.IsForeignKey,
+                    IsRequired: f.IsRequired
                 }))
             };
         });
@@ -918,7 +918,7 @@ export class XTFXBridge
                             Name: fData.Name || "",
                             DataType: (fData.DataType as string) || "String",
                             Length: fData.Length || 0,
-                            IsNullable: fData.IsNullable !== false,
+                            IsRequired: fData.IsRequired || false,
                             IsAutoIncrement: fData.IsAutoIncrement || false,
                             DefaultValue: fData.DefaultValue || ""
                         });

@@ -25,6 +25,7 @@ export class XORMDesignerState
     private _Document: vscode.TextDocument;
     private _Bridge: XTFXBridge;
     private _IsDirty: boolean;
+    private _LastIssues: XIssueItem[];
     private _OnStateChanged: vscode.EventEmitter<IStateChangedEvent>;
 
     constructor(pDocument: vscode.TextDocument)
@@ -32,6 +33,7 @@ export class XORMDesignerState
         this._Document = pDocument;
         this._Bridge = new XTFXBridge();
         this._IsDirty = false;
+        this._LastIssues = [];
         this._OnStateChanged = new vscode.EventEmitter<IStateChangedEvent>();
     }
 
@@ -147,9 +149,14 @@ export class XORMDesignerState
 
     Validate(): XIssueItem[]
     {
-        const issues = this._Bridge.ValidateOrmModel();
-        this.IssueService.SetIssues(issues);
-        return issues;
+        this._LastIssues = this._Bridge.ValidateOrmModel();
+        this.IssueService.SetIssues(this._LastIssues);
+        return this._LastIssues;
+    }
+
+    RefreshIssues(): void
+    {
+        this.IssueService.SetIssues(this._LastIssues);
     }
 
     AddTable(pX: number, pY: number, pName: string): XIOperationResult

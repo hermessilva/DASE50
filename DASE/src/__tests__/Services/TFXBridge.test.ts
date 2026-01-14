@@ -544,14 +544,14 @@ describe('XTFXBridge', () => {
             expect(result.Message).toContain('structural');
         });
 
-        it('should update XORMField IsNullable property', async () => {
+        it('should update XORMField IsRequired property', async () => {
             const json = JSON.stringify({
                 Name: "TestModel",
                 Tables: [{ ID: "table-1", Name: "TestTable", X: 100, Y: 100, Fields: [{ ID: "field-1", Name: "Name", DataType: "String" }] }]
             });
             await bridge.LoadOrmModelFromText(json);
 
-            const result = bridge.UpdateProperty('field-1', 'IsNullable', false);
+            const result = bridge.UpdateProperty('field-1', 'IsRequired', true);
 
             expect(result.Success).toBe(true);
         });
@@ -774,7 +774,7 @@ describe('XTFXBridge', () => {
                 Name: 'UserID',
                 DataType: 'Integer',
                 IsPrimaryKey: true,
-                IsNullable: false
+                IsRequired: true
             };
             
             const mockTable = {
@@ -1043,7 +1043,7 @@ describe('XTFXBridge', () => {
                                     DataType: 'Int32',
                                     Length: 0,
                                     IsPrimaryKey: true,
-                                    IsNullable: false,
+                                    IsRequired: true,
                                     IsAutoIncrement: true,
                                     DefaultValue: '',
                                     Description: ''
@@ -1058,7 +1058,7 @@ describe('XTFXBridge', () => {
                                     DataType: fieldOpts.DataType || 'String',
                                     Length: fieldOpts.Length || 0,
                                     IsPrimaryKey: fieldOpts.IsPrimaryKey || false,
-                                    IsNullable: fieldOpts.IsNullable !== false,
+                                    IsRequired: fieldOpts.IsRequired || false,
                                     IsAutoIncrement: fieldOpts.IsAutoIncrement || false,
                                     DefaultValue: fieldOpts.DefaultValue || '',
                                     Description: fieldOpts.Description || ''
@@ -1133,7 +1133,7 @@ describe('XTFXBridge', () => {
                         DataType: 'Integer',
                         Length: 10,
                         IsPrimaryKey: true,
-                        IsNullable: false,
+                        IsRequired: true,
                         IsAutoIncrement: true,
                         DefaultValue: '0',
                         Description: 'Primary key'
@@ -1236,7 +1236,7 @@ describe('XTFXBridge', () => {
                 Name: 'ID',
                 DataType: 'Int32',
                 IsPrimaryKey: true,
-                IsNullable: false,
+                IsRequired: true,
                 IsAutoIncrement: true,
                 DefaultValue: '',
                 Description: ''
@@ -1266,7 +1266,7 @@ describe('XTFXBridge', () => {
                             DataType: fieldOpts.DataType || 'String',
                             Length: fieldOpts.Length || 0,
                             IsPrimaryKey: false,
-                            IsNullable: fieldOpts.IsNullable !== false,
+                            IsRequired: fieldOpts.IsRequired || false,
                             IsAutoIncrement: fieldOpts.IsAutoIncrement || false,
                             DefaultValue: fieldOpts.DefaultValue || '',
                             Description: ''
@@ -1522,7 +1522,7 @@ describe('XTFXBridge', () => {
                         DataType: 'Int32',  // Non-default value to test truthy branch
                         Length: 10,
                         IsPrimaryKey: true,
-                        IsNullable: true,
+                        IsRequired: false,
                         IsAutoIncrement: true,
                         DefaultValue: '0',
                         Description: 'A full field'
@@ -1680,7 +1680,7 @@ describe('XTFXBridge', () => {
                 DataType: 'Integer',
                 Length: 4,
                 IsPrimaryKey: true,
-                IsNullable: false,
+                IsRequired: true,
                 IsAutoIncrement: true,
                 DefaultValue: '',
                 Description: 'Primary key'
@@ -1806,7 +1806,7 @@ describe('XTFXBridge', () => {
             mockField.Name = 'UserID';
             mockField.DataType = 'Int32' as any;
             mockField.Length = 4;
-            mockField.IsNullable = false;
+            mockField.IsRequired = true;
             mockField.IsAutoIncrement = true;
             mockField.DefaultValue = '';
             mockField.Description = 'Primary key';
@@ -1821,7 +1821,7 @@ describe('XTFXBridge', () => {
             expect(props.some(p => p.Key === 'DataType')).toBe(true);
             expect(props.some(p => p.Key === 'Length')).toBe(true);
             expect(props.some(p => p.Key === 'IsPrimaryKey')).toBe(true);
-            expect(props.some(p => p.Key === 'IsNullable')).toBe(true);
+            expect(props.some(p => p.Key === 'IsRequired')).toBe(true);
             expect(props.some(p => p.Key === 'IsAutoIncrement')).toBe(true);
 
             const pkProp = props.find(p => p.Key === 'IsPrimaryKey');
@@ -2688,7 +2688,7 @@ describe('XTFXBridge', () => {
         it('should use table.Fields when GetChildrenOfType is null', async () => {
             await bridge.LoadOrmModelFromText('{}');
             
-            const mockField = { ID: 'field-1', Name: 'FieldFromArray', DataType: 'String', IsPrimaryKey: false, IsNullable: true };
+            const mockField = { ID: 'field-1', Name: 'FieldFromArray', DataType: 'String', IsPrimaryKey: false, IsRequired: false };
             const mockTable = {
                 ID: 'table-1',
                 Name: 'TestTable',
@@ -2810,7 +2810,7 @@ describe('XTFXBridge', () => {
         it('should use table.Fields when GetChildrenOfType is null in SaveToJson', async () => {
             await bridge.LoadOrmModelFromText('{}');
             
-            const mockField = { ID: 'field-1', Name: 'FieldFromArray', DataType: 'String', Length: 0, IsPrimaryKey: false, IsNullable: true, IsAutoIncrement: false, DefaultValue: '', Description: '' };
+            const mockField = { ID: 'field-1', Name: 'FieldFromArray', DataType: 'String', Length: 0, IsPrimaryKey: false, IsRequired: false, IsAutoIncrement: false, DefaultValue: '', Description: '' };
             const mockTable = {
                 ID: 'table-1',
                 Name: 'TestTable',
@@ -3048,7 +3048,7 @@ describe('XTFXBridge', () => {
                 Bounds: { Left: 0, Top: 0, Width: 200, Height: 150 },
                 // No GetChildrenOfType
                 Fields: [
-                    { ID: 'f1', Name: 'ID', DataType: 'Int32', Length: 4, IsPrimaryKey: true, IsNullable: false, IsAutoIncrement: true, DefaultValue: '', Description: '' }
+                    { ID: 'f1', Name: 'ID', DataType: 'Int32', Length: 4, IsPrimaryKey: true, IsRequired: true, IsAutoIncrement: true, DefaultValue: '', Description: '' }
                 ]
             };
             

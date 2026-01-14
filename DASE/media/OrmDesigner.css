@@ -125,6 +125,45 @@ body {
     font-weight: 600;
 }
 
+/* Field icon (PK, FK, or DataType) */
+.orm-field-icon {
+    fill: var(--vscode-foreground);
+    font-size: 9px;
+    opacity: 0.8;
+}
+
+/* IsRequired checkbox */
+.orm-field-checkbox {
+    cursor: pointer;
+}
+
+.orm-checkbox-bg {
+    fill: var(--vscode-input-background);
+    stroke: var(--vscode-input-border, var(--vscode-foreground));
+    stroke-width: 1;
+}
+
+.orm-checkbox-check {
+    fill: none;
+    stroke: var(--vscode-foreground);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.orm-field-checkbox:hover .orm-checkbox-bg {
+    stroke: var(--vscode-focusBorder);
+}
+
+.orm-field-checkbox.orm-checkbox-disabled {
+    cursor: default;
+    opacity: 0.5;
+}
+
+.orm-field-checkbox.orm-checkbox-disabled:hover .orm-checkbox-bg {
+    stroke: var(--vscode-input-border, var(--vscode-foreground));
+}
+
 .orm-field-group {
     cursor: pointer;
 }
@@ -150,6 +189,7 @@ body {
 .orm-field-drag-ghost {
     pointer-events: none;
     z-index: 1000;
+    opacity: 0.5;
 }
 
 .orm-field-drag-ghost-bg {

@@ -5,14 +5,6 @@ import type { XORMTable } from "./XORMTable.js";
 
 export class XORMField extends XField
 {
-    public static readonly IsNullableProp = XProperty.Register<XORMField, boolean>(
-        (p: XORMField) => p.IsNullable,
-        "00000001-0002-0003-0001-000000000005",
-        "IsNullable",
-        "Is Nullable",
-        true
-    );
-
     public static readonly IsAutoIncrementProp = XProperty.Register<XORMField, boolean>(
         (p: XORMField) => p.IsAutoIncrement,
         "00000001-0002-0003-0001-000000000006",
@@ -21,9 +13,18 @@ export class XORMField extends XField
         false
     );
 
+    public static readonly IsNullableProp = XProperty.Register<XORMField, boolean>(
+        (p: XORMField) => p.IsNullable,
+        "00000001-0002-0003-0001-000000000007",
+        "IsNullable",
+        "Is Nullable",
+        true
+    );
+
     public constructor()
     {
         super();
+        this.IsNullable = true;
     }
 
     /**
@@ -36,16 +37,6 @@ export class XORMField extends XField
         return false;
     }
 
-    public get IsNullable(): boolean
-    {
-        return this.GetValue(XORMField.IsNullableProp) as boolean;
-    }
-
-    public set IsNullable(pValue: boolean)
-    {
-        this.SetValue(XORMField.IsNullableProp, pValue);
-    }
-
     public get IsAutoIncrement(): boolean
     {
         return this.GetValue(XORMField.IsAutoIncrementProp) as boolean;
@@ -54,6 +45,30 @@ export class XORMField extends XField
     public set IsAutoIncrement(pValue: boolean)
     {
         this.SetValue(XORMField.IsAutoIncrementProp, pValue);
+    }
+
+    public get IsNullable(): boolean
+    {
+        return this.GetValue(XORMField.IsNullableProp) as boolean;
+    }
+
+    public set IsNullable(pValue: boolean)
+    {
+        this.SetValue(XORMField.IsNullableProp, pValue);
+        // Sincroniza com IsRequired do base
+        super.IsRequired = !pValue;
+    }
+
+    public override get IsRequired(): boolean
+    {
+        return super.IsRequired;
+    }
+
+    public override set IsRequired(pValue: boolean)
+    {
+        super.IsRequired = pValue;
+        // Sincroniza com IsNullable
+        this.SetValue(XORMField.IsNullableProp, !pValue);
     }
 
     /**

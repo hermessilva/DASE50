@@ -106,6 +106,14 @@ describe("XORMPKField", () => {
         });
     });
 
+    describe("IsRequired immutability", () => {
+        it("should always be true regardless of setter call", () => {
+            const pkField = new XORMPKField();
+            pkField.IsRequired = false; // Should be ignored
+            expect(pkField.IsRequired).toBe(true);
+        });
+    });
+
     describe("IsPrimaryKey immutability", () => {
         it("should always be true", () => {
             const pkField = new XORMPKField();

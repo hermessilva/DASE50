@@ -297,6 +297,77 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
         .color-dropdown-item.selected {
             background-color: var(--vscode-list-activeSelectionBackground);
         }
+        /* DataType dropdown with icons */
+        .datatype-dropdown {
+            position: relative;
+            width: 100%;
+        }
+        .datatype-dropdown-selected {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 2px 4px;
+            background-color: var(--vscode-input-background);
+            border: 1px solid var(--vscode-input-border);
+            cursor: pointer;
+            min-height: 20px;
+        }
+        .datatype-dropdown-selected:hover {
+            border-color: var(--vscode-focusBorder);
+        }
+        .datatype-dropdown-icon {
+            display: inline-block;
+            background: linear-gradient(135deg, #FF8C00 0%, #FF7200 100%);
+            color: #FFFFFF;
+            font-size: 9px;
+            font-weight: 600;
+            min-width: 28px;
+            height: 16px;
+            line-height: 16px;
+            text-align: center;
+            border-radius: 3px;
+            padding: 0 4px;
+            box-shadow: 0 1px 3px rgba(255, 140, 0, 0.3);
+            letter-spacing: 0.3px;
+        }
+        .datatype-dropdown-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .datatype-dropdown-arrow {
+            margin-left: auto;
+            font-size: 10px;
+        }
+        .datatype-dropdown-list {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 200px;
+            overflow-y: auto;
+            background-color: var(--vscode-input-background);
+            border: 1px solid var(--vscode-input-border);
+            z-index: 1000;
+        }
+        .datatype-dropdown.open .datatype-dropdown-list {
+            display: block;
+        }
+        .datatype-dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 6px;
+            cursor: pointer;
+        }
+        .datatype-dropdown-item:hover {
+            background-color: var(--vscode-list-hoverBackground);
+        }
+        .datatype-dropdown-item.selected {
+            background-color: var(--vscode-list-activeSelectionBackground);
+        }
         .property-group {
             margin-bottom: 8px;
         }
@@ -465,6 +536,29 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
             { name: "YellowGreen", hex: "#9ACD32" }
         ];
         
+        // Data type icons mapping
+        const DataTypeIcons = {
+            "String": "Abc",
+            "Int16": "16",
+            "Int32": "32",
+            "Int64": "64",
+            "Decimal": "0.0",
+            "Float": "1.5",
+            "Double": "2.0",
+            "Boolean": "✓✗",
+            "DateTime": "📅",
+            "Date": "📅",
+            "Time": "🕐",
+            "Guid": "ID",
+            "Byte": "B",
+            "Binary": "01",
+            "Text": "Txt"
+        };
+
+        function GetDataTypeIcon(pDataType) {
+            return DataTypeIcons[pDataType] || (pDataType ? pDataType.substring(0, 3) : "?");
+        }
+
         console.log("[PropertiesWebview] Script initialized with", initialProperties.length, "properties");
         
         // Render initial properties immediately
@@ -548,6 +642,31 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                     return '<input type="number" data-key="' + key + '" value="' + value + '" ' + readonly + '>';
 
                 case "Enum":
+                    // Use custom datatype dropdown for DataType and PKType properties
+                    if (pProp.Key === "DataType" || pProp.Key === "PKType")
+                    {
+                        let dataTypeItems = "";
+                        const currentValue = String(value);
+                        if (pProp.Options)
+                        {
+                            for (const opt of pProp.Options)
+                            {
+                                const isSelected = opt === currentValue;
+                                const icon = GetDataTypeIcon(opt);
+                                dataTypeItems += '<div class="datatype-dropdown-item' + (isSelected ? ' selected' : '') + '" data-value="' + EscapeHtml(opt) + '">' +
+                                                 '<span class="datatype-dropdown-icon">' + icon + '</span>' +
+                                                 '<span class="datatype-dropdown-name">' + EscapeHtml(opt) + '</span></div>';
+                            }
+                        }
+                        const currentIcon = GetDataTypeIcon(currentValue);
+                        return '<div class="datatype-dropdown" data-key="' + key + '">' +
+                               '<div class="datatype-dropdown-selected">' +
+                               '<span class="datatype-dropdown-icon">' + currentIcon + '</span>' +
+                               '<span class="datatype-dropdown-name">' + EscapeHtml(currentValue) + '</span>' +
+                               '<span class="datatype-dropdown-arrow">▼</span></div>' +
+                               '<div class="datatype-dropdown-list">' + dataTypeItems + '</div></div>';
+                    }
+                    // Default enum - standard select
                     let options = "";
                     if (pProp.Options)
                     {
@@ -666,9 +785,59 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                 });
             });
 
+            // Handle custom datatype dropdowns
+            const datatypeDropdowns = document.querySelectorAll(".datatype-dropdown");
+            datatypeDropdowns.forEach(function(dropdown) {
+                const selected = dropdown.querySelector(".datatype-dropdown-selected");
+                const items = dropdown.querySelectorAll(".datatype-dropdown-item");
+
+                selected.addEventListener("click", function(e) {
+                    e.stopPropagation();
+                    // Close other dropdowns
+                    document.querySelectorAll(".datatype-dropdown.open").forEach(function(d) {
+                        if (d !== dropdown) d.classList.remove("open");
+                    });
+                    document.querySelectorAll(".color-dropdown.open").forEach(function(d) {
+                        d.classList.remove("open");
+                    });
+                    dropdown.classList.toggle("open");
+                });
+
+                items.forEach(function(item) {
+                    item.addEventListener("click", function(e) {
+                        e.stopPropagation();
+                        const value = this.getAttribute("data-value");
+                        const name = this.querySelector(".datatype-dropdown-name").textContent;
+                        const icon = this.querySelector(".datatype-dropdown-icon").innerHTML;
+                        const key = dropdown.getAttribute("data-key");
+
+                        // Update selected display
+                        selected.querySelector(".datatype-dropdown-name").textContent = name;
+                        selected.querySelector(".datatype-dropdown-icon").innerHTML = icon;
+
+                        // Update selected state in list
+                        items.forEach(function(i) { i.classList.remove("selected"); });
+                        this.classList.add("selected");
+
+                        // Close dropdown
+                        dropdown.classList.remove("open");
+
+                        // Send update
+                        vscode.postMessage({
+                            Type: "UpdateProperty",
+                            PropertyKey: key,
+                            Value: value
+                        });
+                    });
+                });
+            });
+
             // Close dropdowns when clicking outside
             document.addEventListener("click", function() {
                 document.querySelectorAll(".color-dropdown.open").forEach(function(d) {
+                    d.classList.remove("open");
+                });
+                document.querySelectorAll(".datatype-dropdown.open").forEach(function(d) {
                     d.classList.remove("open");
                 });
             });
@@ -977,6 +1146,29 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
             { name: "Yellow", hex: "#FFFF00" },
             { name: "YellowGreen", hex: "#9ACD32" }
         ];
+
+        // Data type icons mapping
+        const DataTypeIcons = {
+            "String": "Abc",
+            "Int16": "16",
+            "Int32": "32",
+            "Int64": "64",
+            "Decimal": "0.0",
+            "Float": "1.5",
+            "Double": "2.0",
+            "Boolean": "✓✗",
+            "DateTime": "📅",
+            "Date": "📅",
+            "Time": "🕐",
+            "Guid": "ID",
+            "Byte": "B",
+            "Binary": "01",
+            "Text": "Txt"
+        };
+
+        function GetDataTypeIcon(pDataType) {
+            return DataTypeIcons[pDataType] || (pDataType ? pDataType.substring(0, 3) : "?");
+        }
         
         console.log("[PropertiesWebview] Script initialized");
         
@@ -1047,6 +1239,31 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                     return '<input type="number" data-key="' + key + '" value="' + value + '" ' + readonly + '>';
 
                 case "Enum":
+                    // Use custom datatype dropdown for DataType and PKType properties
+                    if (pProp.Key === "DataType" || pProp.Key === "PKType")
+                    {
+                        let dataTypeItems = "";
+                        const currentValue = String(value);
+                        if (pProp.Options)
+                        {
+                            for (const opt of pProp.Options)
+                            {
+                                const isSelected = opt === currentValue;
+                                const icon = GetDataTypeIcon(opt);
+                                dataTypeItems += '<div class="datatype-dropdown-item' + (isSelected ? ' selected' : '') + '" data-value="' + EscapeHtml(opt) + '">' +
+                                                 '<span class="datatype-dropdown-icon">' + icon + '</span>' +
+                                                 '<span class="datatype-dropdown-name">' + EscapeHtml(opt) + '</span></div>';
+                            }
+                        }
+                        const currentIcon = GetDataTypeIcon(currentValue);
+                        return '<div class="datatype-dropdown" data-key="' + key + '">' +
+                               '<div class="datatype-dropdown-selected">' +
+                               '<span class="datatype-dropdown-icon">' + currentIcon + '</span>' +
+                               '<span class="datatype-dropdown-name">' + EscapeHtml(currentValue) + '</span>' +
+                               '<span class="datatype-dropdown-arrow">▼</span></div>' +
+                               '<div class="datatype-dropdown-list">' + dataTypeItems + '</div></div>';
+                    }
+                    // Default enum - standard select
                     let options = "";
                     if (pProp.Options)
                     {
@@ -1167,9 +1384,59 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                 });
             });
 
+            // Handle custom datatype dropdowns
+            const datatypeDropdowns = document.querySelectorAll(".datatype-dropdown");
+            datatypeDropdowns.forEach(function(dropdown) {
+                const selected = dropdown.querySelector(".datatype-dropdown-selected");
+                const items = dropdown.querySelectorAll(".datatype-dropdown-item");
+
+                selected.addEventListener("click", function(e) {
+                    e.stopPropagation();
+                    // Close other dropdowns
+                    document.querySelectorAll(".datatype-dropdown.open").forEach(function(d) {
+                        if (d !== dropdown) d.classList.remove("open");
+                    });
+                    document.querySelectorAll(".color-dropdown.open").forEach(function(d) {
+                        d.classList.remove("open");
+                    });
+                    dropdown.classList.toggle("open");
+                });
+
+                items.forEach(function(item) {
+                    item.addEventListener("click", function(e) {
+                        e.stopPropagation();
+                        const value = this.getAttribute("data-value");
+                        const name = this.querySelector(".datatype-dropdown-name").textContent;
+                        const icon = this.querySelector(".datatype-dropdown-icon").innerHTML;
+                        const key = dropdown.getAttribute("data-key");
+
+                        // Update selected display
+                        selected.querySelector(".datatype-dropdown-name").textContent = name;
+                        selected.querySelector(".datatype-dropdown-icon").innerHTML = icon;
+
+                        // Update selected state in list
+                        items.forEach(function(i) { i.classList.remove("selected"); });
+                        this.classList.add("selected");
+
+                        // Close dropdown
+                        dropdown.classList.remove("open");
+
+                        // Send update
+                        vscode.postMessage({
+                            Type: "UpdateProperty",
+                            PropertyKey: key,
+                            Value: value
+                        });
+                    });
+                });
+            });
+
             // Close dropdowns when clicking outside
             document.addEventListener("click", function() {
                 document.querySelectorAll(".color-dropdown.open").forEach(function(d) {
+                    d.classList.remove("open");
+                });
+                document.querySelectorAll(".datatype-dropdown.open").forEach(function(d) {
                     d.classList.remove("open");
                 });
             });

@@ -9,12 +9,14 @@ export class XIssuesViewProvider implements vscode.WebviewViewProvider
     private readonly _Context: vscode.ExtensionContext;
     private _View: vscode.WebviewView | null;
     private _Issues: XIssueItem[];
+    private _Subscription: vscode.Disposable | null;
 
     constructor(pContext: vscode.ExtensionContext)
     {
         this._Context = pContext;
         this._View = null;
         this._Issues = [];
+        this._Subscription = null;
     }
 
     static get ViewType(): string
@@ -27,7 +29,12 @@ export class XIssuesViewProvider implements vscode.WebviewViewProvider
         const provider = new XIssuesViewProvider(pContext);
         const registration = vscode.window.registerWebviewViewProvider(
             XIssuesViewProvider.ViewType,
-            provider
+            provider,
+            {
+                webviewOptions: {
+                    retainContextWhenHidden: true
+                }
+            }
         );
         pContext.subscriptions.push(registration);
         return provider;
@@ -43,19 +50,45 @@ export class XIssuesViewProvider implements vscode.WebviewViewProvider
 
         pWebviewView.webview.html = this.GetHtmlContent();
 
+        // Handle visibility changes
+        pWebviewView.onDidChangeVisibility(() => {
+            if (pWebviewView.visible)
+                this.UpdateView();
+        });
+
+        // Handle disposal
+        pWebviewView.onDidDispose(() => {
+            this._View = null;
+        });
+
         const issueService = GetIssueService();
-        issueService.OnIssuesChanged((pIssues: XIssueItem[]) => {
+        
+        // Load initial state
+        this._Issues = issueService.Issues;
+
+        // Clean up previous subscription if any
+        if (this._Subscription)
+            this._Subscription.dispose();
+
+        this._Subscription = issueService.OnIssuesChanged((pIssues: XIssueItem[]) => {
             this._Issues = pIssues;
             this.UpdateView();
         });
 
         pWebviewView.webview.onDidReceiveMessage((pMsg: { Type: string; ElementID?: string }) => {
-            if (pMsg.Type === "SelectIssue" && pMsg.ElementID)
+            if (pMsg.Type === "Ready")
+            {
+                this.UpdateView();
+            }
+            else if (pMsg.Type === "SelectIssue" && pMsg.ElementID)
             {
                 const selectionService = GetSelectionService();
                 selectionService.Select(pMsg.ElementID);
             }
         });
+
+        // Also update immediately in case the view was already ready or resolves quickly
+        this.UpdateView();
     }
 
     UpdateView(): void
@@ -141,6 +174,9 @@ export class XIssuesViewProvider implements vscode.WebviewViewProvider
     <script>
         const vscode = acquireVsCodeApi();
         
+        // Notify extension that we are ready
+        vscode.postMessage({ Type: "Ready" });
+
         window.addEventListener("message", function(pEvent) {
             const msg = pEvent.data;
             if (msg.Type === "UpdateIssues")

@@ -66,9 +66,14 @@ export class XORMValidator extends XValidator<XORMDocument, XORMDesign>
             else
                 names.add(lowerName);
 
-            // Validate that table has a primary key field
+            // Auto-create PK field if missing
             if (!table.HasPKField())
-                this.AddError(table.ID, table.Name, `Table "${table.Name}" must have a primary key field.`);
+                table.EnsurePKField();
+
+            // Ensure PK field DataType matches table PKType
+            const pkField = table.GetPKField();
+            if (pkField && pkField.DataType !== table.PKType)
+                table.PKType = pkField.DataType;
 
             this.ValidateTableFields(table, pDesign);
         }
@@ -105,22 +110,22 @@ export class XORMValidator extends XValidator<XORMDocument, XORMDesign>
                 continue;
             }
 
-            // Validate FK field DataType matches target table PKType
+            // Validate FK field DataType matches target table PKType - auto-correct if different
             const ref = pDesign.FindReferenceBySourceFieldID(field.ID);
             if (ref !== null)
             {
                 const targetTable = pDesign.FindTableByID(ref.Target);
                 if (targetTable !== null && field.DataType !== targetTable.PKType)
-                    this.AddError(field.ID, field.Name, `FK field DataType must match target table PKType (${targetTable.PKType}).`);
+                    field.DataType = targetTable.PKType;
             }
 
             // Validate field name format (no spaces at start/end, no special chars)
             if (field.Name !== field.Name.trim())
                 this.AddWarning(field.ID, field.Name, "Field name has leading or trailing spaces.");
 
-            // Validate Length for string types
-            if (field.DataType === "String" && field.Length === 0)
-                this.AddWarning(field.ID, field.Name, "String field has no length defined.");
+            // Validate Length for Decimal types - must be greater than 0
+            if (field.DataType === "Decimal" && field.Length === 0)
+                this.AddError(field.ID, field.Name, "Decimal field must have a Length (precision) greater than 0.");
 
             // Validate Scale only for Decimal types
             if (field.DataType !== "Decimal" && field.Scale > 0)

@@ -34,6 +34,32 @@
     let _ContextMenuPosition = { X: 0, Y: 0 };
     let _ContextMenuTarget = null;
 
+    // Data type icons mapping - returns SVG path or emoji
+    const DataTypeIcons = {
+        "String": "Abc",
+        "Int16": "16",
+        "Int32": "32",
+        "Int64": "64",
+        "Decimal": "0.0",
+        "Float": "1.5",
+        "Double": "2.0",
+        "Boolean": "✓✗",
+        "DateTime": "📅",
+        "Date": "📅",
+        "Time": "🕐",
+        "Guid": "ID",
+        "Byte": "B",
+        "Binary": "01",
+        "Text": "Txt"
+    };
+
+    function GetDataTypeIcon(pDataType)
+    {
+        return DataTypeIcons[pDataType] || pDataType?.substring(0, 3) || "?";
+    }
+
+    const FKIcon = "🔗";
+
     const _Canvas = document.getElementById("canvas");
     const _TablesLayer = document.getElementById("tables-layer");
     const _RelationsLayer = document.getElementById("relations-layer");
@@ -287,7 +313,7 @@
         icon.setAttribute("class", "orm-table-icon");
         icon.setAttribute("x", 8);
         icon.setAttribute("y", 18);
-        icon.textContent = "ID";
+        icon.textContent = GetDataTypeIcon(pTable.PKType || "Int32");
         g.appendChild(icon);
 
         const title = document.createElementNS("http://www.w3.org/2000/svg", "text");
@@ -316,15 +342,67 @@
                 fieldBg.setAttribute("fill", "transparent");
                 fieldGroup.appendChild(fieldBg);
 
+                // Field icon (PK key, FK link, or DataType)
+                const fieldIcon = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                fieldIcon.setAttribute("class", "orm-field-icon");
+                fieldIcon.setAttribute("x", 10);
+                fieldIcon.setAttribute("y", y);
+                if (field.IsPrimaryKey)
+                    fieldIcon.textContent = "🔑";
+                else if (field.IsForeignKey)
+                    fieldIcon.textContent = FKIcon;
+                else
+                    fieldIcon.textContent = GetDataTypeIcon(field.DataType);
+                fieldGroup.appendChild(fieldIcon);
+
+                // Field name
                 const fieldText = document.createElementNS("http://www.w3.org/2000/svg", "text");
                 fieldText.setAttribute("class", "orm-table-field" + (field.IsPrimaryKey ? " orm-table-field-pk" : ""));
-                fieldText.setAttribute("x", 10);
+                fieldText.setAttribute("x", 30);
                 fieldText.setAttribute("y", y);
                 
-                const prefix = field.IsPrimaryKey ? "🔑 " : "";
-                const nullable = field.IsNullable ? "" : "*";
-                fieldText.textContent = prefix + (field.Name || field.FieldName || "field") + nullable;
+                const requiredMarker = field.IsRequired ? "*" : "";
+                fieldText.textContent = (field.Name || field.FieldName || "field") + requiredMarker;
                 fieldGroup.appendChild(fieldText);
+
+                // IsRequired checkbox on the right
+                // PK fields are always required and checkbox is disabled
+                const isRequired = field.IsPrimaryKey ? true : field.IsRequired;
+                const checkboxGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                checkboxGroup.setAttribute("class", "orm-field-checkbox" + (field.IsPrimaryKey ? " orm-checkbox-disabled" : ""));
+                checkboxGroup.setAttribute("transform", "translate(" + (width - 20) + "," + (y - 8) + ")");
+
+                const checkboxBg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                checkboxBg.setAttribute("width", 10);
+                checkboxBg.setAttribute("height", 10);
+                checkboxBg.setAttribute("rx", 2);
+                checkboxBg.setAttribute("ry", 2);
+                checkboxBg.setAttribute("class", "orm-checkbox-bg");
+                checkboxGroup.appendChild(checkboxBg);
+
+                if (isRequired)
+                {
+                    const checkMark = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                    checkMark.setAttribute("d", "M2,5 L4,7 L8,3");
+                    checkMark.setAttribute("class", "orm-checkbox-check");
+                    checkboxGroup.appendChild(checkMark);
+                }
+
+                // Only enable click for non-PK fields
+                if (!field.IsPrimaryKey)
+                {
+                    checkboxGroup.style.cursor = "pointer";
+                    checkboxGroup.addEventListener("click", function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        SendMessage(XMessageType.UpdateProperty, {
+                            ElementID: field.ID,
+                            PropertyKey: "IsRequired",
+                            Value: !field.IsRequired
+                        });
+                    });
+                }
+                fieldGroup.appendChild(checkboxGroup);
 
                 SetupFieldEvents(fieldGroup, field, pTable);
                 g.appendChild(fieldGroup);
@@ -547,13 +625,17 @@
         fieldClone.setAttribute("transform", `translate(${-bbox.x}, ${-bbox.y})`);
         ghost.appendChild(fieldClone);
 
-        // Calculate mouse offset from field's center for smooth dragging
+        // Calculate mouse offset from field's top-left for stable dragging
         const rect = _CanvasContainer.getBoundingClientRect();
         const mouseX = pEvent.clientX - rect.left + _CanvasContainer.scrollLeft;
         const mouseY = pEvent.clientY - rect.top + _CanvasContainer.scrollTop;
         
-        // Position ghost centered on mouse
-        ghost.setAttribute("transform", `translate(${mouseX - fieldWidth / 2}, ${mouseY - fieldHeight / 2})`);
+        // Calculate offset relative to field's top-left corner on canvas
+        const dragOffsetX = mouseX - (pTable.X + bbox.x);
+        const dragOffsetY = mouseY - (pTable.Y + bbox.y);
+
+        // Position ghost at original field position
+        ghost.setAttribute("transform", `translate(${mouseX - dragOffsetX}, ${mouseY - dragOffsetY})`);
 
         _TablesLayer.appendChild(ghost);
 
@@ -569,7 +651,9 @@
             CurrentIndex: fieldIndex,
             TableElement: pElement.closest(".orm-table"),
             GhostWidth: fieldWidth,
-            GhostHeight: fieldHeight
+            GhostHeight: fieldHeight,
+            DragOffsetX: dragOffsetX,
+            DragOffsetY: dragOffsetY
         };
 
         // Show drop indicators
@@ -591,12 +675,12 @@
         const mouseX = pEvent.clientX - rect.left + _CanvasContainer.scrollLeft;
         const mouseY = pEvent.clientY - rect.top + _CanvasContainer.scrollTop;
 
-        // Update ghost position to follow mouse
+        // Update ghost position to follow mouse maintaining initial offset
         if (_FieldDragState.Ghost)
         {
-            const ghostWidth = _FieldDragState.GhostWidth || 100;
-            const ghostHeight = _FieldDragState.GhostHeight || 16;
-            _FieldDragState.Ghost.setAttribute("transform", `translate(${mouseX - ghostWidth / 2}, ${mouseY - ghostHeight / 2})`);
+            const ghostX = mouseX - (_FieldDragState.DragOffsetX || 0);
+            const ghostY = mouseY - (_FieldDragState.DragOffsetY || 0);
+            _FieldDragState.Ghost.setAttribute("transform", `translate(${ghostX}, ${ghostY})`);
         }
 
         // Calculate which field slot the mouse is over

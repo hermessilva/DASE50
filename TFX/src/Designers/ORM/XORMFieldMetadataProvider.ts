@@ -135,6 +135,7 @@ export class XORMFieldMetadataProvider extends XPropertyMetadataProvider<XORMFie
         this.RegisterDataTypeRules();
         this.RegisterLengthRules();
         this.RegisterScaleRules();
+        this.RegisterRequiredRules();
         this.RegisterNullableRules();
         this.RegisterAutoIncrementRules();
         this.RegisterNameRules();
@@ -239,12 +240,23 @@ export class XORMFieldMetadataProvider extends XPropertyMetadataProvider<XORMFie
     }
 
     /**
+     * Regras para IsRequired
+     */
+    private RegisterRequiredRules(): void
+    {
+        this.AddPropertyRule("IsRequired", "Is Required", {
+            IsVisible: () => false, // Esconde IsRequired em favor de IsNullable
+            HintProvider: () => "Indicates if the field is mandatory"
+        });
+    }
+
+    /**
      * Regras para IsNullable
      */
     private RegisterNullableRules(): void
     {
         this.AddPropertyRule("IsNullable", "Is Nullable", {
-            HintProvider: () => "Allow null values for this field"
+            HintProvider: () => "Indicates if the field accepts null values"
         });
     }
 
@@ -316,7 +328,7 @@ export class XORMFieldMetadataProvider extends XPropertyMetadataProvider<XORMFie
 
     /**
      * Método estático para obter valor de propriedade
-     * Exposto para uso no contexto
+     * Exposto para ser usado por outros providers (como XORMPKFieldMetadataProvider)
      */
     public static GetFieldPropertyValue(pElement: XORMField, pPropertyID: string): unknown
     {
@@ -326,8 +338,8 @@ export class XORMFieldMetadataProvider extends XPropertyMetadataProvider<XORMFie
             case "DataType": return pElement.DataType;
             case "Length": return pElement.Length;
             case "Scale": return pElement.Scale;
-            case "IsNullable": return pElement.IsNullable;
             case "IsAutoIncrement": return pElement.IsAutoIncrement;
+            case "IsNullable": return pElement.IsNullable;
             case "IsRequired": return pElement.IsRequired;
             case "DefaultValue": return pElement.DefaultValue;
             case "IsForeignKey": return pElement.IsForeignKey;
@@ -347,8 +359,8 @@ export class XORMFieldMetadataProvider extends XPropertyMetadataProvider<XORMFie
             case "DataType": return "Data Type";
             case "Length": return "Length";
             case "Scale": return "Scale";
-            case "IsNullable": return "Is Nullable";
             case "IsAutoIncrement": return "Is Auto Increment";
+            case "IsNullable": return "Is Nullable";
             case "IsRequired": return "Is Required";
             case "DefaultValue": return "Default Value";
             case "IsForeignKey": return "Is Foreign Key";
@@ -366,8 +378,8 @@ export class XORMFieldMetadataProvider extends XPropertyMetadataProvider<XORMFie
             "DataType",
             "Length",
             "Scale",
-            "IsNullable",
             "IsAutoIncrement",
+            "IsNullable",
             "IsRequired",
             "DefaultValue"
         ];

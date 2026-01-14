@@ -138,7 +138,11 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         // Track view state changes to update last active key
         pWebviewPanel.onDidChangeViewState((e) => {
             if (e.webviewPanel.active)
+            {
                 this._LastActiveKey = key;
+                // Update global IssueService with this document's issues
+                state.RefreshIssues();
+            }
         });
 
         // Listen to state changes to notify VS Code about dirty state
@@ -174,6 +178,8 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         try
         {
             await state.Load();
+            // Initial validation to populate issue service even before webview is ready
+            state.Validate();
         }
         catch (err)
         {

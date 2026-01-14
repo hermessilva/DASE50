@@ -13,12 +13,12 @@ import { XORMField } from "./XORMField.js";
  * 
  * 2. RESTRIÇÕES
  *    - DataType é readonly (não pode ser alterado após criação)
- *    - IsNullable é sempre false (PK não pode ser nula)
+ *    - IsRequired é sempre true (PK não pode ser nula)
  *    - Toda tabela DEVE ter exatamente um XORMPKField
  * 
  * 3. VALORES PADRÃO
  *    - DataType: "Int32" (pode ser Int32, Int64 ou Guid)
- *    - IsNullable: false (forçado)
+ *    - IsRequired: true (forçado)
  *    - IsAutoIncrement: true para Int32/Int64, false para Guid
  *    - Name: "ID" (padrão)
  * 
@@ -51,7 +51,7 @@ export class XORMPKField extends XORMField
         // Define valores padrão de PK
         super.DataType = XORMPKField.DEFAULT_PK_DATA_TYPE;
         super.Name = XORMPKField.DEFAULT_PK_NAME;
-        super.IsNullable = false;
+        super.IsRequired = true;
         super.IsAutoIncrement = true;
     }
 
@@ -59,9 +59,22 @@ export class XORMPKField extends XORMField
      * Indica se este campo é uma chave primária
      * Sempre retorna true para XORMPKField
      */
-    public get IsPrimaryKey(): boolean
+    public override get IsPrimaryKey(): boolean
     {
         return true;
+    }
+
+    /**
+     * Campo PK nunca pode ser nulo
+     */
+    public override get IsNullable(): boolean
+    {
+        return false;
+    }
+
+    public override set IsNullable(_pValue: boolean)
+    {
+        // Ignora tentativa de mudar nullable em PK
     }
 
     /**
@@ -103,19 +116,19 @@ export class XORMPKField extends XORMField
     }
 
     /**
-     * IsNullable é sempre false para campos PK
+     * IsRequired é sempre true para campos PK
      */
-    public override get IsNullable(): boolean
+    public override get IsRequired(): boolean
     {
-        return false;
+        return true;
     }
 
     /**
-     * Tentativa de setar IsNullable é ignorada para PK
+     * Tentativa de setar IsRequired é ignorada para PK
      */
-    public override set IsNullable(_pValue: boolean)
+    public override set IsRequired(_pValue: boolean)
     {
-        // PK nunca pode ser nullable - ignora qualquer tentativa
+        // PK nunca pode ser nullable (sempre required) - ignora qualquer tentativa
     }
 
     /**
