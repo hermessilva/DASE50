@@ -632,4 +632,94 @@ describe('XORMDesignerState', () => {
             expect(state.Bridge.ReloadDataTypes).toHaveBeenCalled();
         });
     });
+
+    describe('LoadParentModelTables', () => {
+        it('should delegate to Bridge.LoadParentModelTables', async () => {
+            state.Bridge.LoadParentModelTables = jest.fn().mockResolvedValue(undefined);
+
+            await state.LoadParentModelTables(['Auth.dsorm']);
+
+            expect(state.Bridge.LoadParentModelTables).toHaveBeenCalledWith(['Auth.dsorm']);
+        });
+    });
+
+    describe('AddShadowTable', () => {
+        beforeEach(async () => {
+            (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from('{}'));
+            await state.Load();
+        });
+
+        it('should add shadow table and mark dirty on success', () => {
+            state.Bridge.AddShadowTable = jest.fn().mockReturnValue({ Success: true, ElementID: 'shadow-1' });
+
+            const result = state.AddShadowTable({
+                X: 100, Y: 200, ModelName: 'Auth.dsorm',
+                DocumentID: 'doc-1', DocumentName: 'Auth',
+                ModuleID: '', ModuleName: '',
+                TableID: 'tbl-1', TableName: 'AppUser'
+            });
+
+            expect(result.Success).toBe(true);
+            expect(state.IsDirty).toBe(true);
+        });
+
+        it('should not mark dirty when add fails', () => {
+            state.Bridge.AddShadowTable = jest.fn().mockReturnValue({ Success: false, Message: 'Error' });
+
+            const result = state.AddShadowTable({
+                X: 0, Y: 0, ModelName: 'M',
+                DocumentID: 'd', DocumentName: 'M',
+                ModuleID: '', ModuleName: '',
+                TableID: 't1', TableName: 'T'
+            });
+
+            expect(result.Success).toBe(false);
+            expect(state.IsDirty).toBe(false);
+        });
+
+        it('should handle null result from Bridge.AddShadowTable', () => {
+            state.Bridge.AddShadowTable = jest.fn().mockReturnValue(null);
+
+            const result = state.AddShadowTable({
+                X: 0, Y: 0, ModelName: 'M',
+                DocumentID: 'd', DocumentName: 'M',
+                ModuleID: '', ModuleName: '',
+                TableID: 't1', TableName: 'T'
+            });
+
+            expect(result.Success).toBe(false);
+        });
+    });
+
+    describe('Load with ParentModel', () => {
+        it('should pre-load parent model tables when design has ParentModel', async () => {
+            const xml = '{}';
+            (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from(xml));
+
+            // Mock the Bridge to return a ParentModel value after LoadOrmModelFromText
+            const origLoad = state.Bridge.LoadOrmModelFromText.bind(state.Bridge);
+            state.Bridge.LoadOrmModelFromText = jest.fn((text: string) => {
+                const doc = origLoad(text);
+                // Simulate that after loading, the design has a ParentModel value
+                const controller = (state.Bridge as any)._Controller;
+                if (controller?.Design)
+                    controller.Design.ParentModel = 'Auth.dsorm|Core.dsorm';
+                return doc;
+            }) as typeof state.Bridge.LoadOrmModelFromText;
+            state.Bridge.LoadParentModelTables = jest.fn().mockResolvedValue(undefined);
+
+            await state.Load();
+
+            expect(state.Bridge.LoadParentModelTables).toHaveBeenCalledWith(['Auth.dsorm', 'Core.dsorm']);
+        });
+
+        it('should not load parent model tables when ParentModel is empty', async () => {
+            (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from('{}'));
+            state.Bridge.LoadParentModelTables = jest.fn().mockResolvedValue(undefined);
+
+            await state.Load();
+
+            expect(state.Bridge.LoadParentModelTables).not.toHaveBeenCalled();
+        });
+    });
 });

@@ -1110,7 +1110,7 @@ describe('XTFXBridge', () => {
         it('should trigger background parent table load when design has ParentModel but no cached tables', async () => {
             const design = bridge.Controller.Design;
             design.ParentModel = 'Auth.dsorm';
-            (bridge as any)._ParentModelTables = [];
+            (bridge as any)._ParentModelTableGroups = [];
 
             const b2 = new XTFXBridge();
             b2.LoadOrmModelFromText(JSON.stringify({ Name: 'Auth', Tables: [
@@ -1125,7 +1125,12 @@ describe('XTFXBridge', () => {
         });
 
         it('should include cached parent model tables in StateControlTable and TenantControlTable options', () => {
-            (bridge as any)._ParentModelTables = ['ParentTable1', 'ParentTable2'];
+            (bridge as any)._ParentModelTableGroups = [
+                { ModelName: 'Parent.dsorm', Tables: [
+                    { Name: 'ParentTable1', Fill: '' },
+                    { Name: 'ParentTable2', Fill: '' }
+                ]}
+            ];
             const props = bridge.GetProperties(designId);
             const sct = props.find(p => p.Key === 'StateControlTable')!;
             const tct = props.find(p => p.Key === 'TenantControlTable')!;
