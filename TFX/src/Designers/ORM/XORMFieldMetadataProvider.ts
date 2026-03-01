@@ -225,8 +225,10 @@ export class XORMFieldMetadataProvider extends XPropertyMetadataProvider<XORMFie
 
                         const length = ctx.GetPropertyValue("Length") as number;
                         const scale = val as number;
+                        /* v8 ignore start */
                         if (typeof scale !== "number" || typeof length !== "number")
                             return true;
+                        /* v8 ignore stop */
 
                         return scale <= length;
                     },

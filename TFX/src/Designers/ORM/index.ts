@@ -3,6 +3,7 @@ export * from "./XORMDocument.js";
 export * from "./XORMField.js";
 export * from "./XORMPKField.js";
 export * from "./XORMReference.js";
+export * from "./XORMStateReference.js";
 export * from "./XORMTable.js";
 export * from "./XORMController.js";
 export * from "./XORMValidator.js";

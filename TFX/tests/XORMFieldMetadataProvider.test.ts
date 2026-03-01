@@ -509,6 +509,7 @@ describe("XORMFieldMetadataProvider", () =>
             field.Scale = 2;
             field.IsNullable = false;
             field.IsAutoIncrement = false;
+            field.DefaultValue = "N/A";
 
             expect(XORMFieldMetadataProvider.GetFieldPropertyValue(field, "Name")).toBe("TestName");
             expect(XORMFieldMetadataProvider.GetFieldPropertyValue(field, "DataType")).toBe("String");
@@ -516,6 +517,9 @@ describe("XORMFieldMetadataProvider", () =>
             expect(XORMFieldMetadataProvider.GetFieldPropertyValue(field, "Scale")).toBe(2);
             expect(XORMFieldMetadataProvider.GetFieldPropertyValue(field, "IsNullable")).toBe(false);
             expect(XORMFieldMetadataProvider.GetFieldPropertyValue(field, "IsAutoIncrement")).toBe(false);
+            expect(XORMFieldMetadataProvider.GetFieldPropertyValue(field, "IsRequired")).toBe(true);
+            expect(XORMFieldMetadataProvider.GetFieldPropertyValue(field, "DefaultValue")).toBe("N/A");
+            expect(XORMFieldMetadataProvider.GetFieldPropertyValue(field, "IsPrimaryKey")).toBe(false);
         });
 
         it("should return undefined for unknown property", () =>

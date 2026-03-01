@@ -435,7 +435,7 @@ export class XSerializationEngine
 
     private ValidateNode(pNode: XIXmlNode, pContext: XSerializationContext): void
     {
-        if (!XElementRegistry.Instance.HasTag(pNode.TagName) && pNode.TagName !== "XValues" && pNode.TagName !== "XData" && pNode.TagName !== "XLinkData" && pNode.TagName !== "XLinkedShape" && pNode.TagName !== "XLanguage")
+        if (!XElementRegistry.Instance.HasTag(pNode.TagName) && pNode.TagName !== "XValues" && pNode.TagName !== "XData" && pNode.TagName !== "XLinkData" && pNode.TagName !== "XLinkedShape" && pNode.TagName !== "XLanguage" && pNode.TagName !== "XORMDataSet" && pNode.TagName !== "XORMDataTuple" && pNode.TagName !== "XFieldValue" && pNode.TagName !== "XLinkedFieldValue")
         {
             pContext.AddError(pContext.CreateError(
                 pNode.Attributes.get("ID") ?? "",
