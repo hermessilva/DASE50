@@ -60,6 +60,13 @@ export class XORMValidator extends XValidator<XORMDocument, XORMDesign>
                 continue;
             }
 
+            // Shadow tables are external references: skip duplicate-name tracking and PK management
+            if (table.IsShadow)
+            {
+                this.ValidateTableFields(table, pDesign);
+                continue;
+            }
+
             const lowerName = table.Name.toLowerCase();
             if (names.has(lowerName))
                 this.AddError(table.ID, table.Name, `Duplicate table name: ${table.Name}`);

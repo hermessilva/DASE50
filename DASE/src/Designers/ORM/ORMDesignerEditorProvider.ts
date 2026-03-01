@@ -76,6 +76,25 @@ interface ISaveSeedDataPayload
     }>;
 }
 
+interface IRequestShadowTablePickerPayload
+{
+    X: number;
+    Y: number;
+}
+
+interface IAddShadowTablePayload
+{
+    X: number;
+    Y: number;
+    ModelName: string;
+    DocumentID: string;
+    DocumentName: string;
+    ModuleID: string;
+    ModuleName: string;
+    TableID: string;
+    TableName: string;
+}
+
 interface IDesignerMessage
 {
     Type: string;
@@ -344,6 +363,14 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
                 await this.OnSaveSeedData(pPanel, pState, payload as ISaveSeedDataPayload);
                 break;
 
+            case XDesignerMessageType.RequestShadowTablePicker:
+                this.OnRequestShadowTablePicker(pPanel, pState, payload as IRequestShadowTablePickerPayload);
+                break;
+
+            case XDesignerMessageType.AddShadowTable:
+                await this.OnAddShadowTable(pPanel, pState, payload as IAddShadowTablePayload);
+                break;
+
             default:
                 console.warn("Unknown message type:", type);
         }
@@ -383,6 +410,30 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         {
             this.NotifyDocumentChanged(pState);
             await this.SendIssuesUpdate(pPanel, pState);
+        }
+    }
+
+    OnRequestShadowTablePicker(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: IRequestShadowTablePickerPayload): void
+    {
+        if (typeof pPayload?.X !== "number" || typeof pPayload?.Y !== "number")
+            return;
+
+        const data = pState.Bridge.GetShadowTablePickerData(pPayload.X, pPayload.Y);
+        pPanel.webview.postMessage({ Type: XDesignerMessageType.ShadowTablePickerData, Payload: data });
+    }
+
+    async OnAddShadowTable(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: IAddShadowTablePayload): Promise<void>
+    {
+        if (!pPayload?.TableID || !pPayload?.TableName)
+            return;
+
+        const result = pState.AddShadowTable(pPayload);
+        if (result.Success)
+        {
+            const modelData = await pState.GetModelData();
+            pPanel.webview.postMessage({ Type: XDesignerMessageType.LoadModel, Payload: modelData });
+            await this.SendIssuesUpdate(pPanel, pState);
+            this.NotifyDocumentChanged(pState);
         }
     }
 
@@ -631,6 +682,16 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
     async OnValidateModel(pPanel: vscode.WebviewPanel, pState: XORMDesignerState): Promise<void>
     {
         const issues = await pState.Validate();
+
+        // If shadow-table sync mutated any element (name or colour changed),
+        // refresh the canvas and mark the document as dirty.
+        if (pState.Bridge.LastSyncMutated)
+        {
+            const modelData = await pState.GetModelData();
+            pPanel.webview.postMessage({ Type: XDesignerMessageType.LoadModel, Payload: modelData });
+            this.NotifyDocumentChanged(pState);
+        }
+
         pPanel.webview.postMessage({
             Type: XDesignerMessageType.IssuesChanged,
             Payload: { Issues: issues }
@@ -948,6 +1009,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
     </div>
     <div id="context-menu" class="context-menu">
         <div class="context-menu-item" data-action="add-table"><span class="icon">📊</span>Add Table</div>
+        <div class="context-menu-item" data-action="add-shadow-table"><span class="icon">🔗</span>Add Shadow Table</div>
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="delete-selected"><span class="icon">🗑️</span>Delete Selected</div>
         <div class="context-menu-item" data-action="rename-selected"><span class="icon">✏️</span>Rename Selected</div>
@@ -962,6 +1024,27 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="delete-table"><span class="icon">🗑️</span>Delete Table</div>
         <div class="context-menu-item" data-action="rename-table"><span class="icon">✏️</span>Rename Table</div>
+    </div>
+    <div id="shadow-picker-overlay" class="seed-overlay" style="display:none" tabindex="-1">
+        <div id="shadow-picker-modal" class="seed-modal" role="dialog" aria-modal="true" aria-labelledby="shadow-picker-title">
+            <div class="seed-modal-header">
+                <div class="seed-modal-title-block">
+                    <span class="seed-modal-icon">🔗</span>
+                    <h2 id="shadow-picker-title" class="seed-modal-title">Add Shadow Table</h2>
+                </div>
+                <button id="shadow-picker-close" class="seed-modal-close" aria-label="Close">✕</button>
+            </div>
+            <div style="padding:8px 16px">
+                <input id="shadow-search" type="text" placeholder="Search tables..." class="shadow-search-input" autocomplete="off" />
+            </div>
+            <div id="shadow-tree" class="shadow-tree"></div>
+            <div class="seed-modal-footer">
+                <span id="shadow-status" class="seed-status-msg"></span>
+                <div class="seed-modal-actions">
+                    <button id="shadow-btn-cancel" class="seed-btn seed-btn-secondary">Cancel</button>
+                </div>
+            </div>
+        </div>
     </div>
     <div id="seed-editor-overlay" class="seed-overlay" style="display:none" tabindex="-1">
         <div id="seed-editor-modal" class="seed-modal" role="dialog" aria-modal="true" aria-labelledby="seed-modal-title">

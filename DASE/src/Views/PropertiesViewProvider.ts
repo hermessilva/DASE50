@@ -1,4 +1,4 @@
-import * as vscode from "vscode";
+﻿import * as vscode from "vscode";
 import { GetSelectionService } from "../Services/SelectionService";
 import { XPropertyItem } from "../Models/PropertyItem";
 import { XORMDesignerEditorProvider } from "../Designers/ORM/ORMDesignerEditorProvider";
@@ -120,8 +120,17 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
 
         state.UpdateProperty(this._ElementID, pPropertyKey, pValue);
 
+        // When parent model selection changes, wait for the async table load to complete
+        // before refreshing properties — otherwise the dropdowns show the old groups
+        if (pPropertyKey === "ParentModel")
+        {
+            const models = ((pValue as string) || "").split("|").filter(f => f.length > 0);
+            await state.LoadParentModelTables(models);
+        }
+
         // Refresh properties list — structure may change (e.g. DataType changes visible fields)
-        const oldKeys = this._Properties.map(p => p.Key).join(",");
+        // Always force re-render when ParentModel changes (grouped option content changes, not just keys)
+        const oldKeys = pPropertyKey === "ParentModel" ? "" : this._Properties.map(p => p.Key).join(",");
         this._Properties = await state.GetProperties(this._ElementID);
         const newKeys = this._Properties.map(p => p.Key).join(",");
 
@@ -134,6 +143,7 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                 Value: p.Value,
                 Type: p.Type,
                 Options: p.Options,
+                GroupedOptions: p.GroupedOptions || null,
                 IsReadOnly: p.IsReadOnly,
                 Category: p.Category,
                 Group: p.Group
@@ -173,6 +183,7 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                 Value: p.Value,
                 Type: p.Type,
                 Options: p.Options,
+                GroupedOptions: p.GroupedOptions || null,
                 IsReadOnly: p.IsReadOnly,
                 Category: p.Category,
                 Group: p.Group
@@ -193,7 +204,7 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
         }
     }
     
-    GetHtmlContentWithProperties(pProperties: Array<{Key: string; Name: string; Value: unknown; Type: string; Options: string[] | null; IsReadOnly: boolean; Category: string; Group?: string}>): string
+    GetHtmlContentWithProperties(pProperties: Array<{Key: string; Name: string; Value: unknown; Type: string; Options: string[] | null; GroupedOptions?: Array<{Group: string; Items: string[]}> | null; IsReadOnly: boolean; Category: string; Group?: string}>): string
     {
         const propertiesJson = JSON.stringify(pProperties);
         const elementId = this._ElementID ? `"${this._ElementID}"` : "null";
@@ -475,6 +486,14 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
             opacity: 0.6;
             font-style: italic;
             font-size: 11px;
+        }
+        .property-value select optgroup {
+            font-style: normal;
+            font-weight: 600;
+            color: var(--vscode-descriptionForeground);
+        }
+        .property-value select.grouped-select option {
+            padding-left: 8px;
         }
     </style>
 </head>
@@ -780,6 +799,22 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                                '<span class="datatype-dropdown-name">' + EscapeHtml(currentValue) + '</span>' +
                                '<span class="datatype-dropdown-arrow">▼</span></div>' +
                                '<div class="datatype-dropdown-list">' + dataTypeItems + '</div></div>';
+                    }
+                    // Grouped enum - use <optgroup> for tree-like display
+                    if (pProp.GroupedOptions && pProp.GroupedOptions.length > 0)
+                    {
+                        let groupedHtml = '<option value="" ' + (value === "" ? "selected" : "") + '></option>';
+                        for (const grp of pProp.GroupedOptions)
+                        {
+                            groupedHtml += '<optgroup label="' + EscapeHtml(grp.Group) + '">';
+                            for (const item of grp.Items)
+                            {
+                                const sel = item === value ? "selected" : "";
+                                groupedHtml += '<option value="' + EscapeHtml(item) + '" ' + sel + '>' + EscapeHtml(item) + '</option>';
+                            }
+                            groupedHtml += '</optgroup>';
+                        }
+                        return '<select data-key="' + key + '"' + (pProp.IsReadOnly ? ' disabled' : '') + ' class="grouped-select">' + groupedHtml + '</select>';
                     }
                     // Default enum - standard select
                     let options = "";
@@ -1233,6 +1268,14 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
             font-style: italic;
             font-size: 11px;
         }
+        .property-value select optgroup {
+            font-style: normal;
+            font-weight: 600;
+            color: var(--vscode-descriptionForeground);
+        }
+        .property-value select.grouped-select option {
+            padding-left: 8px;
+        }
     </style>
 </head>
 <body>
@@ -1523,6 +1566,22 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                                '<span class="datatype-dropdown-name">' + EscapeHtml(currentValue) + '</span>' +
                                '<span class="datatype-dropdown-arrow">▼</span></div>' +
                                '<div class="datatype-dropdown-list">' + dataTypeItems + '</div></div>';
+                    }
+                    // Grouped enum - use <optgroup> for tree-like display
+                    if (pProp.GroupedOptions && pProp.GroupedOptions.length > 0)
+                    {
+                        let groupedHtml = '<option value="" ' + (value === "" ? "selected" : "") + '></option>';
+                        for (const grp of pProp.GroupedOptions)
+                        {
+                            groupedHtml += '<optgroup label="' + EscapeHtml(grp.Group) + '">';
+                            for (const item of grp.Items)
+                            {
+                                const sel = item === value ? "selected" : "";
+                                groupedHtml += '<option value="' + EscapeHtml(item) + '" ' + sel + '>' + EscapeHtml(item) + '</option>';
+                            }
+                            groupedHtml += '</optgroup>';
+                        }
+                        return '<select data-key="' + key + '"' + (pProp.IsReadOnly ? ' disabled' : '') + ' class="grouped-select">' + groupedHtml + '</select>';
                     }
                     // Default enum - standard select
                     let options = "";

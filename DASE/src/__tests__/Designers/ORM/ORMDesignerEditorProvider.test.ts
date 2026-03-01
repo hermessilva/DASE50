@@ -1201,7 +1201,8 @@ describe('XORMDesignerEditorProvider', () => {
                 IsDirty: false,
                 Document: { uri: Uri.file('/test/model.dsorm') },
                 IssueService: { SetIssues: jest.fn(), OnIssuesChanged: jest.fn() },
-                SelectionService: { HasSelection: false, PrimaryID: null }
+                SelectionService: { HasSelection: false, PrimaryID: null },
+                Bridge: { LastSyncMutated: false }
             };
         });
 
@@ -1528,6 +1529,18 @@ describe('XORMDesignerEditorProvider', () => {
             await provider.HandleMessage(mockPanel, mockState, { Type: 'ValidateModel' });
 
             expect(vscode.window.showInformationMessage).toHaveBeenCalledWith('Validation: No issues found.');
+        });
+
+        it('should refresh canvas when LastSyncMutated is true after ValidateModel', async () => {
+            mockState.Validate = jest.fn().mockResolvedValue([]);
+            mockState.Bridge = { LastSyncMutated: true };
+
+            await provider.HandleMessage(mockPanel, mockState, { Type: 'ValidateModel' });
+
+            expect(mockState.GetModelData).toHaveBeenCalled();
+            expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
+                expect.objectContaining({ Type: 'LoadModel' })
+            );
         });
 
         it('should handle RenameCompleted message', async () => {

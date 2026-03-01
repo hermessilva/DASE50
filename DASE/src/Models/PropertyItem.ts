@@ -10,6 +10,12 @@ export const XPropertyType = {
 
 export type TPropertyType = typeof XPropertyType[keyof typeof XPropertyType];
 
+export interface IPropertyOptionGroup
+{
+    Group: string;
+    Items: string[];
+}
+
 export class XPropertyItem
 {
     Key: string;
@@ -17,6 +23,7 @@ export class XPropertyItem
     Value: unknown;
     Type: TPropertyType;
     Options: string[] | null;
+    GroupedOptions?: IPropertyOptionGroup[] | null;
     IsReadOnly: boolean;
     Category: string;
     Group?: string;
@@ -28,6 +35,7 @@ export class XPropertyItem
         this.Value = pValue;
         this.Type = pType || XPropertyType.String;
         this.Options = pOptions || null;
+        this.GroupedOptions = null;
         this.IsReadOnly = false;
         this.Category = "General";
         this.Group = pGroup;

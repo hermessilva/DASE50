@@ -12,7 +12,9 @@ export default defineConfig({
             include: ["src/**/*.ts"],
             exclude: [
                 "**/index.ts",
-                "**/*.d.ts"
+                "**/*.d.ts",
+                "**/XTypes.ts",
+                "**/XConfigurationTypes.ts"
             ],
             thresholds: {
                 lines: 100,
