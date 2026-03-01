@@ -21,6 +21,7 @@
           <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">ID</XData>
           <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="String">Int32</XData>
           <XData Name="IsAutoIncrement" ID="00000001-0002-0003-0001-000000000006" Type="Boolean">true</XData>
+          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
         </XValues>
       </XORMPKField>
       <XORMField ID="06f1f323-3ec7-4dad-ad9a-6851a5047c20" Name="NewTableID">
@@ -37,7 +38,7 @@
       <XValues>
         <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">b194133d-53e5-4731-a182-81bc1ca3045b</XData>
         <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">NewTablesdsdds</XData>
-        <XData Name="Bounds" ID="00000001-0001-0001-0003-000000000001" Type="Rect">{X=170;Y=18;Width=200;Height=72}</XData>
+        <XData Name="Bounds" ID="00000001-0001-0001-0003-000000000001" Type="Rect">{X=1382;Y=30;Width=200;Height=72}</XData>
         <XData Name="Fill" ID="00000001-0001-0001-0003-000000000007" Type="Color">{A=255;R=210;G=105;B=30}</XData>
       </XValues>
       <XORMPKField ID="db365290-b1ce-4f21-93ad-df2451ab6e86" Name="ID">
@@ -46,6 +47,7 @@
           <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">ID</XData>
           <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="String">Int32</XData>
           <XData Name="IsAutoIncrement" ID="00000001-0002-0003-0001-000000000006" Type="Boolean">true</XData>
+          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
         </XValues>
       </XORMPKField>
       <XORMField ID="21f65dba-6ec8-4b03-a599-23a9b040256d" Name="NewTableID">
@@ -71,6 +73,7 @@
           <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">ID</XData>
           <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="String">Int32</XData>
           <XData Name="IsAutoIncrement" ID="00000001-0002-0003-0001-000000000006" Type="Boolean">true</XData>
+          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
         </XValues>
       </XORMPKField>
     </XORMTable>
@@ -87,6 +90,7 @@
           <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">ID</XData>
           <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="String">Int32</XData>
           <XData Name="IsAutoIncrement" ID="00000001-0002-0003-0001-000000000006" Type="Boolean">true</XData>
+          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
         </XValues>
       </XORMPKField>
       <XORMField ID="ee5024ea-828e-4ae4-82bf-cc59047517bc" Name="NewTableID">
@@ -114,7 +118,7 @@
         <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">FK_NewTable</XData>
         <XLinkData Name="Source" ID="00000001-0001-0001-0004-000000000010" Type="String" ElementID="21f65dba-6ec8-4b03-a599-23a9b040256d" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">21f65dba-6ec8-4b03-a599-23a9b040256d</XLinkData>
         <XLinkData Name="Target" ID="00000001-0001-0001-0004-000000000011" Type="String" ElementID="7a4073ea-ae8d-49d4-8566-531323fdb943" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">7a4073ea-ae8d-49d4-8566-531323fdb943</XLinkData>
-        <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="Point[]">{X=370;Y=74}|{X=591;Y=74}|{X=591;Y=68}|{X=812;Y=68}</XData>
+        <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="Point[]">{X=1382;Y=86}|{X=1197;Y=86}|{X=1197;Y=68}|{X=1012;Y=68}</XData>
       </XValues>
     </XORMReference>
     <XORMReference ID="4e51fbb0-7077-4373-aa19-91bb6073cf2a" Name="FK_NewTable">
@@ -138,6 +142,7 @@
           <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">ID</XData>
           <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="String">Int32</XData>
           <XData Name="IsAutoIncrement" ID="00000001-0002-0003-0001-000000000006" Type="Boolean">true</XData>
+          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
         </XValues>
       </XORMPKField>
       <XORMField ID="6f8c7651-ddda-4291-8071-338914f2a41a" Name="Tabela01">
@@ -164,6 +169,7 @@
           <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">Tabela02</XData>
           <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="String">Int32</XData>
           <XData Name="Index" ID="00000001-0001-0001-0004-000000000000" Type="Double">3</XData>
+          <XData Name="IsRequired" ID="00000001-0001-0001-0004-000000000002" Type="Boolean">false</XData>
         </XValues>
       </XORMField>
       <XORMField ID="ba6b6857-3ff0-44ed-beeb-1fce4c4aba6a" Name="NewFieldffd">
@@ -173,6 +179,7 @@
           <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="String">Numeric</XData>
           <XData Name="Index" ID="00000001-0001-0001-0004-000000000000" Type="Double">4</XData>
           <XData Name="IsRequired" ID="00000001-0001-0001-0004-000000000002" Type="Boolean">false</XData>
+          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
         </XValues>
       </XORMField>
       <XORMField ID="c1b6ea54-7d4a-4a3e-bbd2-b685aee5060b" Name="NewField">
@@ -190,7 +197,7 @@
           <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">Tabela03xddd</XData>
           <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="String">Int32</XData>
           <XData Name="Index" ID="00000001-0001-0001-0004-000000000000" Type="Double">6</XData>
-          <XData Name="IsRequired" ID="00000001-0001-0001-0004-000000000002" Type="Boolean">false</XData>
+          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
         </XValues>
       </XORMField>
       <XORMField ID="a59bf559-270b-4369-b0e2-c533d50fed43" Name="NewField">
@@ -199,7 +206,7 @@
           <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">NewField</XData>
           <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="String">Text</XData>
           <XData Name="Index" ID="00000001-0001-0001-0004-000000000000" Type="Double">7</XData>
-          <XData Name="IsRequired" ID="00000001-0001-0001-0004-000000000002" Type="Boolean">false</XData>
+          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
         </XValues>
       </XORMField>
       <XORMField ID="c9e98be9-3deb-45df-8037-eacdcfc1932c" Name="NewField">
@@ -226,6 +233,8 @@
           <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">Tabela04</XData>
           <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="String">Int32</XData>
           <XData Name="Index" ID="00000001-0001-0001-0004-000000000000" Type="Double">10</XData>
+          <XData Name="IsRequired" ID="00000001-0001-0001-0004-000000000002" Type="Boolean">false</XData>
+          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
         </XValues>
       </XORMField>
       <XORMField ID="1c8b7264-8485-4764-b0a2-836cea929ec8" Name="NewField">
@@ -287,6 +296,7 @@
           <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">ID</XData>
           <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="String">Int32</XData>
           <XData Name="IsAutoIncrement" ID="00000001-0002-0003-0001-000000000006" Type="Boolean">true</XData>
+          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
         </XValues>
       </XORMPKField>
       <XORMField ID="78e5b8ab-582f-4da2-8302-6e5b65523cb3" Name="Table01ID">
@@ -330,6 +340,7 @@
           <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">ID</XData>
           <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="String">Int32</XData>
           <XData Name="IsAutoIncrement" ID="00000001-0002-0003-0001-000000000006" Type="Boolean">true</XData>
+          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
         </XValues>
       </XORMPKField>
     </XORMTable>
@@ -354,6 +365,7 @@
           <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">ID</XData>
           <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="String">Int32</XData>
           <XData Name="IsAutoIncrement" ID="00000001-0002-0003-0001-000000000006" Type="Boolean">true</XData>
+          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
         </XValues>
       </XORMPKField>
       <XORMField ID="fb82598a-e76c-46fc-969e-4323570d9a08" Name="Tabela03ID">
@@ -388,6 +400,7 @@
           <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">ID</XData>
           <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="String">Int32</XData>
           <XData Name="IsAutoIncrement" ID="00000001-0002-0003-0001-000000000006" Type="Boolean">true</XData>
+          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
         </XValues>
       </XORMPKField>
       <XORMField ID="b8ca7b7b-dc54-4066-85a8-5633e5f31dad" Name="NewField">
