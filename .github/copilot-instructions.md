@@ -35,6 +35,7 @@
 25. [Extending the Codebase](#25-extending-the-codebase)
 26. [Philosophical Principles](#26-philosophical-principles)
 27. [Final Validation Checklist](#27-final-validation-checklist)
+28. [C#/DASE4VS ↔ TS/DASE50 Interoperability](#28-cdase4vs--tsdase50-interoperability)
 
 ---
 
@@ -1509,6 +1510,7 @@ A change is **only complete** when **ALL** of the following are true:
 - [ ] `XProperty` descriptors use globally unique GUIDs.
 - [ ] All properties use `GetValue` / `SetValue` — no direct store access.
 - [ ] `XGuid.NewValue()` used for new IDs — no hardcoded fake GUIDs.
+- [ ] New properties with a C# counterpart in DASE4VS use the matching C# GUID (see Section 28.5).
 
 ### Serialization
 - [ ] `RegisterORMElements()` called before any serialization.
@@ -1532,6 +1534,281 @@ A change is **only complete** when **ALL** of the following are true:
 - [ ] `npm run test:coverage` passes in TFX.
 - [ ] `npm test` passes in DASE.
 - [ ] CI pipeline remains green.
+
+---
+
+## 28. C#/DASE4VS ↔ TS/DASE50 Interoperability
+
+> **Purpose:** This section governs cross-version file compatibility between the C# desktop application (`DASE4VS`, located at `D:\Tootega\Source\DASE4VS`) and the TypeScript/VS Code extension (`DASE50`). Files created by the C# version (`.dsorm`) **must** open correctly in TS without data loss, and vice versa.
+
+### 28.1 Compatibility Architecture
+
+Both platforms use XML serialization inside `.dsorm` files. Each serialized property value is wrapped in an `<XData>` element with a **property GUID `ID` attribute**:
+
+```xml
+<XData Name="PropertyName" ID="GUID-MUST-MATCH" Type="TypeName">value</XData>
+```
+
+The `ID` attribute is the **only identifier used for deserialization lookup** — property names are advisory only. Therefore:
+- **Property GUIDs must be identical** in C# and TS for the same logical property.
+- **Element tag names must be identical** (or aliases registered) for the same logical element type.
+- **ClassIDs in `XElementRegistry`** must match the C# `[XRegister(typeof(T), CID)]` attribute.
+
+### 28.2 C# Source Location
+
+| Folder | Content |
+|--------|---------|
+| `D:\Tootega\Source\DASE4VS\Core\TFX.DASE.Core\Objects\` | `XPersistableElement`, `XProperty`, `XElement`, `XDocument` |
+| `D:\Tootega\Source\DASE4VS\Core\TFX.DASE.Core\Designers\` | `XDesignerElement`, `XRectangle`, `XLine`, `XDataField`, `XDesigner`, `XColorfullElement` |
+| `D:\Tootega\Source\DASE4VS\Designers\TFX.DASE.Designer.Core\ORM\` | All ORM domain classes |
+
+### 28.3 Class Registration ID Mapping
+
+The `ClassID` parameter in `XElementRegistry.Register()` must match the C# `[XRegister(typeof(T), CID)]` CID string.
+
+| TS Class | TS TagName | C# Class | C# CID |
+|----------|------------|----------|---------|
+| `XORMDocument` | `XORMDocument` | `XORMDocument` | `98349501-8203-4A11-AE2B-D8BDEEAA3405` |
+| `XORMDesign` | `XORMDesign` | `XORMDesigner` | `44EFB296-D6D3-4685-AB0D-65C0424E5C1A` |
+| `XORMTable` | `XORMTable` | `XORMTable` | `1B77140B-34E5-4651-B734-66F614BB1F6A` |
+| `XORMField` | `XORMField` | `XORMField` | `13BBF0C8-ECED-4C9C-B877-F77D59430CF4` |
+| `XORMPKField` | `XORMPKField` | `XORMPKField` | `2C6EBAEC-2425-4A2E-8E5F-DD1784D2964C` |
+| `XORMReference` | `XORMReference` | `XORMReference` | `404E9B2A-C6F9-4B3D-88A1-DB30DB965259` |
+
+#### C# types not yet implemented in TS (reserved ClassIDs)
+
+| C# Class | C# CID | TS Roadmap |
+|----------|--------|------------|
+| `XORMFKField` | `ECECC3B6-FA88-4B38-ACCF-912A3CA55547` | Future: FK field sub-type |
+| `XORMIndex` | `22F0A974-7CE7-41E5-AE23-3EE6B49FC848` | Future: index modeling |
+| `XORMView` | `84F31F62-6445-4DB3-A80E-D7CE61643345` | Future: view modeling |
+| `XORMStateField` | (read from `XORMStateField.cs`) | Future: state field |
+| `XORMStateReference` | (read from `XORMStateReference.cs`) | Future: state reference |
+| `XLinkedShape` | `4CA81437-560B-4470-997E-6ADB2D7C8D76` | Maps to internal `XLinkData` |
+
+### 28.4 Tag Name Alias Strategy
+
+The C# version serializes the design canvas as `<XORMDesigner>` but the TS canonical tag is `<XORMDesign>`. Both are registered in `XORMRegistry.ts`:
+
+```typescript
+// 1. Register alias first (C# tag name)
+registry.Register({ TagName: "XORMDesigner", Constructor: XORMDesign, ClassID: "44EFB296-..." });
+
+// 2. Register canonical last — overwrites _ByConstructor so serializer emits <XORMDesign>
+registry.Register({ TagName: "XORMDesign",   Constructor: XORMDesign, ClassID: "44EFB296-..." });
+```
+
+**Rule:** When a future C# tag differs from the TS tag, always register the alias **before** the canonical. The last `Register()` call for a given constructor wins the serialization tag name.
+
+### 28.5 Property GUID Master Table
+
+All GUIDs below are authoritative. **Never change these GUIDs** — they must be identical in both platforms.
+
+#### `XPersistableElement` (C# equivalent: `XPersistableElement`)
+
+| TS Property | TS Name | C# Property | GUID (canonical) |
+|-------------|---------|-------------|------------------|
+| `IDProp` | `ID` | `ID` | `608239C5-A43C-47FF-91A0-661470EC4918` |
+| `NameProp` | `Name` | `Name` | `18043B8B-C189-4FE3-A3C6-552B5C87C7CE` |
+| `IsSelectedProp` | `IsSelected` | `IsSelected` | `4C8D82CC-73D7-49D1-96BA-DE78144C72D8` |
+| `IsLockedProp` | `IsLocked` | `IsReadOnly` (DontChange) | `F206EE68-5488-4180-ACBF-EE5442909895` |
+| `ParentIDProp` | `ParentID` | `ParentID` | `78424203-E6A4-433F-9110-7FEEE1580D68` |
+| `TreeDisplayTextProp` | `TreeDisplayText` | `DisplayText` | `47ED77F3-6E11-48FE-B48A-F59AB8ACD357` |
+| `DescriptionProp` | `Description` | `Description` | `B073026B-F262-4345-887E-BDE6AF586240` |
+
+#### `XRectangle` (C# equivalent: `XRectangle` + `XColorfullElement`)
+
+| TS Property | TS Name | C# Property | GUID (canonical) |
+|-------------|---------|-------------|------------------|
+| `BoundsProp` | `Bounds` | `Rect` | `F731FAEC-F42C-499C-AADB-71823B4600F3` |
+| `FillProp` | `Fill` | `Background` | `7152B5B8-EE22-4D84-9EA1-50AA254DA63D` |
+| `StrokeProp` | `Stroke` | `Color` | `B80349A7-FD18-45BE-B0C8-DE8C6D8A349A` |
+| `PaddingProp` | `Padding` | `Padding` | `BFB1355A-A656-43B1-B214-68ABA4F4F9E4` |
+| `HorizontalAlignmentProp` | `HorizontalAlignment` | `HorizontalAlignment` | `B1F718C2-0551-4FBD-8816-6D59450AE891` |
+| `VerticalAlignmentProp` | `VerticalAlignment` | `VerticalAlignment` | `C872C9D6-1DB1-4D3F-9ADB-15A74AEF927D` |
+
+#### `XLine` (C# equivalent: `XLine`)
+
+| TS Property | TS Name | C# Property | GUID (canonical) |
+|-------------|---------|-------------|------------------|
+| `SourceProp` | `Source` | `LeftShape` (link) | `8A8851EB-B6CA-414F-B55A-C22A6A0F3753` |
+| `TargetProp` | `Target` | `RightShape` (link) | `6461BED3-F1A0-4910-985D-9F0B0058D8BF` |
+| `PointsProp` | `Points` | `Points` | `E2378CBF-8185-465D-8215-142922E96006` |
+
+#### `XField` (C# equivalent: `XDataField` + `XORMField` properties)
+
+| TS Property | TS Name | C# Property | GUID (canonical) |
+|-------------|---------|-------------|------------------|
+| `IndexProp` | `Index` | `OrderIndex` | `5469955E-340A-40D3-A1AE-9C6122EE0BF9` |
+| `DataTypeProp` | `DataType` | `TypeID` ¹ | `244BD6B3-4873-4957-A34D-FD97F7DBD90D` |
+| `IsRequiredProp` | `IsRequired` | `IsRequired` | `6DF729B6-538E-4622-AB5C-8FE1E62618A3` |
+| `DefaultValueProp` | `DefaultValue` | `DefaultValue` | `2152CB85-A8E7-4C05-85E0-02A6EAFB7C74` |
+| `LengthProp` | `Length` | `Length` (XORMField) | `D1AEAA0E-9FC0-478D-9464-DF991F5CE009` |
+| `ScaleProp` | `Scale` | `Scale` (XORMField) | `C093D02A-AF28-4E79-BD27-1CF1FAF20204` |
+
+> ¹ **DataType semantic difference:** In C#, `TypeID` is a `Guid` referencing a type record in `XModelCache`. In TS, `DataType` is a plain string name (`"Int32"`, `"String"`, etc.). When reading C# files, the TS deserializer will encounter a GUID value where it expects a string — migration code must resolve the GUID to a type name using the data-types config (`ORM.DataType.json`).
+
+#### `XORMDesign` (C# equivalent: `XORMDesigner`)
+
+| TS Property | TS Name | C# Property | GUID (canonical) |
+|-------------|---------|-------------|------------------|
+| `SchemaProp` | `Schema` | `Scheme` | `95511660-A5D9-4339-9DE2-62ABD7AB4535` |
+
+#### C# `XORMDesigner` additional properties (not yet in TS)
+
+| C# Property | GUID | Notes |
+|-------------|------|-------|
+| `UseScheme` | `7EACC9B2-56C3-446D-A137-34DF93C518FD` | Reserve if TS adds schema toggle |
+| `UsePKPattern` | `DBE20867-CF5B-4CA0-B2FA-EA6D9B136BC8` | PK naming convention toggle |
+| `IsLegacy` | `73D19230-8EC9-4176-9C23-23AFB357EAC5` | Legacy mode flag |
+| `DBContextName` | `2C9EA42C-FA48-4B0F-A054-09C1D7BFCA06` | EF Core context name |
+| `InheritedModelID` | `A01AECB1-D46E-4C6B-8D27-2B8A3DF497D2` | Inherited model link |
+| `IsMaster` | `8A03638F-7550-4C1B-887E-6588BBFDC1DD` | Primary model flag |
+
+#### `XORMTable` (C# equivalent: `XORMTable`)
+
+| TS Property | TS Name | C# Property | GUID (canonical) |
+|-------------|---------|-------------|------------------|
+| `PKTypeProp` | `PKType` | `PKTypeID` ² | `8F3E9777-A802-4A9F-B5B5-0D5D568E0365` |
+
+> ² **PKType semantic difference:** In C#, `PKTypeID` is a `Guid` referencing a type record. In TS, `PKType` is a string name (`"Int32"`, `"Int64"`, `"Guid"`). Same migration logic as `DataType` applies.
+
+#### C# `XORMTable` additional properties (not yet in TS)
+
+| C# Property | GUID | Notes |
+|-------------|------|-------|
+| `ServerID` (table) | `BDEEF13F-F93F-46EF-B418-9F43232537AB` | Auto-generated server key |
+| `PKID` | `4B2D51C5-A2DA-4171-9526-12E08D71C52B` | Auto-generated PK record ID |
+| `TupleID` | `59D70EF9-7A70-44E1-ADA0-F1A6A658F848` | Auto-generated tuple ID |
+| `UseState` | `04C4A96C-B8C1-4EB3-8F56-72766FCE1823` | State-machine field toggle |
+| `IsCached` | `A2A30CA8-F97A-4B64-9518-9D2F9300AB3F` | Server-side cache flag |
+| `Length` | `BE3E1AC6-592D-41E4-843C-F6678EEDA0FF` | Column length (table-level) |
+| `PKTitle` | `0A9466B7-B0C5-4544-A679-8AFAE30E0FDE` | PK display title |
+| `DeleteOnDeactivate` | `158D67CB-E217-4758-AC87-BCB78A3EC53E` | Cascade deactivation |
+| `TenantControlType` | `F4D069A3-B927-436A-B346-EA0D51BC289C` | Multi-tenant control type |
+| `PKName` | `28A427AD-A4FD-4451-9B4C-3D111EB9B859` | PK field name override |
+| `UseIdentityPK` | `E388549D-5F54-4380-B975-A05DA5354232` | Identity/auto-increment at table level |
+| `InheritanceClass` | `93141221-A6A7-4E05-9A83-BABAC1C3AB0A` | Base class for EF inheritance |
+| `NotMapped` | `7B0B6611-2407-4D3A-982E-33EEDA5CDB78` | EF [NotMapped] attribute |
+| `NavigationType` (base) | `66EA6766-9D24-4481-86EB-0988FE3DAE11` | Navigation type enum |
+| `OnlyDefinition` (base) | `652C9D08-83D4-4D0C-AB0A-880606ADAD1A` | Definition-only mode |
+| `HideTenant` (base) | `E04FEB0C-3959-4967-81BA-B04D47372B29` | Hide tenant field |
+
+#### `XORMField` (C# equivalent: `XORMField`)
+
+| TS Property | TS Name | C# Property | GUID (canonical) |
+|-------------|---------|-------------|------------------|
+| `IsAutoIncrementProp` | `IsAutoIncrement` | (no direct equiv — C# uses table-level `UseIdentityPK`) | `E388549D-5F54-4380-B975-A05DA5354232` ³ |
+| `IsNullableProp` | `IsNullable` | (no equiv — C# uses `IsRequired` only) | TS-only GUID |
+
+> ³ `IsAutoIncrement` in TS lives on `XORMField`; in C# the equivalent `UseIdentityPK` is on `XORMTable`. These are architecturally different. When reading C# files, TS should infer `IsAutoIncrement = true` for the PK field if `XORMTable.UseIdentityPK == true`.
+
+#### C# `XORMField` additional properties (not yet in TS)
+
+| C# Property | GUID | Notes |
+|-------------|------|-------|
+| `IsFace` | `D02DF54D-34C0-4AB5-A0E8-17BD1E09E921` | Display-face field |
+| `UpdateStatic` | `A5143729-F780-4290-8E30-443C773A6BC5` | Static data update flag |
+| `Mask` | `CABE0027-D9FB-4448-BB33-7B4DBCBB9D0D` | Input mask |
+| `IsDisplayField` | `A9E93589-D0C4-4099-BAAC-DDD7078CBA70` | Display field flag |
+| `IsCaseSensitive` | `15FE6898-5354-424F-BC68-77AA0E558FB4` | Case sensitivity |
+| `IsAccentSensitive` | `706FE3CE-FE88-4FB7-9901-321C72EF6232` | Accent sensitivity |
+| `InsertOnly` | `4ED199C7-78ED-4148-A8F5-764D4471E3D9` | Insert-only flag |
+| `Min` | `D319C0F3-6A7F-45D5-B5FA-640FDC4FA1CA` | Minimum value |
+| `Max` | `78943860-1B0E-4B20-A0DA-B481E66ABA54` | Maximum value |
+| `IsFK` | `7CBD471F-E1F2-4A36-B0FC-A962000DF07F` | FK virtual flag |
+
+#### C# `XORMFKField` (future TS sub-type)
+
+ClassID: `ECECC3B6-FA88-4B38-ACCF-912A3CA55547`  
+Extends: `XORMField` — represents a field that references a foreign PK.  
+In TS, FK relationships are modeled as `XORMReference` connecting `XORMField` (FK) to `XORMTable` (target). When reading C# files that contain `<XORMFKField>`, the TS deserializer must map it to an `XORMField` instance and create a corresponding `XORMReference`.
+
+#### `XORMReference` (C# equivalent: `XORMReference`)
+
+TS currently has no extra properties beyond `Source`, `Target`, and `Points` inherited from `XLine`. C# adds:
+
+| C# Property | GUID | Notes |
+|-------------|------|-------|
+| `AllowZero` | `A581E536-A3A6-4591-B8A2-0C2CEBB4C091` | FK allows null/zero |
+| `LowRelevance` | `1865BC7F-22B5-49C1-AB2D-E46F2AF9E97D` | Low-importance display hint |
+| `DeleteCascade` | `72A678B5-AD3F-4F3A-BA49-47610DAFF630` | CASCADE DELETE behavior |
+| `NavigateOneName` | `0ACB5FD7-7EC3-4BD6-82C9-F8ED1C756160` | Navigation property (one side) |
+| `NavigateManyName` | `DEC89778-D6DA-459B-8516-5DD71888EF4F` | Navigation property (many side) |
+| `IndexID` | `12E927CE-24EF-4DC0-93CF-E702064EB5A1` | Auto-generated index ID |
+
+#### `XORMIndex` (C# only — future TS)
+
+ClassID: `22F0A974-7CE7-41E5-AE23-3EE6B49FC848`
+
+| C# Property | GUID |
+|-------------|------|
+| `IsUnique` | `93ADA328-E1D2-4B42-A86B-A3C442070D3E` |
+
+### 28.6 GUID Collision Found & Fixed
+
+A **critical GUID collision** existed in the prototype TS code:
+
+| Property | File | Old (wrong) GUID | Correct C# GUID |
+|----------|------|------------------|-----------------|
+| `XLine.PointsProp` | `XLine.ts` | `00000001-0001-0001-0004-000000000001` | `E2378CBF-8185-465D-8215-142922E96006` |
+| `XField.DataTypeProp` | `XField.ts` | `00000001-0001-0001-0004-000000000001` | `244BD6B3-4873-4957-A34D-FD97F7DBD90D` |
+
+Both shared the same invented GUID, causing silent data corruption during serialization. Both are now fixed with their correct C# GUIDs.
+
+### 28.7 GUID Assignment Rules
+
+1. **Properties that exist in C#** must use the exact C# `XProperty.Register(…, new Guid("…"), …)` GUID value.
+2. **Properties unique to TS** (no C# equivalent) may use any UUID v4 — but must never collide with C# GUIDs.
+3. **Do not reuse a C# GUID for a TS property with different semantics.** If the semantic differs (e.g., `DataType` as string vs `TypeID` as Guid), keep the same GUID but document the semantic difference in Section 28.5.
+4. When adding a new ORM property in TS, first search the C# codebase for a matching property in the DASE4VS ORM folder. If found, use its GUID. If not, generate a fresh UUID v4.
+
+### 28.8 DataType/TypeID Migration Strategy
+
+In C# files, `TypeID` is stored as a GUID (e.g., `B8D52C94-...`) that references a type record in `XModelCache`. In TS, `DataType` is a string name (`"Int32"`, `"String"`, etc.).
+
+**Reading a C# file in TS:**
+1. Deserialize `DataType` value — get a GUID string.
+2. Detect if the value is a full GUID (`XGuid.IsFullValue(value)`).
+3. If GUID: apply the C# TypeID → TS type-name resolution table (populated from `.DASE/ORM.DataType.json` which must include a `CSharpTypeID` field for each type entry).
+4. If string: use as-is (already a TS-format file).
+
+**`ORM.DataType.json` extension for migration:**
+```json
+{
+  "Types": [
+    {
+      "TypeName": "Int32",
+      "CSharpTypeID": "<insert C# Guid for Int32 from XDBTypes>",
+      "CanUseInPK": true,
+      "HasLength": false,
+      "HasScale": false,
+      "CanUseInIndex": true,
+      "IsUTF8": false,
+      "CanAutoIncrement": true
+    }
+  ]
+}
+```
+
+The `CSharpTypeID` field is **optional** — TS-native files will never produce it. Only C# migration reads it.
+
+### 28.9 XORMFKField Migration Rule
+
+When `XORMRegistry` encounters an `<XORMFKField>` element during deserialization of a C# file:
+
+1. Deserialize it as a plain `XORMField` (FK fields are regular fields in TS).
+2. Look up the `<XORMReference>` in the design that points to this field's `OwnerID` (the containing table).
+3. If the reference exists, ensure `XORMField.IsFK = true` (future property).
+4. If no reference exists but the field has a `TypeID` GUID matching the PK type of another table — create a synthetic `XORMReference`.
+
+### 28.10 Checklist — Before Adding a New Property
+
+- [ ] Search C# ORM folder for the same property: `grep -r "YourPropertyName" D:\Tootega\Source\DASE4VS\Designers\TFX.DASE.Designer.Core\ORM\`
+- [ ] If found in C#: use the exact C# GUID in the TS `XProperty.Register(…, "C#-GUID", …)` call.
+- [ ] If not in C#: generate a fresh UUID v4 — verify it's not in the reserved ranges and not in this section.
+- [ ] Update the Master Table in Section 28.5 with the new entry.
+- [ ] If the semantic differs from C# (type mismatch, location mismatch): document in Section 28.5 footnotes.
 
 ---
 

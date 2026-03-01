@@ -38,7 +38,7 @@ export abstract class XRectangle extends XDesignElement
 {
     public static readonly BoundsProp = XProperty.Register<XRectangle, XRect>(
         (p: XRectangle) => p.Bounds,
-        "00000001-0001-0001-0003-000000000001",
+        "F731FAEC-F42C-499C-AADB-71823B4600F3",
         "Bounds",
         "Bounds",
         new XRect(0, 0, 0, 0)
@@ -94,7 +94,7 @@ export abstract class XRectangle extends XDesignElement
 
     public static readonly FillProp = XProperty.Register<XRectangle, XColor>(
         (p: XRectangle) => p.Fill,
-        "00000001-0001-0001-0003-000000000007",
+        "7152B5B8-EE22-4D84-9EA1-50AA254DA63D",
         "Fill",
         "Fill Color",
         XColor.Transparent
@@ -102,7 +102,7 @@ export abstract class XRectangle extends XDesignElement
 
     public static readonly StrokeProp = XProperty.Register<XRectangle, XColor>(
         (p: XRectangle) => p.Stroke,
-        "00000001-0001-0001-0003-000000000008",
+        "B80349A7-FD18-45BE-B0C8-DE8C6D8A349A",
         "Stroke",
         "Stroke Color",
         XColor.Black
@@ -158,7 +158,7 @@ export abstract class XRectangle extends XDesignElement
 
     public static readonly PaddingProp = XProperty.Register<XRectangle, XThickness>(
         (p: XRectangle) => p.Padding,
-        "00000001-0001-0001-0003-00000000000B",
+        "BFB1355A-A656-43B1-B214-68ABA4F4F9E4",
         "Padding",
         "Padding",
         new XThickness(0)
@@ -214,7 +214,7 @@ export abstract class XRectangle extends XDesignElement
 
     public static readonly HorizontalAlignmentProp = XProperty.Register<XRectangle, XAlignment>(
         (p: XRectangle) => p.HorizontalAlignment,
-        "00000001-0001-0001-0003-00000000000F",
+        "B1F718C2-0551-4FBD-8816-6D59450AE891",
         "HorizontalAlignment",
         "Horizontal Alignment",
         XAlignment.None
@@ -222,7 +222,7 @@ export abstract class XRectangle extends XDesignElement
 
     public static readonly VerticalAlignmentProp = XProperty.Register<XRectangle, XAlignment>(
         (p: XRectangle) => p.VerticalAlignment,
-        "00000001-0001-0001-0003-000000000010",
+        "C872C9D6-1DB1-4D3F-9ADB-15A74AEF927D",
         "VerticalAlignment",
         "Vertical Alignment",
         XAlignment.None

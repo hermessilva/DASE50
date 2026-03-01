@@ -30,11 +30,11 @@ describe("XORMReference", () => {
         const xml = `<?xml version="1.0" encoding="utf-8"?>
 <XORMReference ID="${expectedId}" Name="${expectedName}">
   <XValues>
-    <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">${expectedId}</XData>
-    <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">${expectedName}</XData>
-    <XLinkData Name="Source" ID="00000001-0001-0001-0004-000000000010" Type="String" ElementID="${expectedSource}" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">${expectedSource}</XLinkData>
-    <XLinkData Name="Target" ID="00000001-0001-0001-0004-000000000011" Type="String" ElementID="${expectedTarget}" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">${expectedTarget}</XLinkData>
-    <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="Point[]">{X=572;Y=101}|{X=708.5;Y=101}|{X=708.5;Y=134}|{X=845;Y=134}</XData>
+    <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">${expectedId}</XData>
+    <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">${expectedName}</XData>
+    <XLinkData Name="Source" ID="8A8851EB-B6CA-414F-B55A-C22A6A0F3753" Type="String" ElementID="${expectedSource}" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">${expectedSource}</XLinkData>
+    <XLinkData Name="Target" ID="6461BED3-F1A0-4910-985D-9F0B0058D8BF" Type="String" ElementID="${expectedTarget}" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">${expectedTarget}</XLinkData>
+    <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=572;Y=101}|{X=708.5;Y=101}|{X=708.5;Y=134}|{X=845;Y=134}</XData>
   </XValues>
 </XORMReference>`;
 

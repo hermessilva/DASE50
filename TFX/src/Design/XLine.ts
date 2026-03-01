@@ -8,7 +8,7 @@ export abstract class XLine extends XDesignElement
 {
     public static readonly SourceProp = XProperty.RegisterLink<XLine>(
         (p: XLine) => p.Source,
-        "00000001-0001-0001-0004-000000000010",
+        "8A8851EB-B6CA-414F-B55A-C22A6A0F3753",
         "Source",
         "Source Element ID",
         XGuid.EmptyValue
@@ -16,7 +16,7 @@ export abstract class XLine extends XDesignElement
 
     public static readonly TargetProp = XProperty.RegisterLink<XLine>(
         (p: XLine) => p.Target,
-        "00000001-0001-0001-0004-000000000011",
+        "6461BED3-F1A0-4910-985D-9F0B0058D8BF",
         "Target",
         "Target Element ID",
         XGuid.EmptyValue
@@ -24,7 +24,7 @@ export abstract class XLine extends XDesignElement
 
     public static readonly PointsProp = XProperty.Register<XLine, XPoint[]>(
         (p: XLine) => p.Points,
-        "00000001-0001-0001-0004-000000000001",
+        "E2378CBF-8185-465D-8215-142922E96006",
         "Points",
         "Points List",
         []
