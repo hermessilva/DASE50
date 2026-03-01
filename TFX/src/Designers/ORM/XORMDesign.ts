@@ -70,7 +70,7 @@ export class XORMDesign extends XDesign
 {
     public static readonly SchemaProp = XProperty.Register<XORMDesign, string>(
         (p: XORMDesign) => p.Schema,
-        "00000001-0002-0001-0001-000000000002",
+        "95511660-A5D9-4339-9DE2-62ABD7AB4535",
         "Schema",
         "Database Schema",
         "dbo"

@@ -27,7 +27,7 @@ export class XORMTable extends XRectangle
 {
     public static readonly PKTypeProp = XProperty.Register<XORMTable, string>(
         (p: XORMTable) => p.PKType,
-        "00000001-0002-0003-0002-000000000001",
+        "8F3E9777-A802-4A9F-B5B5-0D5D568E0365",
         "PKType",
         "Primary Key Type",
         "Int32"

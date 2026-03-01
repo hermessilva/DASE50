@@ -74,7 +74,7 @@ export abstract class XPersistableElement extends XElement
 {
     public static readonly IDProp = XProperty.Register<XPersistableElement, string>(
         (p: XPersistableElement) => p.ID,
-        "00000001-0001-0001-0001-000000000000",
+        "608239C5-A43C-47FF-91A0-661470EC4918",
         "ID",
         "ID",
         XGuid.EmptyValue
@@ -90,7 +90,7 @@ export abstract class XPersistableElement extends XElement
 
     public static readonly IsSelectedProp = XProperty.Register<XPersistableElement, boolean>(
         (p: XPersistableElement) => p.IsSelected,
-        "00000001-0001-0001-0001-000000000002",
+        "4C8D82CC-73D7-49D1-96BA-DE78144C72D8",
         "IsSelected",
         "Is Selected",
         false
@@ -98,7 +98,7 @@ export abstract class XPersistableElement extends XElement
 
     public static readonly IsLockedProp = XProperty.Register<XPersistableElement, boolean>(
         (p: XPersistableElement) => p.IsLocked,
-        "00000001-0001-0001-0001-000000000003",
+        "F206EE68-5488-4180-ACBF-EE5442909895",
         "IsLocked",
         "Is Locked",
         false
@@ -122,7 +122,7 @@ export abstract class XPersistableElement extends XElement
 
     public static readonly NameProp = XProperty.Register<XPersistableElement, string>(
         (p: XPersistableElement) => p.Name,
-        "00000001-0001-0001-0001-000000000006",
+        "18043B8B-C189-4FE3-A3C6-552B5C87C7CE",
         "Name",
         "Name",
         ""
@@ -130,7 +130,7 @@ export abstract class XPersistableElement extends XElement
 
     public static readonly TreeDisplayTextProp = XProperty.Register<XPersistableElement, string | null>(
         (p: XPersistableElement) => p.TreeDisplayText,
-        "00000001-0001-0001-0001-000000000007",
+        "47ED77F3-6E11-48FE-B48A-F59AB8ACD357",
         "TreeDisplayText",
         "Tree Display Text",
         null
@@ -170,7 +170,7 @@ export abstract class XPersistableElement extends XElement
 
     public static readonly ParentIDProp = XProperty.Register<XPersistableElement, string>(
         (p: XPersistableElement) => p.ParentID,
-        "00000001-0001-0001-0001-00000000000C",
+        "78424203-E6A4-433F-9110-7FEEE1580D68",
         "ParentID",
         "Parent ID",
         XGuid.EmptyValue
@@ -178,7 +178,7 @@ export abstract class XPersistableElement extends XElement
 
     public static readonly DescriptionProp = XProperty.Register<XPersistableElement, string>(
         (p: XPersistableElement) => p.Description,
-        "00000001-0001-0001-0001-00000000000D",
+        "B073026B-F262-4345-887E-BDE6AF586240",
         "Description",
         "Description",
         ""

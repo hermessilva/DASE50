@@ -5,7 +5,7 @@ export abstract class XField extends XRectangle
 {
     public static readonly IndexProp = XProperty.Register<XField, number>(
         (p: XField) => p.Index,
-        "00000001-0001-0001-0004-000000000000",
+        "5469955E-340A-40D3-A1AE-9C6122EE0BF9",
         "Index",
         "Index",
         0
@@ -13,7 +13,7 @@ export abstract class XField extends XRectangle
 
     public static readonly DataTypeProp = XProperty.Register<XField, string>(
         (p: XField) => p.DataType,
-        "00000001-0001-0001-0004-000000000001",
+        "244BD6B3-4873-4957-A34D-FD97F7DBD90D",
         "DataType",
         "Data Type",
         "String"
@@ -21,7 +21,7 @@ export abstract class XField extends XRectangle
 
     public static readonly IsRequiredProp = XProperty.Register<XField, boolean>(
         (p: XField) => p.IsRequired,
-        "00000001-0001-0001-0004-000000000002",
+        "6DF729B6-538E-4622-AB5C-8FE1E62618A3",
         "IsRequired",
         "Is Required",
         true
@@ -29,7 +29,7 @@ export abstract class XField extends XRectangle
 
     public static readonly DefaultValueProp = XProperty.Register<XField, string>(
         (p: XField) => p.DefaultValue,
-        "00000001-0001-0001-0004-000000000003",
+        "2152CB85-A8E7-4C05-85E0-02A6EAFB7C74",
         "DefaultValue",
         "Default Value",
         ""
@@ -37,7 +37,7 @@ export abstract class XField extends XRectangle
 
     public static readonly LengthProp = XProperty.Register<XField, number>(
         (p: XField) => p.Length,
-        "00000001-0001-0001-0004-000000000004",
+        "D1AEAA0E-9FC0-478D-9464-DF991F5CE009",
         "Length",
         "Length",
         0
@@ -45,7 +45,7 @@ export abstract class XField extends XRectangle
 
     public static readonly ScaleProp = XProperty.Register<XField, number>(
         (p: XField) => p.Scale,
-        "00000001-0001-0001-0004-000000000005",
+        "C093D02A-AF28-4E79-BD27-1CF1FAF20204",
         "Scale",
         "Scale",
         0
