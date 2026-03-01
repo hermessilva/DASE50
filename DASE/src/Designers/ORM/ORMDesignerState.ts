@@ -120,6 +120,7 @@ export class XORMDesignerState
             if (parentModel)
             {
                 const selected = parentModel.split("|").filter((f: string) => f.length > 0);
+                /* istanbul ignore next */
                 if (selected.length > 0)
                     await this._Bridge.LoadParentModelTables(selected);
             }

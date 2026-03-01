@@ -230,11 +230,14 @@ describe('XTFXBridge — Branch Coverage', () => {
         it('should provide GroupedOptions for StateControlTable when parent groups exist', () => {
             bridge.LoadOrmModelFromText(JSON.stringify({
                 Name: 'TestModel',
-                Tables: [{ ID: 'tbl-1', Name: 'Orders', X: 0, Y: 0, Width: 200, Height: 60 }]
+                Tables: [
+                    { ID: 'tbl-1', Name: 'Orders', X: 0, Y: 0, Width: 200, Height: 60 },
+                    { ID: 'tbl-2', Name: 'Customers', X: 300, Y: 0, Width: 200, Height: 60 }
+                ]
             }));
             const designId = bridge.Controller.Design.ID;
             (bridge as any)._ParentModelTableGroups = [
-                { ModelName: 'Auth.dsorm', Tables: [{ Name: 'AppUser', Fill: '' }] }
+                { ModelName: 'Auth.dsorm', Tables: [{ Name: 'AppUser', Fill: '' }, { Name: 'Roles', Fill: '' }] }
             ];
 
             const props = bridge.GetProperties(designId);
@@ -242,6 +245,25 @@ describe('XTFXBridge — Branch Coverage', () => {
             expect(sct).toBeDefined();
             expect(sct!.GroupedOptions).toBeDefined();
             expect(sct!.GroupedOptions!.length).toBeGreaterThanOrEqual(1);
+        });
+
+        it('should execute catch callback when LoadParentModelTables rejects during GetProperties', async () => {
+            bridge.SetContextPath('/test/dir/model.dsorm');
+            bridge.LoadOrmModelFromText(JSON.stringify({
+                Name: 'TestModel',
+                Tables: [{ ID: 'tbl-1', Name: 'Orders', X: 0, Y: 0, Width: 200, Height: 60 }]
+            }));
+            const designId = bridge.Controller.Design.ID;
+            bridge.Controller.Design.ParentModel = 'Auth.dsorm';
+            (bridge as any)._ParentModelTableGroups = [];
+
+            (vscode.workspace.fs.readFile as jest.Mock).mockRejectedValue(new Error('File not found'));
+
+            bridge.GetProperties(designId);
+
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            expect((bridge as any)._ParentModelTableGroups).toEqual([]);
         });
 
         it('should not include GroupedOptions when no tables exist', () => {
@@ -274,88 +296,271 @@ describe('XTFXBridge — Branch Coverage', () => {
     });
 
     describe('GetSeedData — FK resolution branches', () => {
-        it('should resolve FK options from referenced table with seed data', () => {
+        it('should produce label with display field value different from PK (dispVal !== pkVal branch)', () => {
             bridge.LoadOrmModelFromText(JSON.stringify({
                 Name: 'TestModel',
                 Tables: [
                     {
-                        ID: 'tbl-categories', Name: 'Categories', X: 0, Y: 0, Width: 200, Height: 60,
+                        ID: 'cat-tbl', Name: 'Category', X: 0, Y: 0, Width: 200, Height: 60,
                         Fields: [
-                            { ID: 'cat-name', Name: 'CategoryName', DataType: 'String', IsPrimaryKey: false }
-                        ],
-                        DataSets: [
-                            {
-                                Name: 'Default',
-                                Tuples: [
-                                    { FieldValues: [
-                                        { FieldID: '__pk__', Value: '1' },
-                                        { FieldID: 'cat-name', Value: 'Electronics' }
-                                    ]},
-                                    { FieldValues: [
-                                        { FieldID: '__pk__', Value: '2' },
-                                        { FieldID: 'cat-name', Value: 'Books' }
-                                    ]}
-                                ]
-                            }
+                            { ID: 'cat-pk', Name: 'ID', DataType: 'Int32', IsPrimaryKey: true },
+                            { ID: 'cat-name', Name: 'CategoryName', DataType: 'String' }
                         ]
                     },
                     {
-                        ID: 'tbl-products', Name: 'Products', X: 300, Y: 0, Width: 200, Height: 60,
+                        ID: 'prod-tbl', Name: 'Product', X: 300, Y: 0, Width: 200, Height: 60,
                         Fields: [
-                            { ID: 'prod-name', Name: 'ProductName', DataType: 'String', IsPrimaryKey: false }
+                            { ID: 'prod-pk', Name: 'ID', DataType: 'Int32', IsPrimaryKey: true },
+                            { ID: 'fk-field', Name: 'CategoryID', DataType: 'Int32' }
                         ]
                     }
                 ],
-                References: [
-                    { ID: 'ref-1', SourceTableID: 'tbl-products', TargetTableID: 'tbl-categories' }
-                ]
+                References: [{ ID: 'ref1', SourceFieldID: 'fk-field', TargetTableID: 'cat-tbl' }]
             }));
 
-            const seedData = bridge.GetSeedData('tbl-products');
-            expect(seedData).toBeDefined();
+            const design = bridge.Controller.Design;
+
+            const fkField = design.GetTables().find((t: any) => t.ID === 'prod-tbl')
+                ?.GetFields().find((f: any) => f.ID === 'fk-field');
+            if (fkField) fkField.IsFK = true;
+
+            const catTable = design.GetTables().find((t: any) => t.ID === 'cat-tbl')!;
+            const ds = new tfx.XORMDataSet();
+            ds.ID = tfx.XGuid.NewValue();
+            ds.Name = 'Default';
+            catTable.AppendChild(ds);
+
+            const pkField = catTable.GetPKField();
+
+            const tuple = new tfx.XORMDataTuple();
+            tuple.ID = tfx.XGuid.NewValue();
+            ds.AppendChild(tuple);
+
+            const fvPK = new tfx.XFieldValue();
+            fvPK.ID = tfx.XGuid.NewValue();
+            fvPK.FieldID = pkField!.ID;
+            fvPK.Value = '1';
+            tuple.AppendChild(fvPK);
+
+            const fvName = new tfx.XFieldValue();
+            fvName.ID = tfx.XGuid.NewValue();
+            fvName.FieldID = 'cat-name';
+            fvName.Value = 'Electronics';
+            tuple.AppendChild(fvName);
+
+            const result = bridge.GetSeedData('prod-tbl');
+
+            expect(result).not.toBeNull();
+            const fkCol = result!.Columns.find(c => c.FieldID === 'fk-field');
+            expect(fkCol).toBeDefined();
+            expect(fkCol!.FKOptions).toBeDefined();
+            expect(fkCol!.FKOptions!.length).toBe(1);
+            expect(fkCol!.FKOptions![0].Label).toBe('1 \u2014 Electronics');
         });
 
-        it('should return empty FK options when target table has no seed data', () => {
+        it('should use pkVal as label when display value matches PK value (dispVal === pkVal)', () => {
             bridge.LoadOrmModelFromText(JSON.stringify({
                 Name: 'TestModel',
                 Tables: [
                     {
-                        ID: 'tbl-categories', Name: 'Categories', X: 0, Y: 0, Width: 200, Height: 60
+                        ID: 'cat-tbl', Name: 'Category', X: 0, Y: 0, Width: 200, Height: 60,
+                        Fields: [{ ID: 'cat-pk', Name: 'ID', DataType: 'Int32', IsPrimaryKey: true }]
                     },
                     {
-                        ID: 'tbl-products', Name: 'Products', X: 300, Y: 0, Width: 200, Height: 60,
+                        ID: 'prod-tbl', Name: 'Product', X: 300, Y: 0, Width: 200, Height: 60,
                         Fields: [
-                            { ID: 'prod-name', Name: 'ProductName', DataType: 'String', IsPrimaryKey: false }
+                            { ID: 'prod-pk', Name: 'ID', DataType: 'Int32', IsPrimaryKey: true },
+                            { ID: 'fk-field', Name: 'CategoryID', DataType: 'Int32' }
                         ]
                     }
                 ],
-                References: [
-                    { ID: 'ref-1', SourceTableID: 'tbl-products', TargetTableID: 'tbl-categories' }
-                ]
+                References: [{ ID: 'ref1', SourceFieldID: 'fk-field', TargetTableID: 'cat-tbl' }]
             }));
 
-            const seedData = bridge.GetSeedData('tbl-products');
-            expect(seedData).toBeDefined();
+            const design = bridge.Controller.Design;
+            const fkField = design.GetTables().find((t: any) => t.ID === 'prod-tbl')
+                ?.GetFields().find((f: any) => f.ID === 'fk-field');
+            if (fkField) fkField.IsFK = true;
+
+            const catTable = design.GetTables().find((t: any) => t.ID === 'cat-tbl')!;
+            const pkField = catTable.GetPKField();
+
+            const ds = new tfx.XORMDataSet();
+            ds.ID = tfx.XGuid.NewValue();
+            ds.Name = 'Default';
+            catTable.AppendChild(ds);
+
+            const tuple = new tfx.XORMDataTuple();
+            tuple.ID = tfx.XGuid.NewValue();
+            ds.AppendChild(tuple);
+
+            const fvPK = new tfx.XFieldValue();
+            fvPK.ID = tfx.XGuid.NewValue();
+            fvPK.FieldID = pkField!.ID;
+            fvPK.Value = '42';
+            tuple.AppendChild(fvPK);
+
+            const result = bridge.GetSeedData('prod-tbl');
+
+            const fkCol = result!.Columns.find(c => c.FieldID === 'fk-field');
+            expect(fkCol!.FKOptions![0].Label).toBe('42');
         });
 
-        it('should handle FK field where referenced table has no matching target', () => {
+        it('should fall back to pkVal when display field value is not in tuple (dispVal ?? pkVal)', () => {
             bridge.LoadOrmModelFromText(JSON.stringify({
                 Name: 'TestModel',
                 Tables: [
                     {
-                        ID: 'tbl-products', Name: 'Products', X: 300, Y: 0, Width: 200, Height: 60,
+                        ID: 'cat-tbl', Name: 'Category', X: 0, Y: 0, Width: 200, Height: 60,
                         Fields: [
-                            { ID: 'prod-name', Name: 'ProductName', DataType: 'String', IsPrimaryKey: false }
+                            { ID: 'cat-pk', Name: 'ID', DataType: 'Int32', IsPrimaryKey: true },
+                            { ID: 'cat-name', Name: 'CategoryName', DataType: 'String' }
+                        ]
+                    },
+                    {
+                        ID: 'prod-tbl', Name: 'Product', X: 300, Y: 0, Width: 200, Height: 60,
+                        Fields: [
+                            { ID: 'prod-pk', Name: 'ID', DataType: 'Int32', IsPrimaryKey: true },
+                            { ID: 'fk-field', Name: 'CategoryID', DataType: 'Int32' }
                         ]
                     }
                 ],
-                References: [
-                    { ID: 'ref-1', SourceTableID: 'tbl-products', TargetTableID: 'nonexistent' }
+                References: [{ ID: 'ref1', SourceFieldID: 'fk-field', TargetTableID: 'cat-tbl' }]
+            }));
+
+            const design = bridge.Controller.Design;
+            const fkField = design.GetTables().find((t: any) => t.ID === 'prod-tbl')
+                ?.GetFields().find((f: any) => f.ID === 'fk-field');
+            if (fkField) fkField.IsFK = true;
+
+            const catTable = design.GetTables().find((t: any) => t.ID === 'cat-tbl')!;
+            const pkField = catTable.GetPKField();
+
+            const ds = new tfx.XORMDataSet();
+            ds.ID = tfx.XGuid.NewValue();
+            ds.Name = 'Default';
+            catTable.AppendChild(ds);
+
+            const tuple = new tfx.XORMDataTuple();
+            tuple.ID = tfx.XGuid.NewValue();
+            ds.AppendChild(tuple);
+
+            const fvPK = new tfx.XFieldValue();
+            fvPK.ID = tfx.XGuid.NewValue();
+            fvPK.FieldID = pkField!.ID;
+            fvPK.Value = '5';
+            tuple.AppendChild(fvPK);
+
+            const result = bridge.GetSeedData('prod-tbl');
+
+            const fkCol = result!.Columns.find(c => c.FieldID === 'fk-field');
+            expect(fkCol!.FKOptions![0].Label).toBe('5');
+        });
+
+        it('should fall back to empty string when PK value not found in tuple (pkVal ?? "")', () => {
+            bridge.LoadOrmModelFromText(JSON.stringify({
+                Name: 'TestModel',
+                Tables: [
+                    {
+                        ID: 'cat-tbl', Name: 'Category', X: 0, Y: 0, Width: 200, Height: 60,
+                        Fields: [{ ID: 'cat-pk', Name: 'ID', DataType: 'Int32', IsPrimaryKey: true }]
+                    },
+                    {
+                        ID: 'prod-tbl', Name: 'Product', X: 300, Y: 0, Width: 200, Height: 60,
+                        Fields: [
+                            { ID: 'prod-pk', Name: 'ID', DataType: 'Int32', IsPrimaryKey: true },
+                            { ID: 'fk-field', Name: 'CategoryID', DataType: 'Int32' }
+                        ]
+                    }
+                ],
+                References: [{ ID: 'ref1', SourceFieldID: 'fk-field', TargetTableID: 'cat-tbl' }]
+            }));
+
+            const design = bridge.Controller.Design;
+            const fkField = design.GetTables().find((t: any) => t.ID === 'prod-tbl')
+                ?.GetFields().find((f: any) => f.ID === 'fk-field');
+            if (fkField) fkField.IsFK = true;
+
+            const catTable = design.GetTables().find((t: any) => t.ID === 'cat-tbl')!;
+
+            const ds = new tfx.XORMDataSet();
+            ds.ID = tfx.XGuid.NewValue();
+            ds.Name = 'Default';
+            catTable.AppendChild(ds);
+
+            const tuple = new tfx.XORMDataTuple();
+            tuple.ID = tfx.XGuid.NewValue();
+            ds.AppendChild(tuple);
+
+            const result = bridge.GetSeedData('prod-tbl');
+
+            const fkCol = result!.Columns.find(c => c.FieldID === 'fk-field');
+            expect(fkCol!.FKOptions).toBeDefined();
+            expect(fkCol!.FKOptions!.length).toBe(1);
+            expect(fkCol!.FKOptions![0].Value).toBe('');
+            expect(fkCol!.FKOptions![0].Label).toBe('');
+        });
+
+        it('should handle FK field with no matching reference (ref not found)', () => {
+            bridge.LoadOrmModelFromText(JSON.stringify({
+                Name: 'TestModel',
+                Tables: [
+                    {
+                        ID: 'prod-tbl', Name: 'Product', X: 0, Y: 0, Width: 200, Height: 60,
+                        Fields: [
+                            { ID: 'prod-pk', Name: 'ID', DataType: 'Int32', IsPrimaryKey: true },
+                            { ID: 'fk-field', Name: 'CategoryID', DataType: 'Int32' }
+                        ]
+                    }
                 ]
             }));
 
-            const seedData = bridge.GetSeedData('tbl-products');
-            expect(seedData).toBeDefined();
+            const fkField = bridge.Controller.Design.GetTables()
+                .find((t: any) => t.ID === 'prod-tbl')
+                ?.GetFields().find((f: any) => f.ID === 'fk-field');
+            if (fkField) fkField.IsFK = true;
+
+            const result = bridge.GetSeedData('prod-tbl');
+
+            expect(result).not.toBeNull();
+            const fkCol = result!.Columns.find(c => c.FieldID === 'fk-field');
+            expect(fkCol!.IsForeignKey).toBe(true);
+            expect(fkCol!.FKOptions).toBeUndefined();
+        });
+
+        it('should handle FK reference where target table no longer exists', () => {
+            bridge.LoadOrmModelFromText(JSON.stringify({
+                Name: 'TestModel',
+                Tables: [
+                    {
+                        ID: 'cat-tbl', Name: 'Category', X: 0, Y: 0, Width: 200, Height: 60,
+                        Fields: [{ ID: 'cat-pk', Name: 'ID', DataType: 'Int32', IsPrimaryKey: true }]
+                    },
+                    {
+                        ID: 'prod-tbl', Name: 'Product', X: 300, Y: 0, Width: 200, Height: 60,
+                        Fields: [
+                            { ID: 'prod-pk', Name: 'ID', DataType: 'Int32', IsPrimaryKey: true },
+                            { ID: 'fk-field', Name: 'CategoryID', DataType: 'Int32' }
+                        ]
+                    }
+                ],
+                References: [{ ID: 'ref1', SourceFieldID: 'fk-field', TargetTableID: 'cat-tbl' }]
+            }));
+
+            const design = bridge.Controller.Design;
+            const fkField = design.GetTables().find((t: any) => t.ID === 'prod-tbl')
+                ?.GetFields().find((f: any) => f.ID === 'fk-field');
+            if (fkField) fkField.IsFK = true;
+
+            const refs = design.GetReferences();
+            if (refs.length > 0) (refs[0] as any).Target = 'nonexistent-table-id';
+
+            const result = bridge.GetSeedData('prod-tbl');
+
+            expect(result).not.toBeNull();
+            const fkCol = result!.Columns.find(c => c.FieldID === 'fk-field');
+            expect(fkCol!.IsForeignKey).toBe(true);
+            expect(fkCol!.FKOptions).toBeUndefined();
         });
     });
 
@@ -366,6 +571,25 @@ describe('XTFXBridge — Branch Coverage', () => {
             const design = b.Controller?.Design as any;
 
             if (design) design.ParentModel = '|';
+
+            const xml = b.SaveOrmModelToText();
+
+            (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from(xml));
+
+            const mockDoc = { uri: vscode.Uri.file('/test/file.dsorm') };
+            const state = new (require('../../Designers/ORM/ORMDesignerState').XORMDesignerState)(mockDoc);
+
+            await state.Load();
+
+            expect(state.IsDirty).toBe(false);
+        });
+
+        it('should call LoadParentModelTables when ParentModel has valid entries (line 123)', async () => {
+            const b = new XTFXBridge();
+            b.LoadOrmModelFromText(JSON.stringify({ Name: 'Test' }));
+            const design = b.Controller?.Design as any;
+
+            if (design) design.ParentModel = 'Auth.dsorm';
 
             const xml = b.SaveOrmModelToText();
 
