@@ -475,29 +475,27 @@ describe("XORMDesign Coverage Tests", () => {
             }).toThrow("Source field has no parent table.");
         });
 
-        it("should handle when field not found in parent table's GetFields (lines 228-229)", () => {
+        it("should handle when field not found in parent table's GetFields", () => {
             const design = new XORMDesign();
             const table1 = design.CreateTable({ X: 100, Y: 100, Width: 200, Height: 150, Name: "Table1" });
             const table2 = design.CreateTable({ X: 500, Y: 100, Width: 200, Height: 150, Name: "Table2" });
-            
+
             // Create field properly attached to table
             const field = table1.CreateField({ Name: "TestField" });
-            
-            // Mock GetFields to return empty array (field not found)
+
+            // Mock GetFields to return empty array (field not found → fieldIndex = -1 → fieldY = NaN)
+            // In the new XRouter-based routing, fieldIndex < 0 sets fieldY = NaN:
+            // the router falls back to using the full table bounds as source (center Y).
+            // Routing still proceeds rather than aborting.
             const originalGetFields = table1.GetFields.bind(table1);
             table1.GetFields = () => [];
-            
+
             const ref = design.CreateReference({ SourceFieldID: field.ID, TargetTableID: table2.ID, Name: "TestRef" });
-            
-            // Manually clear points and attempt routing
             ref.Points = [];
-            
-            // Should not throw, just return early
+
+            // Should not throw
             expect(() => design.RouteAllLines()).not.toThrow();
-            
-            // Points should remain empty
-            expect(ref.Points.length).toBe(0);
-            
+
             // Restore
             table1.GetFields = originalGetFields;
         });
@@ -1366,25 +1364,26 @@ describe("XORMDesign Coverage Tests", () => {
             expect(ref.Points.length).toBeGreaterThanOrEqual(2);
         });
 
-        it("should use C-route with source exiting left (line 457-458)", () => {
+        it("should route when tables are vertically aligned (source to the right of target)", () => {
             const design = new XORMDesign();
-            // Vertically aligned tables where source exits left
-            // Tables must have horizontal overlap AND source centerX > target centerX
-            // Source at X=350 (center=400), Target at X=300 (center=375) - source is to the right
-            // Width overlap: source 350-500, target 300-500 (overlap: 350-500)
+            // Source at X=350 (wider, right), Target at X=300 (narrower, left) — horizontal overlap
             const table1 = design.CreateTable({ X: 350, Y: 100, Width: 150, Height: 100, Name: "Table1" });
             const table2 = design.CreateTable({ X: 300, Y: 350, Width: 200, Height: 100, Name: "Table2" });
             const field = table1.CreateField({ Name: "FK_Field" });
             const ref = design.CreateReference({ SourceFieldID: field.ID, TargetTableID: table2.ID, Name: "FK_Test" });
-            
+
             ref.Points = [];
             design.RouteAllLines();
-            
-            expect(ref.Points.length).toBeGreaterThanOrEqual(3);
-            // Check route exits to the left (first point X < source left)
-            const sourceLeft = 350;
-            const firstRoutePoint = ref.Points[1]; // After start point
-            expect(firstRoutePoint.X).toBeLessThan(sourceLeft);
+
+            // XRouter produces an orthogonal route — exact direction depends on
+            // the graph-search, but the route must exist and must be orthogonal.
+            expect(ref.Points.length).toBeGreaterThanOrEqual(2);
+            for (let i = 1; i < ref.Points.length; i++)
+            {
+                const dx = Math.abs(ref.Points[i].X - ref.Points[i - 1].X);
+                const dy = Math.abs(ref.Points[i].Y - ref.Points[i - 1].Y);
+                expect(dx === 0 || dy === 0).toBe(true);
+            }
         });
 
         it("should detect horizontal line collision with obstacle (line 609-611)", () => {
