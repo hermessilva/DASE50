@@ -77,13 +77,15 @@ describe('XTFXBridge', () => {
 
         it('should load .dsorm files from directory excluding the current file, sorted alphabetically', async () => {
             bridge.SetContextPath('/test/dir/Current.dsorm');
-            (vscode.workspace.fs.readDirectory as jest.Mock).mockResolvedValue([
-                ['Zebra.dsorm', vscode.FileType.File],
-                ['Auth.dsorm', vscode.FileType.File],
-                ['Current.dsorm', vscode.FileType.File],
-                ['readme.txt', vscode.FileType.File],
-                ['subfolder', vscode.FileType.Directory]
-            ]);
+            (vscode.workspace.fs.readDirectory as jest.Mock)
+                .mockResolvedValueOnce([
+                    ['Zebra.dsorm', vscode.FileType.File],
+                    ['Auth.dsorm', vscode.FileType.File],
+                    ['Current.dsorm', vscode.FileType.File],
+                    ['readme.txt', vscode.FileType.File],
+                    ['subfolder', vscode.FileType.Directory]
+                ])
+                .mockResolvedValue([]);
 
             await bridge.LoadAvailableOrmFiles();
 
@@ -106,20 +108,20 @@ describe('XTFXBridge', () => {
     describe('LoadParentModelTables', () => {
         it('should do nothing when no context path is set', async () => {
             await bridge.LoadParentModelTables(['Auth.dsorm']);
-            expect((bridge as any)._ParentModelTables).toEqual([]);
+            expect((bridge as any)._ParentModelTableGroups).toEqual([]);
         });
 
         it('should do nothing when parent models array is empty', async () => {
             bridge.SetContextPath('/test/dir/current.dsorm');
             await bridge.LoadParentModelTables([]);
-            expect((bridge as any)._ParentModelTables).toEqual([]);
+            expect((bridge as any)._ParentModelTableGroups).toEqual([]);
         });
 
         it('should skip empty string model name entries', async () => {
             bridge.SetContextPath('/test/dir/current.dsorm');
             bridge.Initialize();
             await bridge.LoadParentModelTables(['']);
-            expect((bridge as any)._ParentModelTables).toEqual([]);
+            expect((bridge as any)._ParentModelTableGroups).toEqual([]);
         });
 
         it('should load table names from a valid serialized parent model file', async () => {
@@ -137,9 +139,12 @@ describe('XTFXBridge', () => {
             bridge.Initialize();
             await bridge.LoadParentModelTables(['Auth.dsorm']);
 
-            const tables = (bridge as any)._ParentModelTables as string[];
-            expect(tables).toContain('AppUser');
-            expect(tables).toContain('AppRole');
+            const groups = (bridge as any)._ParentModelTableGroups as Array<{ModelName: string, Tables: Array<{Name: string, Fill: string}>}>;
+            expect(groups.length).toBe(1);
+            expect(groups[0].ModelName).toBe('Auth.dsorm');
+            const tableNames = groups[0].Tables.map((t: {Name: string}) => t.Name);
+            expect(tableNames).toContain('AppUser');
+            expect(tableNames).toContain('AppRole');
         });
 
         it('should deduplicate table names from multiple parent model files', async () => {
@@ -163,9 +168,11 @@ describe('XTFXBridge', () => {
             bridge.Initialize();
             await bridge.LoadParentModelTables(['Model1.dsorm', 'Model2.dsorm']);
 
-            const tables = (bridge as any)._ParentModelTables as string[];
-            expect(tables.filter((t: string) => t === 'SharedTable').length).toBe(1);
-            expect(tables).toContain('UniqueTable');
+            const groups = (bridge as any)._ParentModelTableGroups as Array<{ModelName: string, Tables: Array<{Name: string, Fill: string}>}>;
+            expect(groups.length).toBe(2);
+            const allTableNames = groups.flatMap(g => g.Tables.map((t: {Name: string}) => t.Name));
+            expect(allTableNames.filter((t: string) => t === 'SharedTable').length).toBe(2);
+            expect(allTableNames).toContain('UniqueTable');
         });
 
         it('should log error and continue when a parent file cannot be read', async () => {
@@ -175,7 +182,7 @@ describe('XTFXBridge', () => {
 
             await bridge.LoadParentModelTables(['Missing.dsorm']);
 
-            expect((bridge as any)._ParentModelTables).toEqual([]);
+            expect((bridge as any)._ParentModelTableGroups).toEqual([]);
         });
     });
 

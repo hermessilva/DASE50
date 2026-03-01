@@ -779,4 +779,256 @@ describe('XORMDesignerEditorProvider', () => {
         });
     });
 
+    describe('HandleMessage RequestSeedData', () => {
+        let mockPanel: any;
+        let mockState: any;
+
+        beforeEach(() => {
+            mockPanel = createMockWebviewPanel();
+            mockState = {
+                Bridge: {
+                    GetSeedData: jest.fn().mockReturnValue({ TableID: 't1', TableName: 'T', Columns: [], Rows: [] }),
+                    SaveSeedData: jest.fn().mockReturnValue({ Success: true }),
+                    GetShadowTablePickerData: jest.fn().mockReturnValue({ X: 0, Y: 0, Models: [] }),
+                    AddShadowTable: jest.fn().mockReturnValue({ Success: true, ElementID: 'shadow-1' }),
+                    LastSyncMutated: false,
+                    GetAllDataTypes: jest.fn().mockReturnValue([]),
+                    GetPKDataTypes: jest.fn().mockReturnValue([])
+                },
+                GetModelData: jest.fn().mockReturnValue({ Tables: [], References: [] }),
+                Validate: jest.fn().mockReturnValue([]),
+                AddShadowTable: jest.fn().mockReturnValue({ Success: true, ElementID: 'shadow-1' }),
+                GetProperties: jest.fn().mockReturnValue([]),
+                IsDirty: false,
+                Document: { uri: Uri.file('/test/model.dsorm') },
+                IssueService: { SetIssues: jest.fn() },
+                SelectionService: { HasSelection: false, PrimaryID: null }
+            };
+        });
+
+        it('should send seed data when table exists', async () => {
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'RequestSeedData',
+                Payload: { TableID: 't1' }
+            });
+
+            expect(mockState.Bridge.GetSeedData).toHaveBeenCalledWith('t1');
+            expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
+                expect.objectContaining({ Type: 'SeedDataLoaded' })
+            );
+        });
+
+        it('should do nothing when TableID is missing', async () => {
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'RequestSeedData',
+                Payload: {}
+            });
+
+            expect(mockState.Bridge.GetSeedData).not.toHaveBeenCalled();
+        });
+
+        it('should log warning when seed data is null', async () => {
+            mockState.Bridge.GetSeedData.mockReturnValue(null);
+
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'RequestSeedData',
+                Payload: { TableID: 'not-found' }
+            });
+
+            expect(mockPanel.webview.postMessage).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('HandleMessage SaveSeedData', () => {
+        let mockPanel: any;
+        let mockState: any;
+
+        beforeEach(() => {
+            mockPanel = createMockWebviewPanel();
+            mockState = {
+                Bridge: {
+                    SaveSeedData: jest.fn().mockReturnValue({ Success: true }),
+                    LastSyncMutated: false,
+                    GetAllDataTypes: jest.fn().mockReturnValue([]),
+                    GetPKDataTypes: jest.fn().mockReturnValue([])
+                },
+                Validate: jest.fn().mockReturnValue([]),
+                GetProperties: jest.fn().mockReturnValue([]),
+                IsDirty: false,
+                Document: { uri: Uri.file('/test/model.dsorm') },
+                IssueService: { SetIssues: jest.fn() },
+                SelectionService: { HasSelection: false, PrimaryID: null }
+            };
+        });
+
+        it('should save seed data and notify changes on success', async () => {
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'SaveSeedData',
+                Payload: { TableID: 't1', Rows: [{ TupleID: 'r1', Values: { f1: 'v1' } }] }
+            });
+
+            expect(mockState.Bridge.SaveSeedData).toHaveBeenCalledWith('t1', [{ TupleID: 'r1', Values: { f1: 'v1' } }]);
+            expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
+                expect.objectContaining({ Type: 'SeedDataSaved' })
+            );
+        });
+
+        it('should do nothing when TableID is missing', async () => {
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'SaveSeedData',
+                Payload: { Rows: [] }
+            });
+
+            expect(mockState.Bridge.SaveSeedData).not.toHaveBeenCalled();
+        });
+
+        it('should do nothing when Rows is not an array', async () => {
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'SaveSeedData',
+                Payload: { TableID: 't1', Rows: 'invalid' }
+            });
+
+            expect(mockState.Bridge.SaveSeedData).not.toHaveBeenCalled();
+        });
+
+        it('should not notify document changed when save fails', async () => {
+            mockState.Bridge.SaveSeedData.mockReturnValue({ Success: false, Message: 'Error' });
+
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'SaveSeedData',
+                Payload: { TableID: 't1', Rows: [] }
+            });
+
+            expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    Type: 'SeedDataSaved',
+                    Payload: expect.objectContaining({ Success: false })
+                })
+            );
+        });
+    });
+
+    describe('HandleMessage RequestShadowTablePicker', () => {
+        let mockPanel: any;
+        let mockState: any;
+
+        beforeEach(() => {
+            mockPanel = createMockWebviewPanel();
+            mockState = {
+                Bridge: {
+                    GetShadowTablePickerData: jest.fn().mockReturnValue({ X: 10, Y: 20, Models: [] }),
+                    LastSyncMutated: false
+                },
+                Document: { uri: Uri.file('/test/model.dsorm') },
+                IssueService: { SetIssues: jest.fn() },
+                SelectionService: { HasSelection: false, PrimaryID: null }
+            };
+        });
+
+        it('should send shadow table picker data', async () => {
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'RequestShadowTablePicker',
+                Payload: { X: 10, Y: 20 }
+            });
+
+            expect(mockState.Bridge.GetShadowTablePickerData).toHaveBeenCalledWith(10, 20);
+            expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
+                expect.objectContaining({ Type: 'ShadowTablePickerData' })
+            );
+        });
+
+        it('should do nothing when X is not a number', async () => {
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'RequestShadowTablePicker',
+                Payload: { X: 'invalid', Y: 20 }
+            });
+
+            expect(mockState.Bridge.GetShadowTablePickerData).not.toHaveBeenCalled();
+        });
+
+        it('should do nothing when Y is not a number', async () => {
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'RequestShadowTablePicker',
+                Payload: { X: 10, Y: null }
+            });
+
+            expect(mockState.Bridge.GetShadowTablePickerData).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('HandleMessage AddShadowTable', () => {
+        let mockPanel: any;
+        let mockState: any;
+
+        beforeEach(() => {
+            mockPanel = createMockWebviewPanel();
+            mockState = {
+                AddShadowTable: jest.fn().mockReturnValue({ Success: true, ElementID: 'shadow-1' }),
+                GetModelData: jest.fn().mockReturnValue({ Tables: [], References: [] }),
+                Validate: jest.fn().mockReturnValue([]),
+                GetProperties: jest.fn().mockReturnValue([]),
+                Bridge: {
+                    LastSyncMutated: false,
+                    GetAllDataTypes: jest.fn().mockReturnValue([]),
+                    GetPKDataTypes: jest.fn().mockReturnValue([])
+                },
+                IsDirty: false,
+                Document: { uri: Uri.file('/test/model.dsorm') },
+                IssueService: { SetIssues: jest.fn() },
+                SelectionService: { HasSelection: false, PrimaryID: null }
+            };
+        });
+
+        it('should add shadow table and send model update', async () => {
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'AddShadowTable',
+                Payload: {
+                    X: 100, Y: 200, ModelName: 'Auth.dsorm',
+                    DocumentID: 'doc-1', DocumentName: 'Auth',
+                    ModuleID: '', ModuleName: '',
+                    TableID: 'tbl-1', TableName: 'AppUser'
+                }
+            });
+
+            expect(mockState.AddShadowTable).toHaveBeenCalled();
+            expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
+                expect.objectContaining({ Type: 'LoadModel' })
+            );
+        });
+
+        it('should do nothing when TableID is missing', async () => {
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'AddShadowTable',
+                Payload: { TableName: 'T' }
+            });
+
+            expect(mockState.AddShadowTable).not.toHaveBeenCalled();
+        });
+
+        it('should do nothing when TableName is missing', async () => {
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'AddShadowTable',
+                Payload: { TableID: 't1' }
+            });
+
+            expect(mockState.AddShadowTable).not.toHaveBeenCalled();
+        });
+
+        it('should not send model update when add fails', async () => {
+            mockState.AddShadowTable.mockReturnValue({ Success: false });
+
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'AddShadowTable',
+                Payload: {
+                    X: 0, Y: 0, ModelName: 'M',
+                    DocumentID: 'd', DocumentName: 'M',
+                    ModuleID: '', ModuleName: '',
+                    TableID: 't1', TableName: 'T'
+                }
+            });
+
+            expect(mockPanel.webview.postMessage).not.toHaveBeenCalled();
+        });
+    });
+
 });
