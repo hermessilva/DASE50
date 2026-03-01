@@ -288,7 +288,8 @@ export class XTFXBridge
                 const trimmedText = pText.trim();
                 if (trimmedText.startsWith("<?xml") || trimmedText.startsWith("<"))
                 {
-                    const result = this._Engine.Deserialize<XORMDocument>(pText);
+                    const normalizedText = this.NormalizeCSharpXml(pText);
+                const result = this._Engine.Deserialize<XORMDocument>(normalizedText);
                     if (result.Success && result.Data)
                     {
                         // Initialize the document to consolidate multiple XORMDesign instances
@@ -352,6 +353,29 @@ export class XTFXBridge
             this._Controller.Document = doc;
             return doc;
         }
+    }
+
+    private NormalizeCSharpXml(pXml: string): string
+    {
+        const trimmed = pXml.trim();
+
+        // Detect optional XML declaration
+        let declaration = "";
+        let body = trimmed;
+        if (body.startsWith("<?xml"))
+        {
+            const declEnd = body.indexOf("?>") + 2;
+            declaration = body.substring(0, declEnd);
+            body = body.substring(declEnd).trimStart();
+        }
+
+        // C# format: root is <XORMDesigner> without an <XORMDocument> wrapper.
+        // Wrap it so the TS deserializer can produce a valid XORMDocument.
+        if (!body.startsWith("<XORMDesigner"))
+            return pXml;
+
+        const docID = XGuid.NewValue();
+        return `${declaration}<XORMDocument ID="${docID}" Name="ORM Model">${body}</XORMDocument>`;
     }
 
     SaveOrmModelToText(): string
@@ -818,7 +842,7 @@ export class XTFXBridge
             return simplified;
         };
 
-        const refsData: IReferenceData[] = references.map((r: any) => {
+        const refsData: IReferenceData[] = references.filter((r: any) => r.IsVisible !== false).map((r: any) => {
             // Encontrar tabelas source e target para simplificação
             const sourceTable = tables.find((t: any) => {
                 const fields = t.GetChildrenOfType?.(XORMField) ?? t.Fields ?? [];

@@ -2577,6 +2577,58 @@ describe('XTFXBridge', () => {
             expect(doc).toBeDefined();
             expect(doc.Name).toBe('ORM Model');
         });
+
+        it('should normalize C# format XML with XORMDesigner root (with XML declaration)', async () => {
+            const xmlText = '<?xml version="1.0" encoding="utf-8"?><XORMDesigner ID="design-id" Name="TestModel"></XORMDesigner>';
+
+            const mockDoc: any = {
+                ID: 'mock-id',
+                Name: 'ORM Model',
+                ChildNodes: [],
+                Initialize: jest.fn(),
+                Design: { ChildNodes: [], GetReferences: jest.fn().mockReturnValue([]) }
+            };
+
+            bridge.Initialize();
+            (bridge as any)._Engine = {
+                Deserialize: jest.fn().mockReturnValue({ Success: true, Data: mockDoc }),
+                Serialize: jest.fn().mockReturnValue({ Success: true, XmlOutput: '' })
+            };
+
+            const doc = await bridge.LoadOrmModelFromText(xmlText);
+
+            const deserializeSpy = (bridge as any)._Engine.Deserialize;
+            expect(deserializeSpy).toHaveBeenCalledWith(expect.stringContaining('<XORMDocument'));
+            expect(deserializeSpy).toHaveBeenCalledWith(expect.stringContaining('<XORMDesigner'));
+            expect(mockDoc.Initialize).toHaveBeenCalled();
+            expect(doc).toBe(mockDoc);
+        });
+
+        it('should normalize C# format XML with XORMDesigner root (without XML declaration)', async () => {
+            const xmlText = '<XORMDesigner ID="design-id" Name="TestModel"></XORMDesigner>';
+
+            const mockDoc: any = {
+                ID: 'mock-id',
+                Name: 'ORM Model',
+                ChildNodes: [],
+                Initialize: jest.fn(),
+                Design: { ChildNodes: [], GetReferences: jest.fn().mockReturnValue([]) }
+            };
+
+            bridge.Initialize();
+            (bridge as any)._Engine = {
+                Deserialize: jest.fn().mockReturnValue({ Success: true, Data: mockDoc }),
+                Serialize: jest.fn().mockReturnValue({ Success: true, XmlOutput: '' })
+            };
+
+            const doc = await bridge.LoadOrmModelFromText(xmlText);
+
+            const deserializeSpy = (bridge as any)._Engine.Deserialize;
+            expect(deserializeSpy).toHaveBeenCalledWith(expect.stringContaining('<XORMDocument'));
+            expect(deserializeSpy).toHaveBeenCalledWith(expect.stringContaining('<XORMDesigner'));
+            expect(mockDoc.Initialize).toHaveBeenCalled();
+            expect(doc).toBe(mockDoc);
+        });
     });
 
     describe('SaveOrmModelToText serialization branches', () => {

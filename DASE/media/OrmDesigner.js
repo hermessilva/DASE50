@@ -1073,10 +1073,13 @@
 
     function CreateRelationElement(pRef)
     {
-        // Source is a field ID - find the table that contains this field
-        const sourceTable = _Model.Tables.find(t => 
+        // Source is normally a field ID - find the table that contains this field.
+        // Fallback: legacy 1:1 Table→Table references use the source table ID directly.
+        let sourceTable = _Model.Tables.find(t => 
             t.Fields && t.Fields.some(f => f.ID === pRef.SourceFieldID)
         );
+        if (!sourceTable)
+            sourceTable = _Model.Tables.find(t => t.ID === pRef.SourceFieldID);
         // Target is a table ID
         const targetTable = _Model.Tables.find(t => t.ID === pRef.TargetTableID);
 
