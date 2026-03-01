@@ -6,9 +6,11 @@ module.exports = {
     testMatch: ['**/__tests__/**/*.test.ts'],
     transform: {
         '^.+\\.tsx?$': ['ts-jest', {
-            tsconfig: 'tsconfig.test.json'
+            tsconfig: 'tsconfig.test.json',
+            isolatedModules: true
         }]
     },
+    workerIdleMemoryLimit: '512MB',
     moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
     moduleNameMapper: {
         '^vscode$': '<rootDir>/src/__tests__/__mocks__/vscode.ts'
