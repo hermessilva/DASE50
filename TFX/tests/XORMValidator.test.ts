@@ -124,6 +124,45 @@ describe("XORMValidator", () =>
             const error = issues.find(i => i.Message.includes("Duplicate table name"));
             expect(error).toBeUndefined();
         });
+
+        it("should not error on duplicate name when one table is a shadow table", () =>
+        {
+            const doc = new XORMDocument();
+            const table1 = new XORMTable();
+            table1.Name = "Users";
+            doc.Design.AppendChild(table1);
+            table1.CreatePKField();
+
+            const shadow = new XORMTable();
+            shadow.Name = "Users";
+            shadow.IsShadow = true;
+            doc.Design.AppendChild(shadow);
+
+            const validator = new XORMValidator();
+            const issues = validator.Validate(doc);
+
+            const error = issues.find(i => i.Message.includes("Duplicate table name"));
+            expect(error).toBeUndefined();
+        });
+
+        it("should not auto-create PK field for shadow tables during validation", () =>
+        {
+            const doc = new XORMDocument();
+            const shadow = new XORMTable();
+            shadow.Name = "ExternalUsers";
+            shadow.IsShadow = true;
+            doc.Design.AppendChild(shadow);
+
+            // Add a real table so there is no "no tables" warning masking the issue
+            const table = doc.Design.CreateTable({ Name: "LocalTable" });
+            table.CreatePKField();
+
+            const validator = new XORMValidator();
+            validator.Validate(doc);
+
+            // Shadow table must remain PK-less
+            expect(shadow.HasPKField()).toBe(false);
+        });
     });
 
     describe("Field validation", () =>

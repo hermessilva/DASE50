@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import * as vscode from "vscode";
 import * as path from "path";
-import { XPropertyItem, XPropertyType } from "../Models/PropertyItem";
+import { XPropertyItem, XPropertyType, IPropertyOptionGroup } from "../Models/PropertyItem";
 import { XIssueItem, XIssueSeverity, TIssueSeverity } from "../Models/IssueItem";
 import { GetLogService } from "./LogService";
 import { XVsCodeFileSystemAdapter } from "./VsCodeFileSystemAdapter";
@@ -70,6 +70,14 @@ interface ITableData
     FillProp?: string;
     PKType?: string;
     Fields: IFieldData[];
+    // Shadow table metadata
+    IsShadow?: boolean;
+    ShadowDocumentID?: string;
+    ShadowDocumentName?: string;
+    ShadowTableID?: string;
+    ShadowTableName?: string;
+    ShadowModuleID?: string;
+    ShadowModuleName?: string;
 }
 
 interface IReferenceData
@@ -144,6 +152,42 @@ export interface ISeedRowSave
     Values: Record<string, string>;
 }
 
+export interface IShadowTableEntry
+{
+    ID: string;
+    Name: string;
+}
+
+export interface IShadowModelEntry
+{
+    ModelName: string;
+    DocumentID: string;
+    DocumentName: string;
+    ModuleID: string;
+    ModuleName: string;
+    Tables: IShadowTableEntry[];
+}
+
+export interface IShadowTablePickerData
+{
+    X: number;
+    Y: number;
+    Models: IShadowModelEntry[];
+}
+
+export interface IAddShadowTablePayload
+{
+    X: number;
+    Y: number;
+    ModelName: string;
+    DocumentID: string;
+    DocumentName: string;
+    ModuleID: string;
+    ModuleName: string;
+    TableID: string;
+    TableName: string;
+}
+
 interface IJsonData
 {
     Name?: string;
@@ -164,7 +208,8 @@ export class XTFXBridge
     private _TypeInfos: XORMDataTypeInfo[];
     private _TypesLoaded: boolean;
     private _AvailableOrmFiles: string[];
-    private _ParentModelTables: string[];
+    private _ParentModelTableGroups: Array<{ModelName: string, Tables: Array<{Name: string, Fill: string}>}>;
+    private _LastSyncMutated: boolean;
 
     /** Fallback property hints for well-known types when config is not yet loaded. */
     private static readonly _FallbackTypeHints: Record<string, { HasLength: boolean; HasScale: boolean; CanAutoIncrement: boolean }> =
@@ -195,7 +240,8 @@ export class XTFXBridge
         this._TypeInfos = [];
         this._TypesLoaded = false;
         this._AvailableOrmFiles = [];
-        this._ParentModelTables = [];
+        this._ParentModelTableGroups = [];
+        this._LastSyncMutated = false;
     }
 
     Initialize(): void
@@ -294,32 +340,48 @@ export class XTFXBridge
             return;
 
         const currentFileName = path.basename(this._ContextPath);
-        const dirPath = path.dirname(this._ContextPath);
+        const rootDir = path.dirname(this._ContextPath);
 
-        try
+        const scanDir = async (pAbsDir: string, pRelPrefix: string): Promise<void> =>
         {
-            const dirUri = vscode.Uri.file(dirPath);
-            const entries = await vscode.workspace.fs.readDirectory(dirUri);
-            for (const [name, type] of entries)
+            try
             {
-                if (type === vscode.FileType.File && name.endsWith(".dsorm") && name !== currentFileName)
-                    this._AvailableOrmFiles.push(name);
+                const dirUri = vscode.Uri.file(pAbsDir);
+                const entries = await vscode.workspace.fs.readDirectory(dirUri);
+                for (const [name, type] of entries)
+                {
+                    if (type === vscode.FileType.Directory)
+                    {
+                        await scanDir(
+                            path.join(pAbsDir, name),
+                            pRelPrefix ? `${pRelPrefix}/${name}` : name
+                        );
+                    }
+                    else if (type === vscode.FileType.File && name.endsWith(".dsorm"))
+                    {
+                        const relPath = pRelPrefix ? `${pRelPrefix}/${name}` : name;
+                        if (relPath !== currentFileName)
+                            this._AvailableOrmFiles.push(relPath);
+                    }
+                }
             }
-            this._AvailableOrmFiles.sort((a, b) => a.localeCompare(b));
-        }
-        catch (error)
-        {
-            GetLogService().Error(`Failed to scan .dsorm files: ${error}`);
-        }
+            catch (error)
+            {
+                GetLogService().Error(`Failed to scan directory ${pAbsDir}: ${error}`);
+            }
+        };
+
+        await scanDir(rootDir, "");
+        this._AvailableOrmFiles.sort((a, b) => a.localeCompare(b));
     }
 
     /**
      * Loads table names from the given parent model files (relative to the current context directory).
-     * Results are cached in _ParentModelTables.
+     * Results are cached in _ParentModelTableGroups (one group per model file).
      */
     async LoadParentModelTables(pParentModels: string[]): Promise<void>
     {
-        this._ParentModelTables = [];
+        this._ParentModelTableGroups = [];
 
         if (!this._ContextPath || pParentModels.length === 0)
             return;
@@ -338,19 +400,24 @@ export class XTFXBridge
                 const bytes = await vscode.workspace.fs.readFile(fileUri);
                 const text = Buffer.from(bytes).toString("utf8");
 
-                // Parse the file using the serialization engine to extract table names
-                const trimmed = text.trim();
-                const xmlText = trimmed.startsWith("<") ? trimmed : this.NormalizeCSharpXml(text);
+                // Parse the file using the serialization engine to extract table names.
+                // Always call NormalizeCSharpXml so that C# format files (<XORMDesigner> root)
+                // are wrapped in <XORMDocument> before deserialization — matching LoadOrmModelFromText.
+                // NormalizeCSharpXml is a no-op for TS-format files (returns the input unchanged).
+                const xmlText = this.NormalizeCSharpXml(text);
                 const result = this._Engine?.Deserialize<XORMDocument>(xmlText);
                 if (result?.Success && result.Data)
                 {
                     result.Data.Initialize();
                     const tables = result.Data.Design?.GetTables?.() ?? [];
+                    const tableEntries: Array<{Name: string, Fill: string}> = [];
                     for (const table of tables)
                     {
-                        if (table.Name && !this._ParentModelTables.includes(table.Name))
-                            this._ParentModelTables.push(table.Name);
+                        if (table.Name)
+                            tableEntries.push({ Name: table.Name, Fill: table.Fill?.ToString() ?? "" });
                     }
+                    if (tableEntries.length > 0)
+                        this._ParentModelTableGroups.push({ ModelName: modelName, Tables: tableEntries });
                 }
             }
             catch (error)
@@ -677,6 +744,121 @@ export class XTFXBridge
         }
     }
 
+    /**
+     * Whether the last call to ValidateOrmModel caused any mutation on shadow tables
+     * (name or colour update). Callers can check this to decide whether to refresh the canvas.
+     */
+    get LastSyncMutated(): boolean
+    {
+        return this._LastSyncMutated;
+    }
+
+    /**
+     * Synchronises every shadow table in the current design against its source.
+     *
+     * Same-model shadows (ShadowTableID points to a real table in the current design):
+     *   - Table still exists → update Name, ShadowTableName and Fill to match.
+     *   - Table removed → error issue.
+     *
+     * Cross-model shadows (ShadowTableID is empty / not in current design):
+     *   - Parent model not in _ParentModelTableGroups → error issue.
+     *   - Table name not found in the parent model group → error issue.
+     *   - Table found → update Fill to match the cached entry.
+     *
+     * Returns extra XIssueItem[] for missing originals; structural updates are applied
+     * directly to the shadow table objects. Sets _LastSyncMutated when any update is made.
+     */
+    private SyncShadowTables(): XIssueItem[]
+    {
+        this._LastSyncMutated = false;
+        const issues: XIssueItem[] = [];
+        const design = this._Controller?.Design as XORMDesign | null;
+        if (!design)
+            return issues;
+
+        const allTables: XORMTable[] = design.GetTables?.() ?? [];
+        const realTables = allTables.filter((t: XORMTable) => !t.IsShadow);
+        const shadowTables = allTables.filter((t: XORMTable) => t.IsShadow);
+
+        for (const shadow of shadowTables)
+        {
+            // Try to find the original in the current design by ShadowTableID
+            const sameModelOriginal = shadow.ShadowTableID
+                ? realTables.find((t: XORMTable) => t.ID === shadow.ShadowTableID) ?? null
+                : null;
+
+            if (sameModelOriginal)
+            {
+                // Same-model shadow: sync name and fill
+                if (sameModelOriginal.Name !== shadow.ShadowTableName)
+                {
+                    shadow.Name = sameModelOriginal.Name;
+                    shadow.ShadowTableName = sameModelOriginal.Name;
+                    this._LastSyncMutated = true;
+                }
+                const srcFill = sameModelOriginal.Fill?.ToString();
+                const dstFill = shadow.Fill?.ToString();
+                if (srcFill && srcFill !== dstFill)
+                {
+                    shadow.Fill = XColor.Parse(srcFill);
+                    this._LastSyncMutated = true;
+                }
+            }
+            else if (shadow.ShadowDocumentName)
+            {
+                // Cross-model shadow: ShadowDocumentName stores the model path without extension.
+                // _ParentModelTableGroups keys include the extension — add it when looking up.
+                const shadowDocName = shadow.ShadowDocumentName;
+                const groupKey = shadowDocName.endsWith(".dsorm") ? shadowDocName : shadowDocName + ".dsorm";
+                const grp = this._ParentModelTableGroups.find(g => g.ModelName === groupKey);
+
+                if (!grp)
+                {
+                    issues.push(new XIssueItem(
+                        shadow.ID,
+                        shadow.Name,
+                        XIssueSeverity.Error,
+                        `Shadow table "${shadow.Name}" references model "${shadowDocName}" which is not available in the parent model list.`
+                    ));
+                }
+                else
+                {
+                    const tableEntry = grp.Tables.find(e => e.Name === shadow.ShadowTableName);
+                    if (!tableEntry)
+                    {
+                        issues.push(new XIssueItem(
+                            shadow.ID,
+                            shadow.Name,
+                            XIssueSeverity.Error,
+                            `Shadow table "${shadow.Name}" references table "${shadow.ShadowTableName}" which no longer exists in model "${shadowDocName}".`
+                        ));
+                    }
+                    else
+                    {
+                        const dstFill = shadow.Fill?.ToString();
+                        if (tableEntry.Fill && tableEntry.Fill !== dstFill)
+                        {
+                            shadow.Fill = XColor.Parse(tableEntry.Fill);
+                            this._LastSyncMutated = true;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // Shadow with no resolvable source reference
+                issues.push(new XIssueItem(
+                    shadow.ID,
+                    shadow.Name,
+                    XIssueSeverity.Error,
+                    `Shadow table "${shadow.Name}" has no valid source reference.`
+                ));
+            }
+        }
+
+        return issues;
+    }
+
     ValidateOrmModel(): XIssueItem[]
     {
         this.Initialize();
@@ -685,11 +867,14 @@ export class XTFXBridge
         if (!doc)
             return [];
 
+        // Sync shadow tables first: update name/fill from source, collect missing-source errors
+        const shadowIssues = this.SyncShadowTables();
+
         // Update validator with types from configuration (or defaults if not loaded)
         this._Validator.ValidPKTypes = this._PKDataTypes.length > 0 ? this._PKDataTypes : ["Guid", "Int32", "Int64"];
         
         const tfxIssues = this._Validator.Validate(doc);
-        const issues: XIssueItem[] = [];
+        const issues: XIssueItem[] = [...shadowIssues];
 
         for (const issue of tfxIssues)
         {
@@ -783,6 +968,125 @@ export class XTFXBridge
         return this._Controller?.RouteAllLines?.() ?? false;
     }
 
+    /**
+     * Builds the tree of available tables for the shadow table picker.
+     * Includes the current model's own tables (as the first group), 
+     * then one group per parent model previously loaded into _ParentModelTableGroups.
+     */
+    GetShadowTablePickerData(pX: number, pY: number): IShadowTablePickerData
+    {
+        this.Initialize();
+
+        const models: IShadowModelEntry[] = [];
+
+        // Current model
+        const currentModelName = this._ContextPath
+            ? path.basename(this._ContextPath)
+            : (this._Controller?.Document?.Name ?? "Current Model");
+        const currentDocumentName = this._Controller?.Document?.Name ?? "";
+        const currentTables = this._Controller?.Design?.GetTables?.()?.filter((t: XORMTable) => !t.IsShadow) ?? [];
+        if (currentTables.length > 0)
+        {
+            models.push({
+                ModelName: currentModelName,
+                DocumentID: this._Controller?.Document?.ID ?? XGuid.NewValue(),
+                DocumentName: currentDocumentName,
+                ModuleID: "",
+                ModuleName: "",
+                Tables: currentTables.map((t: XORMTable) => ({ ID: t.ID, Name: t.Name }))
+                    .sort((a: IShadowTableEntry, b: IShadowTableEntry) => a.Name.localeCompare(b.Name))
+            });
+        }
+
+        // Parent models — skip any group whose name matches the current model (avoid duplicates)
+        for (const grp of this._ParentModelTableGroups)
+        {
+            if (grp.ModelName === currentModelName)
+                continue;
+            models.push({
+                ModelName: grp.ModelName,
+                DocumentID: "",
+                DocumentName: grp.ModelName.replace(/\.dsorm$/i, ""),
+                ModuleID: "",
+                ModuleName: "",
+                Tables: grp.Tables.map(e => ({ ID: "", Name: e.Name }))
+                    .sort((a: IShadowTableEntry, b: IShadowTableEntry) => a.Name.localeCompare(b.Name))
+            });
+        }
+
+        return { X: pX, Y: pY, Models: models };
+    }
+
+    /**
+     * Creates a Shadow Table in the current design.
+     * A shadow table is a read-only placeholder that references a table from another (or the same) model.
+     * It is used as a FK target for code-generation purposes.
+     */
+    AddShadowTable(pPayload: IAddShadowTablePayload): XIOperationResult
+    {
+        this.Initialize();
+
+        const design = this._Controller?.Design;
+        if (!design)
+            return { Success: false, Message: "No active design." };
+
+        // Prevent duplicate shadow tables that reference the same source
+        const existing = design.GetTables().find(
+            (t: XORMTable) => t.IsShadow && t.ShadowTableName === pPayload.TableName &&
+                t.ShadowDocumentName === pPayload.DocumentName
+        );
+        if (existing)
+            return { Success: true, ElementID: existing.ID };
+
+        // Create the table at the target position
+        const table = design.CreateTable({
+            X: pPayload.X,
+            Y: pPayload.Y,
+            Width: 200,
+            Height: 28,
+            Name: pPayload.TableName
+        });
+
+        table.IsShadow = true;
+        table.ShadowDocumentID = pPayload.DocumentID || XGuid.NewValue();
+        table.ShadowDocumentName = pPayload.DocumentName;
+        table.ShadowTableID = pPayload.TableID || table.ID;
+        table.ShadowTableName = pPayload.TableName;
+        table.ShadowModuleID = pPayload.ModuleID || "";
+        table.ShadowModuleName = pPayload.ModuleName || "";
+
+        // Inherit the original table's fill color so the shadow visually matches its source
+        const originalInDesign = pPayload.TableID
+            ? design.GetTables().find((t: XORMTable) => t.ID === pPayload.TableID && !t.IsShadow)
+            : null;
+        if (originalInDesign)
+        {
+            const fillStr = originalInDesign.Fill?.ToString();
+            if (fillStr)
+                table.Fill = XColor.Parse(fillStr);
+        }
+        else
+        {
+            // Look in the cached parent-model groups by the relative model file path.
+            // _ParentModelTableGroups keys use the relative file path (e.g. "FolderX21/CEPx.dsorm"),
+            // which matches pPayload.ModelName exactly. pPayload.DocumentName has the extension
+            // stripped so it cannot match — always prefer ModelName for the lookup.
+            const docName = pPayload.ModelName || pPayload.DocumentName;
+            const grp = this._ParentModelTableGroups.find(g => g.ModelName === docName);
+            const entry = grp?.Tables.find(e => e.Name === pPayload.TableName);
+            if (entry?.Fill)
+                table.Fill = XColor.Parse(entry.Fill);
+        }
+
+        // Shadow tables are locked and cannot be renamed or deleted accidentally
+        table.IsLocked = false; // allow drag/delete but not rename
+
+        // Route lines after structural change
+        design.RouteAllLines?.();
+
+        return { Success: true, ElementID: table.ID };
+    }
+
     DeleteElement(pElementID: string): XIOperationResult
     {
         return this._Controller?.RemoveElement(pElementID) || { Success: false };
@@ -827,9 +1131,18 @@ export class XTFXBridge
         // Directly set known properties instead of using SetValueByKey
         // This avoids key mismatch issues with the property registry
         if (pPropertyKey === "Name")
+        {
+            // Shadow tables cannot be renamed
+            if (element instanceof XORMTable && element.IsShadow)
+                return { Success: false, Message: "Shadow tables are read-only." };
             element.Name = pValue as string;
+        }
         else if (element instanceof XORMTable)
         {
+            // All property edits are blocked on shadow tables
+            if (element.IsShadow)
+                return { Success: false, Message: "Shadow tables are read-only." };
+
             switch (pPropertyKey)
             {
                 case "PKType":
@@ -1024,32 +1337,72 @@ export class XTFXBridge
             props.push(parentModelProp);
 
             // Trigger async parent table load on first access if design has parent models but tables not yet loaded
-            if (element.ParentModel && this._ParentModelTables.length === 0)
+            if (element.ParentModel && this._ParentModelTableGroups.length === 0)
             {
                 const selected = element.ParentModel.split("|").filter(f => f.length > 0);
                 if (selected.length > 0)
                     this.LoadParentModelTables(selected).catch(() => { /* background load */ });
             }
 
-            // Tables for lookup: current model tables + tables from parent models
-            const currentTables = this._Controller?.Design?.GetTables?.()?.map((t: XORMTable) => t.Name) ?? [];
-            const allTableOptions = [...new Set([...currentTables, ...this._ParentModelTables])].sort((a, b) => a.localeCompare(b));
-            const tableOptions = ["", ...allTableOptions];
+            // Tables for lookup: current model tables (excluding shadows) + tables from parent models
+            // Exclude parent groups that duplicate the current model name (user may have added the file to its own parent list)
+            const currentModelName = this._ContextPath ? path.basename(this._ContextPath) : (this._Controller?.Document?.Name ?? "Current Model");
+            const currentTables = this._Controller?.Design?.GetTables?.()?.filter((t: XORMTable) => !t.IsShadow).map((t: XORMTable) => t.Name) ?? [];
+            const uniqueParentGroups = this._ParentModelTableGroups.filter(g => g.ModelName !== currentModelName);
+            const parentTables = uniqueParentGroups.flatMap(g => g.Tables.map(e => e.Name));
+            const allTableOptions = ["", ...new Set([...currentTables, ...parentTables])].sort((a, b) => a.localeCompare(b));
 
-            props.push(new XPropertyItem("StateControlTable", "State Control Table", element.StateControlTable, XPropertyType.Enum, tableOptions, "Relations"));
-            props.push(new XPropertyItem("TenantControlTable", "Tenant Control Table", element.TenantControlTable, XPropertyType.Enum, tableOptions, "Relations"));
+            // Build grouped options (tree view): current model group + one group per parent model file
+            const groupedOptions: IPropertyOptionGroup[] = [];
+            if (currentTables.length > 0)
+                groupedOptions.push({ Group: currentModelName, Items: [...currentTables].sort((a, b) => a.localeCompare(b)) });
+            for (const grp of uniqueParentGroups)
+                groupedOptions.push({ Group: grp.ModelName, Items: grp.Tables.map(e => e.Name).sort((a, b) => a.localeCompare(b)) });
+
+            const sctProp = new XPropertyItem("StateControlTable", "State Control Table", element.StateControlTable, XPropertyType.Enum, allTableOptions, "Relations");
+            sctProp.GroupedOptions = groupedOptions.length > 0 ? groupedOptions : null;
+            props.push(sctProp);
+
+            const tctProp = new XPropertyItem("TenantControlTable", "Tenant Control Table", element.TenantControlTable, XPropertyType.Enum, allTableOptions, "Relations");
+            tctProp.GroupedOptions = groupedOptions.length > 0 ? groupedOptions : null;
+            props.push(tctProp);
         }
         else if (element instanceof XORMTable)
         {
-            const pkTypes = this._PKDataTypes.length > 0 ? this._PKDataTypes : ["Guid", "Int32", "Int64"];
-            props.push(new XPropertyItem("PKType", "PK Type", element.PKType, XPropertyType.Enum, pkTypes, "Data"));
-            props.push(new XPropertyItem("Description", "Description", element.Description, XPropertyType.String, undefined, "Data"));
+            if (element.IsShadow)
+            {
+                // Shadow table: show origin info, everything read-only
+                const nameProp = props.find(p => p.Key === "Name");
+                if (nameProp)
+                    nameProp.IsReadOnly = true;
 
-            const fillColor = element.Fill;
-            const colorStr = typeof fillColor.ToString === 'function'
-                ? fillColor.ToString()
-                : String(fillColor);
-            props.push(new XPropertyItem("Fill", "Fill", colorStr, XPropertyType.Color, undefined, "Appearance"));
+                const docProp = new XPropertyItem("ShadowDocumentName", "Source Model", element.ShadowDocumentName || "", XPropertyType.String, undefined, "Shadow");
+                docProp.IsReadOnly = true;
+                props.push(docProp);
+
+                const tblProp = new XPropertyItem("ShadowTableName", "Source Table", element.ShadowTableName || "", XPropertyType.String, undefined, "Shadow");
+                tblProp.IsReadOnly = true;
+                props.push(tblProp);
+
+                if (element.ShadowModuleName)
+                {
+                    const modProp = new XPropertyItem("ShadowModuleName", "Module", element.ShadowModuleName, XPropertyType.String, undefined, "Shadow");
+                    modProp.IsReadOnly = true;
+                    props.push(modProp);
+                }
+            }
+            else
+            {
+                const pkTypes = this._PKDataTypes.length > 0 ? this._PKDataTypes : ["Guid", "Int32", "Int64"];
+                props.push(new XPropertyItem("PKType", "PK Type", element.PKType, XPropertyType.Enum, pkTypes, "Data"));
+                props.push(new XPropertyItem("Description", "Description", element.Description, XPropertyType.String, undefined, "Data"));
+
+                const fillColor = element.Fill;
+                const colorStr = typeof fillColor.ToString === 'function'
+                    ? fillColor.ToString()
+                    : String(fillColor);
+                props.push(new XPropertyItem("Fill", "Fill", colorStr, XPropertyType.Color, undefined, "Appearance"));
+            }
         }
         else if (element instanceof XORMReference)
         {
@@ -1350,6 +1703,13 @@ export class XTFXBridge
                 Height: t.Bounds.Height,
                 FillProp: fillColor,
                 PKType: t.PKType,
+                IsShadow: t.IsShadow || false,
+                ShadowDocumentID: t.ShadowDocumentID || undefined,
+                ShadowDocumentName: t.ShadowDocumentName || undefined,
+                ShadowTableID: t.ShadowTableID || undefined,
+                ShadowTableName: t.ShadowTableName || undefined,
+                ShadowModuleID: t.ShadowModuleID || undefined,
+                ShadowModuleName: t.ShadowModuleName || undefined,
                 Fields: fields.map((f: any) => ({
                     ID: f.ID,
                     Name: f.Name,
@@ -1469,6 +1829,18 @@ export class XTFXBridge
                 if (tData.Description)
                     table.Description = tData.Description;
 
+                // Restore shadow metadata
+                if (tData.IsShadow)
+                {
+                    table.IsShadow = true;
+                    if (tData.ShadowDocumentID) table.ShadowDocumentID = tData.ShadowDocumentID;
+                    if (tData.ShadowDocumentName) table.ShadowDocumentName = tData.ShadowDocumentName;
+                    if (tData.ShadowTableID) table.ShadowTableID = tData.ShadowTableID;
+                    if (tData.ShadowTableName) table.ShadowTableName = tData.ShadowTableName;
+                    if (tData.ShadowModuleID) table.ShadowModuleID = tData.ShadowModuleID;
+                    if (tData.ShadowModuleName) table.ShadowModuleName = tData.ShadowModuleName;
+                }
+
                 if (tData.Fields && Array.isArray(tData.Fields))
                 {
                     const pkData = tData.Fields.find(f => f.IsPrimaryKey);
@@ -1581,6 +1953,13 @@ export class XTFXBridge
                     Y: t.Bounds.Top,
                     Width: t.Bounds.Width,
                     Height: t.Bounds.Height,
+                    IsShadow: t.IsShadow || undefined,
+                    ShadowDocumentID: t.ShadowDocumentID || undefined,
+                    ShadowDocumentName: t.ShadowDocumentName || undefined,
+                    ShadowTableID: t.ShadowTableID || undefined,
+                    ShadowTableName: t.ShadowTableName || undefined,
+                    ShadowModuleID: t.ShadowModuleID || undefined,
+                    ShadowModuleName: t.ShadowModuleName || undefined,
                     Fields: fields.map((f: any) => ({
                         ID: f.ID,
                         Name: f.Name,

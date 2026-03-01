@@ -1610,4 +1610,28 @@ describe("XORMDesign Coverage Tests", () => {
             expect(lastPoint).toBeDefined();
         });
     });
+
+    describe("ParentModel / StateControlTable / TenantControlTable properties", () => {
+
+        it("should get and set ParentModel", () => {
+            const design = new XORMDesign();
+            expect(design.ParentModel).toBe("");
+            design.ParentModel = "Auth.dsorm|Common.dsorm";
+            expect(design.ParentModel).toBe("Auth.dsorm|Common.dsorm");
+        });
+
+        it("should get and set StateControlTable", () => {
+            const design = new XORMDesign();
+            expect(design.StateControlTable).toBe("");
+            design.StateControlTable = "XState";
+            expect(design.StateControlTable).toBe("XState");
+        });
+
+        it("should get and set TenantControlTable", () => {
+            const design = new XORMDesign();
+            expect(design.TenantControlTable).toBe("");
+            design.TenantControlTable = "XTenant";
+            expect(design.TenantControlTable).toBe("XTenant");
+        });
+    });
 });

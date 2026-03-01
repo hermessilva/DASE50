@@ -4181,4 +4181,476 @@ describe('XTFXBridge', () => {
             expect(allTypes.length).toBeGreaterThan(0);
         });
     });
+
+    describe('LoadAvailableOrmFiles', () => {
+        it('should do nothing when no context path is set', async () => {
+            await bridge.LoadAvailableOrmFiles();
+            expect((bridge as any)._AvailableOrmFiles).toEqual([]);
+        });
+
+        it('should load .dsorm files from directory excluding the current file, sorted alphabetically', async () => {
+            bridge.SetContextPath('/test/dir/Current.dsorm');
+            (vscode.workspace.fs.readDirectory as jest.Mock).mockResolvedValue([
+                ['Zebra.dsorm', vscode.FileType.File],
+                ['Auth.dsorm', vscode.FileType.File],
+                ['Current.dsorm', vscode.FileType.File],
+                ['readme.txt', vscode.FileType.File],
+                ['subfolder', vscode.FileType.Directory]
+            ]);
+
+            await bridge.LoadAvailableOrmFiles();
+
+            const files = (bridge as any)._AvailableOrmFiles as string[];
+            expect(files).toEqual(['Auth.dsorm', 'Zebra.dsorm']);
+            expect(files).not.toContain('Current.dsorm');
+        });
+
+        it('should clear the list and log an error when readDirectory fails', async () => {
+            bridge.SetContextPath('/test/dir/file.dsorm');
+            (bridge as any)._AvailableOrmFiles = ['stale.dsorm'];
+            (vscode.workspace.fs.readDirectory as jest.Mock).mockRejectedValue(new Error('Permission denied'));
+
+            await bridge.LoadAvailableOrmFiles();
+
+            expect((bridge as any)._AvailableOrmFiles).toEqual([]);
+        });
+    });
+
+    describe('LoadParentModelTables', () => {
+        it('should do nothing when no context path is set', async () => {
+            await bridge.LoadParentModelTables(['Auth.dsorm']);
+            expect((bridge as any)._ParentModelTables).toEqual([]);
+        });
+
+        it('should do nothing when parent models array is empty', async () => {
+            bridge.SetContextPath('/test/dir/current.dsorm');
+            await bridge.LoadParentModelTables([]);
+            expect((bridge as any)._ParentModelTables).toEqual([]);
+        });
+
+        it('should skip empty string model name entries', async () => {
+            bridge.SetContextPath('/test/dir/current.dsorm');
+            bridge.Initialize();
+            await bridge.LoadParentModelTables(['']);
+            expect((bridge as any)._ParentModelTables).toEqual([]);
+        });
+
+        it('should load table names from a valid serialized parent model file', async () => {
+            bridge.SetContextPath('/test/dir/current.dsorm');
+
+            const bridge2 = new XTFXBridge();
+            bridge2.LoadOrmModelFromText(JSON.stringify({ Name: 'Auth', Tables: [
+                { ID: 'tbl1', Name: 'AppUser', X: 0, Y: 0, Width: 200, Height: 60 },
+                { ID: 'tbl2', Name: 'AppRole', X: 250, Y: 0, Width: 200, Height: 60 }
+            ]}));
+            const xml = bridge2.SaveOrmModelToText();
+
+            (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from(xml));
+
+            bridge.Initialize();
+            await bridge.LoadParentModelTables(['Auth.dsorm']);
+
+            const tables = (bridge as any)._ParentModelTables as string[];
+            expect(tables).toContain('AppUser');
+            expect(tables).toContain('AppRole');
+        });
+
+        it('should deduplicate table names from multiple parent model files', async () => {
+            bridge.SetContextPath('/test/dir/current.dsorm');
+
+            const b1 = new XTFXBridge();
+            b1.LoadOrmModelFromText(JSON.stringify({ Name: 'M1', Tables: [
+                { ID: 't1', Name: 'SharedTable', X: 0, Y: 0, Width: 200, Height: 60 }
+            ]}));
+
+            const b2 = new XTFXBridge();
+            b2.LoadOrmModelFromText(JSON.stringify({ Name: 'M2', Tables: [
+                { ID: 't2', Name: 'SharedTable', X: 0, Y: 0, Width: 200, Height: 60 },
+                { ID: 't3', Name: 'UniqueTable', X: 250, Y: 0, Width: 200, Height: 60 }
+            ]}));
+
+            (vscode.workspace.fs.readFile as jest.Mock)
+                .mockResolvedValueOnce(Buffer.from(b1.SaveOrmModelToText()))
+                .mockResolvedValueOnce(Buffer.from(b2.SaveOrmModelToText()));
+
+            bridge.Initialize();
+            await bridge.LoadParentModelTables(['Model1.dsorm', 'Model2.dsorm']);
+
+            const tables = (bridge as any)._ParentModelTables as string[];
+            expect(tables.filter((t: string) => t === 'SharedTable').length).toBe(1);
+            expect(tables).toContain('UniqueTable');
+        });
+
+        it('should log error and continue when a parent file cannot be read', async () => {
+            bridge.SetContextPath('/test/dir/current.dsorm');
+            bridge.Initialize();
+            (vscode.workspace.fs.readFile as jest.Mock).mockRejectedValue(new Error('File not found'));
+
+            await bridge.LoadParentModelTables(['Missing.dsorm']);
+
+            expect((bridge as any)._ParentModelTables).toEqual([]);
+        });
+    });
+
+    describe('GetProperties for XORMDesign (new properties)', () => {
+        let designId: string;
+
+        beforeEach(async () => {
+            bridge.LoadOrmModelFromText(JSON.stringify({ Name: 'TestModel', Tables: [
+                { ID: 'tbl1', Name: 'Orders', X: 0, Y: 0, Width: 200, Height: 60 }
+            ]}));
+            designId = bridge.Controller.Design.ID;
+        });
+
+        it('should return ParentModel, StateControlTable and TenantControlTable properties', () => {
+            const props = bridge.GetProperties(designId);
+
+            expect(props.some(p => p.Key === 'ParentModel')).toBe(true);
+            expect(props.some(p => p.Key === 'StateControlTable')).toBe(true);
+            expect(props.some(p => p.Key === 'TenantControlTable')).toBe(true);
+        });
+
+        it('should return ParentModel as MultiFileSelect type', () => {
+            const props = bridge.GetProperties(designId);
+            const pm = props.find(p => p.Key === 'ParentModel')!;
+
+            expect(pm.Type).toBe(XPropertyType.MultiFileSelect);
+        });
+
+        it('should include current model tables in StateControlTable options', () => {
+            const props = bridge.GetProperties(designId);
+            const sct = props.find(p => p.Key === 'StateControlTable')!;
+
+            expect(sct.Options).toBeDefined();
+            expect(sct.Options).toContain('');
+            expect(sct.Options).toContain('Orders');
+        });
+
+        it('should expose available orm files in ParentModel options when _AvailableOrmFiles is populated', () => {
+            (bridge as any)._AvailableOrmFiles = ['Auth.dsorm', 'Common.dsorm'];
+            const props = bridge.GetProperties(designId);
+            const pm = props.find(p => p.Key === 'ParentModel')!;
+
+            expect(pm.Options).toEqual(['Auth.dsorm', 'Common.dsorm']);
+        });
+
+        it('should trigger background parent table load when design has ParentModel but no cached tables', async () => {
+            const design = bridge.Controller.Design;
+            design.ParentModel = 'Auth.dsorm';
+            (bridge as any)._ParentModelTables = [];
+
+            const b2 = new XTFXBridge();
+            b2.LoadOrmModelFromText(JSON.stringify({ Name: 'Auth', Tables: [
+                { ID: 't1', Name: 'AuthUser', X: 0, Y: 0, Width: 200, Height: 60 }
+            ]}));
+            const parentXml = b2.SaveOrmModelToText();
+
+            bridge.SetContextPath('/test/dir/current.dsorm');
+            (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from(parentXml));
+
+            expect(() => bridge.GetProperties(designId)).not.toThrow();
+        });
+
+        it('should include cached parent model tables in StateControlTable and TenantControlTable options', () => {
+            (bridge as any)._ParentModelTables = ['ParentTable1', 'ParentTable2'];
+            const props = bridge.GetProperties(designId);
+            const sct = props.find(p => p.Key === 'StateControlTable')!;
+            const tct = props.find(p => p.Key === 'TenantControlTable')!;
+
+            expect(sct.Options).toContain('ParentTable1');
+            expect(sct.Options).toContain('Orders');
+            expect(tct.Options).toContain('ParentTable2');
+        });
+    });
+
+    describe('UpdateProperty for XORMDesign (new properties)', () => {
+        let designId: string;
+
+        beforeEach(() => {
+            bridge.LoadOrmModelFromText(JSON.stringify({ Name: 'TestModel' }));
+            designId = bridge.Controller.Design.ID;
+        });
+
+        it('should update ParentModel property and trigger background table reload', () => {
+            (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from('<XORMDocument />'));
+
+            const result = bridge.UpdateProperty(designId, 'ParentModel', 'Auth.dsorm');
+
+            expect(result.Success).toBe(true);
+            expect(bridge.Controller.Design.ParentModel).toBe('Auth.dsorm');
+        });
+
+        it('should update ParentModel with empty value without error', () => {
+            (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from('<XORMDocument />'));
+
+            const result = bridge.UpdateProperty(designId, 'ParentModel', '');
+
+            expect(result.Success).toBe(true);
+        });
+
+        it('should update StateControlTable property', () => {
+            const result = bridge.UpdateProperty(designId, 'StateControlTable', 'Orders');
+
+            expect(result.Success).toBe(true);
+            expect(bridge.Controller.Design.StateControlTable).toBe('Orders');
+        });
+
+        it('should update TenantControlTable property', () => {
+            const result = bridge.UpdateProperty(designId, 'TenantControlTable', 'Tenants');
+
+            expect(result.Success).toBe(true);
+            expect(bridge.Controller.Design.TenantControlTable).toBe('Tenants');
+        });
+
+        it('should return error for unknown XORMDesign property', () => {
+            const result = bridge.UpdateProperty(designId, 'UnknownDesignProp', 'value');
+
+            expect(result.Success).toBe(false);
+            expect(result.Message).toContain('Unknown property');
+        });
+    });
+
+    describe('NormalizeFieldValues and XmlEscape (private methods)', () => {
+        it('should escape & < > " characters in XmlEscape', () => {
+            const result = (bridge as any).XmlEscape('a & b < c > d "e"');
+
+            expect(result).toBe('a &amp; b &lt; c &gt; d &quot;e&quot;');
+        });
+
+        it('should leave plain text unchanged in XmlEscape', () => {
+            expect((bridge as any).XmlEscape('hello world')).toBe('hello world');
+        });
+
+        it('should leave XFieldValue as-is when it has no ID attribute', () => {
+            const input = '<XFieldValue SomeProp="value">content</XFieldValue>';
+            const result = (bridge as any).NormalizeFieldValues(input);
+
+            expect(result).toBe(input);
+        });
+
+        it('should convert self-closing XFieldValue with ID and FieldID into expanded form', () => {
+            const input = '<XFieldValue ID="elem-1" FieldID="field-1" />';
+            const result = (bridge as any).NormalizeFieldValues(input) as string;
+
+            expect(result).toContain('<XFieldValue ID="elem-1">');
+            expect(result).toContain('field-1');
+            expect(result).not.toContain('/>');
+        });
+
+        it('should convert open/close XFieldValue and include value in output', () => {
+            const input = '<XFieldValue ID="elem-2" FieldID="field-2">myValue</XFieldValue>';
+            const result = (bridge as any).NormalizeFieldValues(input) as string;
+
+            expect(result).toContain('<XFieldValue ID="elem-2">');
+            expect(result).toContain('field-2');
+            expect(result).toContain('myValue');
+        });
+
+        it('should use EmptyGuid as FieldID when FieldID attribute is absent', () => {
+            const input = '<XFieldValue ID="elem-3">content</XFieldValue>';
+            const result = (bridge as any).NormalizeFieldValues(input) as string;
+
+            expect(result).toContain('elem-3');
+            expect(result).toContain('00000000-0000-0000-0000-000000000000');
+        });
+    });
+
+    describe('GetSeedData', () => {
+        it('should return null when element ID does not exist', () => {
+            bridge.Initialize();
+
+            const result = bridge.GetSeedData('nonexistent-id');
+
+            expect(result).toBeNull();
+        });
+
+        it('should return null when element is not an XORMTable', () => {
+            bridge.LoadOrmModelFromText(JSON.stringify({ Name: 'M' }));
+            const designId = bridge.Controller.Design.ID;
+
+            const result = bridge.GetSeedData(designId);
+
+            expect(result).toBeNull();
+        });
+
+        it('should return seed payload with columns and empty rows for a table with no dataset', () => {
+            bridge.LoadOrmModelFromText(JSON.stringify({ Name: 'M', Tables: [
+                { ID: 'tbl1', Name: 'Products', X: 0, Y: 0, Width: 200, Height: 60,
+                  Fields: [
+                    { ID: 'f1', Name: 'ID', DataType: 'Int32', IsPrimaryKey: true },
+                    { ID: 'f2', Name: 'ProductName', DataType: 'String' }
+                  ]
+                }
+            ]}));
+
+            const result = bridge.GetSeedData('tbl1');
+
+            expect(result).not.toBeNull();
+            expect(result!.TableID).toBe('tbl1');
+            expect(result!.TableName).toBe('Products');
+            expect(result!.Columns.length).toBeGreaterThan(0);
+            expect(result!.Rows).toEqual([]);
+        });
+
+        it('should resolve FK options for a FK field when the referenced table has a dataset', () => {
+            bridge.LoadOrmModelFromText(JSON.stringify({ Name: 'M', Tables: [
+                { ID: 'cat-tbl', Name: 'Category', X: 0, Y: 0, Width: 200, Height: 60,
+                  Fields: [{ ID: 'cat-pk', Name: 'ID', DataType: 'Int32', IsPrimaryKey: true }]
+                },
+                { ID: 'prod-tbl', Name: 'Product', X: 300, Y: 0, Width: 200, Height: 60,
+                  Fields: [
+                    { ID: 'prod-pk', Name: 'ID', DataType: 'Int32', IsPrimaryKey: true },
+                    { ID: 'fk-field', Name: 'CategoryID', DataType: 'Int32' }
+                  ]
+                }
+            ], References: [{ ID: 'ref1', SourceFieldID: 'fk-field', TargetTableID: 'cat-tbl' }]}));
+
+            // Mark the FK field as foreign key and add a dataset to the category table
+            const design = bridge.Controller.Design;
+            const fkField = design.GetTables().find((t: any) => t.ID === 'prod-tbl')
+                ?.GetFields().find((f: any) => f.ID === 'fk-field');
+            if (fkField)
+                fkField.IsFK = true;
+
+            const catTable = design.GetTables().find((t: any) => t.ID === 'cat-tbl');
+            const ds = new tfx.XORMDataSet();
+            ds.ID = tfx.XGuid.NewValue();
+            ds.Name = 'T';
+            catTable.AppendChild(ds);
+
+            const tuple = new tfx.XORMDataTuple();
+            tuple.ID = tfx.XGuid.NewValue();
+            const fv = new tfx.XFieldValue();
+            fv.ID = tfx.XGuid.NewValue();
+            fv.FieldID = 'cat-pk';
+            fv.Value = '1';
+            tuple.AppendChild(fv);
+            ds.AppendChild(tuple);
+
+            const result = bridge.GetSeedData('prod-tbl');
+
+            expect(result).not.toBeNull();
+            const fkCol = result!.Columns.find(c => c.FieldID === 'fk-field');
+            expect(fkCol).toBeDefined();
+            expect(fkCol!.IsForeignKey).toBe(true);
+            expect(fkCol!.FKOptions).toBeDefined();
+            expect(fkCol!.FKOptions!.length).toBe(1);
+            expect(fkCol!.FKOptions![0].Value).toBe('1');
+        });
+
+        it('should set empty FKOptions when the FK target table has no dataset', () => {
+            bridge.LoadOrmModelFromText(JSON.stringify({ Name: 'M', Tables: [
+                { ID: 'cat-tbl', Name: 'Category', X: 0, Y: 0, Width: 200, Height: 60,
+                  Fields: [{ ID: 'cat-pk', Name: 'ID', DataType: 'Int32', IsPrimaryKey: true }]
+                },
+                { ID: 'prod-tbl', Name: 'Product', X: 300, Y: 0, Width: 200, Height: 60,
+                  Fields: [
+                    { ID: 'prod-pk', Name: 'ID', DataType: 'Int32', IsPrimaryKey: true },
+                    { ID: 'fk-field', Name: 'CategoryID', DataType: 'Int32' }
+                  ]
+                }
+            ], References: [{ ID: 'ref1', SourceFieldID: 'fk-field', TargetTableID: 'cat-tbl' }]}));
+
+            const fkField = bridge.Controller.Design.GetTables()
+                .find((t: any) => t.ID === 'prod-tbl')
+                ?.GetFields().find((f: any) => f.ID === 'fk-field');
+            if (fkField)
+                fkField.IsFK = true;
+
+            const result = bridge.GetSeedData('prod-tbl');
+
+            const fkCol = result!.Columns.find(c => c.FieldID === 'fk-field');
+            expect(fkCol!.FKOptions).toEqual([]);
+        });
+
+        it('should return existing rows from the table dataset', () => {
+            bridge.LoadOrmModelFromText(JSON.stringify({ Name: 'M', Tables: [
+                { ID: 'tbl1', Name: 'Items', X: 0, Y: 0, Width: 200, Height: 60,
+                  Fields: [{ ID: 'f1', Name: 'ID', DataType: 'Int32', IsPrimaryKey: true }]
+                }
+            ]}));
+
+            const table = bridge.Controller.Design.GetTables()[0];
+            const ds = new tfx.XORMDataSet();
+            ds.ID = tfx.XGuid.NewValue();
+            ds.Name = 'T';
+            table.AppendChild(ds);
+
+            const tuple = new tfx.XORMDataTuple();
+            tuple.ID = 'row-1';
+            const fv = new tfx.XFieldValue();
+            fv.ID = tfx.XGuid.NewValue();
+            fv.FieldID = 'f1';
+            fv.Value = '42';
+            tuple.AppendChild(fv);
+            ds.AppendChild(tuple);
+
+            const result = bridge.GetSeedData('tbl1');
+
+            expect(result!.Rows.length).toBe(1);
+            expect(result!.Rows[0].TupleID).toBe('row-1');
+            expect(result!.Rows[0].Values['f1']).toBe('42');
+        });
+    });
+
+    describe('SaveSeedData', () => {
+        it('should return error result when table is not found', () => {
+            bridge.Initialize();
+
+            const result = bridge.SaveSeedData('nonexistent-id', []);
+
+            expect(result.Success).toBe(false);
+            expect(result.Message).toContain('Table not found');
+        });
+
+        it('should create a new dataset and persist rows', () => {
+            bridge.LoadOrmModelFromText(JSON.stringify({ Name: 'M', Tables: [
+                { ID: 'tbl1', Name: 'Items', X: 0, Y: 0, Width: 200, Height: 60,
+                  Fields: [{ ID: 'f1', Name: 'ID', DataType: 'Int32', IsPrimaryKey: true }]
+                }
+            ]}));
+
+            const result = bridge.SaveSeedData('tbl1', [{ TupleID: 'NEW', Values: { 'f1': '10' } }]);
+
+            expect(result.Success).toBe(true);
+            const payload = bridge.GetSeedData('tbl1');
+            expect(payload!.Rows.length).toBe(1);
+            expect(payload!.Rows[0].Values['f1']).toBe('10');
+        });
+
+        it('should replace existing rows when saving new rows', () => {
+            bridge.LoadOrmModelFromText(JSON.stringify({ Name: 'M', Tables: [
+                { ID: 'tbl1', Name: 'Items', X: 0, Y: 0, Width: 200, Height: 60,
+                  Fields: [{ ID: 'f1', Name: 'ID', DataType: 'Int32', IsPrimaryKey: true }]
+                }
+            ]}));
+
+            bridge.SaveSeedData('tbl1', [
+                { TupleID: 'NEW', Values: { 'f1': '1' } },
+                { TupleID: 'NEW', Values: { 'f1': '2' } }
+            ]);
+
+            const result = bridge.SaveSeedData('tbl1', [{ TupleID: 'row-x', Values: { 'f1': '99' } }]);
+
+            expect(result.Success).toBe(true);
+            const payload = bridge.GetSeedData('tbl1');
+            expect(payload!.Rows.length).toBe(1);
+            expect(payload!.Rows[0].Values['f1']).toBe('99');
+        });
+
+        it('should clear all rows when saving an empty array', () => {
+            bridge.LoadOrmModelFromText(JSON.stringify({ Name: 'M', Tables: [
+                { ID: 'tbl1', Name: 'Items', X: 0, Y: 0, Width: 200, Height: 60,
+                  Fields: [{ ID: 'f1', Name: 'ID', DataType: 'Int32', IsPrimaryKey: true }]
+                }
+            ]}));
+
+            bridge.SaveSeedData('tbl1', [{ TupleID: 'NEW', Values: { 'f1': '1' } }]);
+
+            const clearResult = bridge.SaveSeedData('tbl1', []);
+
+            expect(clearResult.Success).toBe(true);
+            expect(bridge.GetSeedData('tbl1')!.Rows).toEqual([]);
+        });
+    });
 });

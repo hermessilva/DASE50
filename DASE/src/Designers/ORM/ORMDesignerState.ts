@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { XTFXBridge } from "../../Services/TFXBridge";
+import type { IAddShadowTablePayload } from "../../Services/TFXBridge";
 import { GetIssueService, XIssueService } from "../../Services/IssueService";
 import { GetSelectionService, XSelectionService } from "../../Services/SelectionService";
 import { GetLogService } from "../../Services/LogService";
@@ -113,6 +114,16 @@ export class XORMDesignerState
             const bytes = await vscode.workspace.fs.readFile(uri);
             const text = Buffer.from(bytes).toString("utf8");
             this._Bridge.LoadOrmModelFromText(text);
+
+            // Pre-load parent model tables so the properties panel has them on first open
+            const parentModel = this._Bridge.Controller?.Design?.ParentModel as string | undefined;
+            if (parentModel)
+            {
+                const selected = parentModel.split("|").filter((f: string) => f.length > 0);
+                if (selected.length > 0)
+                    await this._Bridge.LoadParentModelTables(selected);
+            }
+
             this._IsDirty = false;
         }
         catch (error)
@@ -192,6 +203,19 @@ export class XORMDesignerState
         if (result)
             this.IsDirty = true;
         return { Success: result };
+    }
+
+    async LoadParentModelTables(pModels: string[]): Promise<void>
+    {
+        return this._Bridge.LoadParentModelTables(pModels);
+    }
+
+    AddShadowTable(pPayload: IAddShadowTablePayload): XIOperationResult
+    {
+        const result = this._Bridge.AddShadowTable(pPayload);
+        if (result?.Success)
+            this.IsDirty = true;
+        return result || { Success: false };
     }
 
     DeleteSelected(): XIOperationResult

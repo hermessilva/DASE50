@@ -32,6 +32,62 @@ export class XORMTable extends XRectangle
         "Int32"
     );
 
+    public static readonly IsShadowProp = XProperty.Register<XORMTable, boolean>(
+        (p: XORMTable) => p.IsShadow,
+        "7E3F9A2C-D1B8-4E6F-A3C5-2D9F7B1E4A6C",
+        "IsShadow",
+        "Is Shadow Table",
+        false
+    );
+
+    public static readonly ShadowDocumentIDProp = XProperty.Register<XORMTable, string>(
+        (p: XORMTable) => p.ShadowDocumentID,
+        "B4A7D3F1-8C2E-4A9B-D6F4-3E1C8B5D2A7F",
+        "ShadowDocumentID",
+        "Shadow Document ID",
+        ""
+    );
+
+    public static readonly ShadowDocumentNameProp = XProperty.Register<XORMTable, string>(
+        (p: XORMTable) => p.ShadowDocumentName,
+        "C9E2B6A4-F3D7-4C1E-B8A3-5D2F9C7E1B4A",
+        "ShadowDocumentName",
+        "Shadow Document Name",
+        ""
+    );
+
+    public static readonly ShadowTableIDProp = XProperty.Register<XORMTable, string>(
+        (p: XORMTable) => p.ShadowTableID,
+        "D6F4C1B8-A2E9-4F3B-C7D1-8E5B4A9F6C2D",
+        "ShadowTableID",
+        "Shadow Table ID",
+        ""
+    );
+
+    public static readonly ShadowTableNameProp = XProperty.Register<XORMTable, string>(
+        (p: XORMTable) => p.ShadowTableName,
+        "E1A8F5C3-B7D4-4A2C-E9B6-4F1D8A3C7E5B",
+        "ShadowTableName",
+        "Shadow Table Name",
+        ""
+    );
+
+    public static readonly ShadowModuleIDProp = XProperty.Register<XORMTable, string>(
+        (p: XORMTable) => p.ShadowModuleID,
+        "F3D2A7E6-C8B1-4D5A-F2C9-7B4E1A6D3F8C",
+        "ShadowModuleID",
+        "Shadow Module ID",
+        ""
+    );
+
+    public static readonly ShadowModuleNameProp = XProperty.Register<XORMTable, string>(
+        (p: XORMTable) => p.ShadowModuleName,
+        "A7C5E1F4-D9B2-4B8A-E5D3-1C6F9A4E7B2D",
+        "ShadowModuleName",
+        "Shadow Module Name",
+        ""
+    );
+
     public constructor()
     {
         super();
@@ -45,6 +101,76 @@ export class XORMTable extends XRectangle
     public set PKType(pValue: string)
     {
         this.SetValue(XORMTable.PKTypeProp, pValue);
+    }
+
+    public get IsShadow(): boolean
+    {
+        return this.GetValue(XORMTable.IsShadowProp) as boolean;
+    }
+
+    public set IsShadow(pValue: boolean)
+    {
+        this.SetValue(XORMTable.IsShadowProp, pValue);
+    }
+
+    public get ShadowDocumentID(): string
+    {
+        return this.GetValue(XORMTable.ShadowDocumentIDProp) as string;
+    }
+
+    public set ShadowDocumentID(pValue: string)
+    {
+        this.SetValue(XORMTable.ShadowDocumentIDProp, pValue);
+    }
+
+    public get ShadowDocumentName(): string
+    {
+        return this.GetValue(XORMTable.ShadowDocumentNameProp) as string;
+    }
+
+    public set ShadowDocumentName(pValue: string)
+    {
+        this.SetValue(XORMTable.ShadowDocumentNameProp, pValue);
+    }
+
+    public get ShadowTableID(): string
+    {
+        return this.GetValue(XORMTable.ShadowTableIDProp) as string;
+    }
+
+    public set ShadowTableID(pValue: string)
+    {
+        this.SetValue(XORMTable.ShadowTableIDProp, pValue);
+    }
+
+    public get ShadowTableName(): string
+    {
+        return this.GetValue(XORMTable.ShadowTableNameProp) as string;
+    }
+
+    public set ShadowTableName(pValue: string)
+    {
+        this.SetValue(XORMTable.ShadowTableNameProp, pValue);
+    }
+
+    public get ShadowModuleID(): string
+    {
+        return this.GetValue(XORMTable.ShadowModuleIDProp) as string;
+    }
+
+    public set ShadowModuleID(pValue: string)
+    {
+        this.SetValue(XORMTable.ShadowModuleIDProp, pValue);
+    }
+
+    public get ShadowModuleName(): string
+    {
+        return this.GetValue(XORMTable.ShadowModuleNameProp) as string;
+    }
+
+    public set ShadowModuleName(pValue: string)
+    {
+        this.SetValue(XORMTable.ShadowModuleNameProp, pValue);
     }
 
     /**

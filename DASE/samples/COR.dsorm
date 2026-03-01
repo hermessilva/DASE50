@@ -8,9 +8,7 @@
     <XValues>
       <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">7EC1C21E-EC23-49FA-B841-915FD59D6C77</XData>
       <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">COR</XData>
-      <XData Name="ParentModel" ID="C2F5A832-7D4B-4E1F-AC3A-6B7E8D1A4F20" Type="String">Exemplo.dsorm</XData>
-      <XData Name="StateControlTable" ID="3A8B7C2D-1E4F-4D6A-89C5-2D7E1F8A3B4C" Type="String">CORxStatus</XData>
-      <XData Name="TenantControlTable" ID="F6E1D9B4-3C2A-4A7E-B8D8-1B4C7E9F2A6D" Type="String">CORxEmpresa</XData>
+      <XData Name="ParentModel" ID="C2F5A832-7D4B-4E1F-AC3A-6B7E8D1A4F20" Type="String">Exemplo.dsorm|FolderX21/CEPx.dsorm|FolderX21/ERPx.dsorm</XData>
     </XValues>
     <XORMTable ID="C819571D-25DF-4B56-B72C-482081863EC8" Name="CORxStatus">
       <XValues>
@@ -410,7 +408,7 @@
       <XValues>
         <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">3AD380CA-7C2E-4B3F-A9CF-64657217DBE4</XData>
         <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">CORxEmpresa</XData>
-        <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=467;Y=353;Width=150.97;Height=69}</XData>
+        <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=468;Y=321;Width=150.97;Height=69}</XData>
         <XData Name="Fill" ID="7152B5B8-EE22-4D84-9EA1-50AA254DA63D" Type="Color">{A=255;R=100;G=149;B=237}</XData>
         <XData Name="PKType" ID="8F3E9777-A802-4A9F-B5B5-0D5D568E0365" Type="String">Guid</XData>
       </XValues>
@@ -457,7 +455,7 @@
         <XData Name="Fill" ID="7152B5B8-EE22-4D84-9EA1-50AA254DA63D" Type="Color">{A=255;R=0;G=255;B=255}</XData>
         <XLinkData Name="Source" ID="8A8851EB-B6CA-414F-B55A-C22A6A0F3753" Type="String" ElementID="71E25BE1-68E6-4A40-829E-F20DA234B20C" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">71E25BE1-68E6-4A40-829E-F20DA234B20C</XLinkData>
         <XLinkData Name="Target" ID="6461BED3-F1A0-4910-985D-9F0B0058D8BF" Type="String" ElementID="223507E8-705D-4F07-B8F0-994458869CF6" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">223507E8-705D-4F07-B8F0-994458869CF6</XLinkData>
-        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=467;Y=393}|{X=447;Y=393}|{X=447;Y=111}|{X=613;Y=111}</XData>
+        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=618.97;Y=361}|{X=711.55;Y=361}|{X=711.55;Y=155}</XData>
       </XValues>
     </XORMReference>
     <XORMReference ID="4F443AC8-9532-46C1-9887-C496C4CB7DCC">
@@ -466,7 +464,7 @@
         <XData Name="Fill" ID="7152B5B8-EE22-4D84-9EA1-50AA254DA63D" Type="Color">{A=255;R=0;G=255;B=255}</XData>
         <XLinkData Name="Source" ID="8A8851EB-B6CA-414F-B55A-C22A6A0F3753" Type="String" ElementID="F7D52B81-FF72-47C4-BD3C-1F83D5FB8653" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">F7D52B81-FF72-47C4-BD3C-1F83D5FB8653</XLinkData>
         <XLinkData Name="Target" ID="6461BED3-F1A0-4910-985D-9F0B0058D8BF" Type="String" ElementID="739A89F1-C544-40B7-B384-D41F8387324C" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">739A89F1-C544-40B7-B384-D41F8387324C</XLinkData>
-        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=467;Y=409}|{X=345.1816666666665;Y=409}|{X=345.1816666666665;Y=291}|{X=223.363333333333;Y=291}</XData>
+        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=468;Y=377}|{X=345.6816666666665;Y=377}|{X=345.6816666666665;Y=291}|{X=223.363333333333;Y=291}</XData>
       </XValues>
     </XORMReference>
     <XORMTable ID="8BCAB131-3AB6-4F1D-BE92-661BCB040145" Name="CORxEmpresaGrupo">
@@ -539,7 +537,7 @@
         <XData Name="Fill" ID="7152B5B8-EE22-4D84-9EA1-50AA254DA63D" Type="Color">{A=255;R=100;G=149;B=237}</XData>
         <XLinkData Name="Source" ID="8A8851EB-B6CA-414F-B55A-C22A6A0F3753" Type="String" ElementID="810BEC6C-FED3-4F2B-BFFC-A081E133496C" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">810BEC6C-FED3-4F2B-BFFC-A081E133496C</XLinkData>
         <XLinkData Name="Target" ID="6461BED3-F1A0-4910-985D-9F0B0058D8BF" Type="String" ElementID="3AD380CA-7C2E-4B3F-A9CF-64657217DBE4" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">3AD380CA-7C2E-4B3F-A9CF-64657217DBE4</XLinkData>
-        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=370.22666666666703;Y=542}|{X=418.6133333333335;Y=542}|{X=418.6133333333335;Y=405}|{X=467;Y=405}</XData>
+        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=370.22666666666703;Y=542}|{X=419.1133333333335;Y=542}|{X=419.1133333333335;Y=373}|{X=468;Y=373}</XData>
       </XValues>
     </XORMReference>
     <XORMTable ID="C4507496-5321-477F-BDCA-5ADDE2A370A0" Name="CORxUsuario">
@@ -621,7 +619,7 @@
         <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">3D11CC22-30A3-4B72-93C6-6F8733789E1F</XData>
         <XLinkData Name="Source" ID="8A8851EB-B6CA-414F-B55A-C22A6A0F3753" Type="String" ElementID="ABF4AD21-C403-484B-B98C-F390E3441B13" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">ABF4AD21-C403-484B-B98C-F390E3441B13</XLinkData>
         <XLinkData Name="Target" ID="6461BED3-F1A0-4910-985D-9F0B0058D8BF" Type="String" ElementID="C819571D-25DF-4B56-B72C-482081863EC8" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">C819571D-25DF-4B56-B72C-482081863EC8</XLinkData>
-        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=467;Y=425}|{X=355.97333333333347;Y=425}|{X=355.97333333333347;Y=109}|{X=244.946666666667;Y=109}</XData>
+        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=468;Y=393}|{X=356.47333333333347;Y=393}|{X=356.47333333333347;Y=109}|{X=244.946666666667;Y=109}</XData>
       </XValues>
     </XORMStateReference>
     <XORMStateReference ID="0F3626E1-A65A-4611-BDB2-E747CA5A9893">
@@ -636,7 +634,7 @@
       <XValues>
         <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">F1E72850-DF8D-49A8-8647-A413FE98936F</XData>
         <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">CORxRecurso</XData>
-        <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=583;Y=578;Width=163.453333333333;Height=90}</XData>
+        <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=799;Y=687;Width=163.453333333333;Height=90}</XData>
         <XData Name="Fill" ID="7152B5B8-EE22-4D84-9EA1-50AA254DA63D" Type="Color">{A=255;R=255;G=140;B=0}</XData>
         <XData Name="PKType" ID="8F3E9777-A802-4A9F-B5B5-0D5D568E0365" Type="String">Guid</XData>
       </XValues>
@@ -755,27 +753,16 @@
         <XValues>
           <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">3734AC50-9385-4093-BD44-ECB593B85943</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">CORxRecursoTemplateID</XData>
-          <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">3</XData>
           <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Guid</XData>
           <XData Name="IsAutoIncrement" ID="00000001-0002-0003-0001-000000000006" Type="Boolean">true</XData>
         </XValues>
       </XORMPKField>
-      <XORMFKField ID="89EA3964-27DC-42E5-A8EB-A65A19884EEB" Name="CORxRecursoID">
-        <XValues>
-          <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">89EA3964-27DC-42E5-A8EB-A65A19884EEB</XData>
-          <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">CORxRecursoID</XData>
-          <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=3;Y=24;Width=168.71;Height=21}</XData>
-          <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">4</XData>
-          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Guid</XData>
-          <XData Name="IsFK" ID="7CBD471F-E1F2-4A36-B0FC-A962000DF07F" Type="Boolean">true</XData>
-        </XValues>
-      </XORMFKField>
       <XORMField ID="0E2891D9-2BFA-4610-8BC5-B4DC05C2772F" Name="Template">
         <XValues>
           <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">0E2891D9-2BFA-4610-8BC5-B4DC05C2772F</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">Template</XData>
           <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=3;Y=45;Width=168.71;Height=21}</XData>
-          <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">5</XData>
+          <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">1</XData>
           <XData Name="Length" ID="D1AEAA0E-9FC0-478D-9464-DF991F5CE009" Type="Double">50</XData>
         </XValues>
       </XORMField>
@@ -783,10 +770,20 @@
         <XValues>
           <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">801287BC-3EA8-469E-BA8B-F9E7714F3DAD</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">CORxStatusID</XData>
-          <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">6</XData>
+          <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">2</XData>
           <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int16</XData>
         </XValues>
       </XORMStateField>
+      <XORMFKField ID="89EA3964-27DC-42E5-A8EB-A65A19884EEB" Name="CORxRecursoID">
+        <XValues>
+          <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">89EA3964-27DC-42E5-A8EB-A65A19884EEB</XData>
+          <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">CORxRecursoID</XData>
+          <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=3;Y=24;Width=168.71;Height=21}</XData>
+          <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">3</XData>
+          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Guid</XData>
+          <XData Name="IsFK" ID="7CBD471F-E1F2-4A36-B0FC-A962000DF07F" Type="Boolean">true</XData>
+        </XValues>
+      </XORMFKField>
       <XORMDataSet ID="F559DB1B-A96E-4236-8EEE-80F357D06CDC" Name="T">
         <XValues>
           <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">F559DB1B-A96E-4236-8EEE-80F357D06CDC</XData>
@@ -819,14 +816,14 @@
         <XData Name="Fill" ID="7152B5B8-EE22-4D84-9EA1-50AA254DA63D" Type="Color">{A=255;R=255;G=140;B=0}</XData>
         <XLinkData Name="Source" ID="8A8851EB-B6CA-414F-B55A-C22A6A0F3753" Type="String" ElementID="89EA3964-27DC-42E5-A8EB-A65A19884EEB" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">89EA3964-27DC-42E5-A8EB-A65A19884EEB</XLinkData>
         <XLinkData Name="Target" ID="6461BED3-F1A0-4910-985D-9F0B0058D8BF" Type="String" ElementID="F1E72850-DF8D-49A8-8647-A413FE98936F" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">F1E72850-DF8D-49A8-8647-A413FE98936F</XLinkData>
-        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=851;Y=577}|{X=798.7266666666665;Y=577}|{X=798.7266666666665;Y=638}|{X=746.453333333333;Y=638}</XData>
+        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=851;Y=609}|{X=779;Y=609}|{X=779;Y=747}|{X=799;Y=747}</XData>
       </XValues>
     </XORMReference>
     <XORMTable ID="229CC598-25B4-481A-AD01-839AC481F39C" Name="CORxRecursoDireito">
       <XValues>
         <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">229CC598-25B4-481A-AD01-839AC481F39C</XData>
         <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">CORxRecursoDireito</XData>
-        <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=305;Y=741;Width=164.343333333333;Height=69}</XData>
+        <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=309;Y=719;Width=164.343333333333;Height=69}</XData>
         <XData Name="Fill" ID="7152B5B8-EE22-4D84-9EA1-50AA254DA63D" Type="Color">{A=255;R=255;G=140;B=0}</XData>
         <XData Name="PKType" ID="8F3E9777-A802-4A9F-B5B5-0D5D568E0365" Type="String">Guid</XData>
       </XValues>
@@ -932,7 +929,7 @@
         <XData Name="Fill" ID="7152B5B8-EE22-4D84-9EA1-50AA254DA63D" Type="Color">{A=255;R=255;G=140;B=0}</XData>
         <XLinkData Name="Source" ID="8A8851EB-B6CA-414F-B55A-C22A6A0F3753" Type="String" ElementID="93BC2CE8-2162-4E77-8997-57D1E84C2888" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">93BC2CE8-2162-4E77-8997-57D1E84C2888</XLinkData>
         <XLinkData Name="Target" ID="6461BED3-F1A0-4910-985D-9F0B0058D8BF" Type="String" ElementID="F1E72850-DF8D-49A8-8647-A413FE98936F" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">F1E72850-DF8D-49A8-8647-A413FE98936F</XLinkData>
-        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=469.343333333333;Y=797}|{X=526.1716666666665;Y=797}|{X=526.1716666666665;Y=638}|{X=583;Y=638}</XData>
+        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=473.343333333333;Y=775}|{X=636.1716666666665;Y=775}|{X=636.1716666666665;Y=747}|{X=799;Y=747}</XData>
       </XValues>
     </XORMReference>
     <XORMReference ID="2BBF2707-C62C-4B4A-80B9-A3FE91C2D5B3">
@@ -941,14 +938,14 @@
         <XData Name="Fill" ID="7152B5B8-EE22-4D84-9EA1-50AA254DA63D" Type="Color">{A=255;R=165;G=42;B=42}</XData>
         <XLinkData Name="Source" ID="8A8851EB-B6CA-414F-B55A-C22A6A0F3753" Type="String" ElementID="5A1A2485-40DA-4CC0-971B-5BC410380265" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">5A1A2485-40DA-4CC0-971B-5BC410380265</XLinkData>
         <XLinkData Name="Target" ID="6461BED3-F1A0-4910-985D-9F0B0058D8BF" Type="String" ElementID="5F2F0D8B-73E3-4DE8-BA01-9E20DD2F1C43" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">5F2F0D8B-73E3-4DE8-BA01-9E20DD2F1C43</XLinkData>
-        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=305;Y=813}|{X=233.35166666666652;Y=813}|{X=233.35166666666652;Y=715}|{X=161.703333333333;Y=715}</XData>
+        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=309;Y=791}|{X=235.35166666666652;Y=791}|{X=235.35166666666652;Y=715}|{X=161.703333333333;Y=715}</XData>
       </XValues>
     </XORMReference>
     <XORMTable ID="AAF08027-8502-45B4-902D-C5833E2026F2" Name="CORxUsuarioRecursoTemplate">
       <XValues>
         <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">AAF08027-8502-45B4-902D-C5833E2026F2</XData>
         <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">CORxUsuarioRecursoTemplate</XData>
-        <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=845;Y=364;Width=217.053333333333;Height=69}</XData>
+        <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=845;Y=364;Width=217.053333333333;Height=104}</XData>
         <XData Name="Fill" ID="7152B5B8-EE22-4D84-9EA1-50AA254DA63D" Type="Color">{A=255;R=127;G=255;B=0}</XData>
         <XData Name="PKType" ID="8F3E9777-A802-4A9F-B5B5-0D5D568E0365" Type="String">Guid</XData>
       </XValues>
@@ -956,7 +953,6 @@
         <XValues>
           <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">E828C371-64F6-4D04-89B4-1617D7EF78E8</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">CORxUsuarioRecursoTemplateID</XData>
-          <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">3</XData>
           <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Guid</XData>
           <XData Name="IsAutoIncrement" ID="00000001-0002-0003-0001-000000000006" Type="Boolean">true</XData>
         </XValues>
@@ -966,7 +962,7 @@
           <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">BAFD2290-B73E-4792-B244-1183E6EDE2E0</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">CORxUsuarioID</XData>
           <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=3;Y=24;Width=209.053333333333;Height=21}</XData>
-          <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">4</XData>
+          <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">1</XData>
           <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Guid</XData>
           <XData Name="IsFK" ID="7CBD471F-E1F2-4A36-B0FC-A962000DF07F" Type="Boolean">true</XData>
         </XValues>
@@ -976,11 +972,19 @@
           <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">096D2640-17A2-435F-A520-24EB8879A6AD</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">CORxRecursoTemplateID</XData>
           <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=3;Y=45;Width=209.053333333333;Height=21}</XData>
-          <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">5</XData>
+          <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">2</XData>
           <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Guid</XData>
           <XData Name="IsFK" ID="7CBD471F-E1F2-4A36-B0FC-A962000DF07F" Type="Boolean">true</XData>
         </XValues>
       </XORMFKField>
+      <XORMField ID="f84f8233-706d-4d5d-9f59-3366e0831509" Name="NewTableID">
+        <XValues>
+          <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">f84f8233-706d-4d5d-9f59-3366e0831509</XData>
+          <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">NewTableID</XData>
+          <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">3</XData>
+          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
+        </XValues>
+      </XORMField>
     </XORMTable>
     <XORMReference ID="D3EBA1E1-5D7E-4EF4-A84A-2EC9053EB6C6">
       <XValues>
@@ -1004,7 +1008,7 @@
       <XValues>
         <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">47B6568E-DB10-46E9-A280-E95FAEA46A10</XData>
         <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">CORxRecursoTemplateDireito</XData>
-        <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=733;Y=720;Width=212.483333333333;Height=69}</XData>
+        <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=493;Y=538;Width=212.483333333333;Height=69}</XData>
         <XData Name="Fill" ID="7152B5B8-EE22-4D84-9EA1-50AA254DA63D" Type="Color">{A=255;R=127;G=255;B=0}</XData>
         <XData Name="PKType" ID="8F3E9777-A802-4A9F-B5B5-0D5D568E0365" Type="String">Guid</XData>
       </XValues>
@@ -1110,7 +1114,7 @@
         <XData Name="Fill" ID="7152B5B8-EE22-4D84-9EA1-50AA254DA63D" Type="Color">{A=255;R=127;G=255;B=0}</XData>
         <XLinkData Name="Source" ID="8A8851EB-B6CA-414F-B55A-C22A6A0F3753" Type="String" ElementID="7BC76B2D-6EE0-4CE8-AB11-250EAB827782" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">7BC76B2D-6EE0-4CE8-AB11-250EAB827782</XLinkData>
         <XLinkData Name="Target" ID="6461BED3-F1A0-4910-985D-9F0B0058D8BF" Type="String" ElementID="49A3C800-A644-4F33-8F12-629E77B0611F" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">49A3C800-A644-4F33-8F12-629E77B0611F</XLinkData>
-        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=945.483333333333;Y=776}|{X=1047.71;Y=776}|{X=1047.71;Y=573}|{X=1027.71;Y=573}</XData>
+        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=705.483333333333;Y=594}|{X=778.2416666666666;Y=594}|{X=778.2416666666666;Y=573}|{X=851;Y=573}</XData>
       </XValues>
     </XORMReference>
     <XORMReference ID="413AF556-566D-4C86-8686-58231BC10E05">
@@ -1119,14 +1123,14 @@
         <XData Name="Fill" ID="7152B5B8-EE22-4D84-9EA1-50AA254DA63D" Type="Color">{A=255;R=255;G=140;B=0}</XData>
         <XLinkData Name="Source" ID="8A8851EB-B6CA-414F-B55A-C22A6A0F3753" Type="String" ElementID="1616CAED-E113-4A43-950D-F609CFF21AF2" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">1616CAED-E113-4A43-950D-F609CFF21AF2</XLinkData>
         <XLinkData Name="Target" ID="6461BED3-F1A0-4910-985D-9F0B0058D8BF" Type="String" ElementID="229CC598-25B4-481A-AD01-839AC481F39C" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">229CC598-25B4-481A-AD01-839AC481F39C</XLinkData>
-        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=733;Y=792}|{X=601.1716666666665;Y=792}|{X=601.1716666666665;Y=785}|{X=469.343333333333;Y=785}</XData>
+        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=493;Y=610}|{X=391.1716666666665;Y=610}|{X=391.1716666666665;Y=719}</XData>
       </XValues>
     </XORMReference>
     <XORMTable ID="6488A695-15B4-456F-87A6-D6F581C56748" Name="CORxRecursoTipo">
       <XValues>
         <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">6488A695-15B4-456F-87A6-D6F581C56748</XData>
         <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">CORxRecursoTipo</XData>
-        <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=544;Y=457;Width=151.846666666667;Height=48}</XData>
+        <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=565;Y=862;Width=151.846666666667;Height=48}</XData>
         <XData Name="Fill" ID="7152B5B8-EE22-4D84-9EA1-50AA254DA63D" Type="Color">{A=255;R=255;G=140;B=0}</XData>
         <XData Name="PKType" ID="8F3E9777-A802-4A9F-B5B5-0D5D568E0365" Type="String">Int16</XData>
       </XValues>
@@ -1218,14 +1222,14 @@
         <XData Name="Fill" ID="7152B5B8-EE22-4D84-9EA1-50AA254DA63D" Type="Color">{A=255;R=255;G=140;B=0}</XData>
         <XLinkData Name="Source" ID="8A8851EB-B6CA-414F-B55A-C22A6A0F3753" Type="String" ElementID="61305C42-2646-46D5-9DEF-5AD382F819A1" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">61305C42-2646-46D5-9DEF-5AD382F819A1</XLinkData>
         <XLinkData Name="Target" ID="6461BED3-F1A0-4910-985D-9F0B0058D8BF" Type="String" ElementID="6488A695-15B4-456F-87A6-D6F581C56748" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">6488A695-15B4-456F-87A6-D6F581C56748</XLinkData>
-        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=583;Y=666}|{X=524;Y=666}|{X=524;Y=493}|{X=544;Y=493}</XData>
+        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=799;Y=775}|{X=757.9233333333335;Y=775}|{X=757.9233333333335;Y=898}|{X=716.846666666667;Y=898}</XData>
       </XValues>
     </XORMReference>
     <XORMTable ID="C2674FB1-F96E-4912-BF3B-9888681DC7C8" Name="CORxMenu">
       <XValues>
         <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">C2674FB1-F96E-4912-BF3B-9888681DC7C8</XData>
         <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">CORxMenu</XData>
-        <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=1122;Y=444;Width=117.47;Height=69}</XData>
+        <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=1177;Y=532;Width=117.47;Height=69}</XData>
         <XData Name="Fill" ID="7152B5B8-EE22-4D84-9EA1-50AA254DA63D" Type="Color">{A=255;R=127;G=255;B=212}</XData>
         <XData Name="PKType" ID="8F3E9777-A802-4A9F-B5B5-0D5D568E0365" Type="String">Guid</XData>
       </XValues>
@@ -1301,27 +1305,16 @@
         <XValues>
           <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">56B9426E-A185-4705-9FAB-FF2FFB11FFE0</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">CORxMenuItemID</XData>
-          <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">3</XData>
           <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Guid</XData>
           <XData Name="IsAutoIncrement" ID="00000001-0002-0003-0001-000000000006" Type="Boolean">true</XData>
         </XValues>
       </XORMPKField>
-      <XORMFKField ID="BAA2CA39-56F6-46F6-80DD-4404D49C3F6C" Name="CORxMenuID">
-        <XValues>
-          <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">BAA2CA39-56F6-46F6-80DD-4404D49C3F6C</XData>
-          <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">CORxMenuID</XData>
-          <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=3;Y=24;Width=133.343333333333;Height=21}</XData>
-          <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">4</XData>
-          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Guid</XData>
-          <XData Name="IsFK" ID="7CBD471F-E1F2-4A36-B0FC-A962000DF07F" Type="Boolean">true</XData>
-        </XValues>
-      </XORMFKField>
       <XORMField ID="C99FD248-FA61-495E-976A-43F12FD392C3" Name="Item">
         <XValues>
           <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">C99FD248-FA61-495E-976A-43F12FD392C3</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">Item</XData>
           <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=3;Y=45;Width=133.343333333333;Height=21}</XData>
-          <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">5</XData>
+          <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">1</XData>
           <XData Name="Length" ID="D1AEAA0E-9FC0-478D-9464-DF991F5CE009" Type="Double">50</XData>
         </XValues>
       </XORMField>
@@ -1330,7 +1323,17 @@
           <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">78CE036D-F0BD-4003-A1AF-F94EEB080E43</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">CORxRecursoID</XData>
           <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=3;Y=66;Width=133.343333333333;Height=21}</XData>
-          <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">6</XData>
+          <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">2</XData>
+          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Guid</XData>
+          <XData Name="IsFK" ID="7CBD471F-E1F2-4A36-B0FC-A962000DF07F" Type="Boolean">true</XData>
+        </XValues>
+      </XORMFKField>
+      <XORMFKField ID="BAA2CA39-56F6-46F6-80DD-4404D49C3F6C" Name="CORxMenuID">
+        <XValues>
+          <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">BAA2CA39-56F6-46F6-80DD-4404D49C3F6C</XData>
+          <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">CORxMenuID</XData>
+          <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=3;Y=24;Width=133.343333333333;Height=21}</XData>
+          <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">3</XData>
           <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Guid</XData>
           <XData Name="IsFK" ID="7CBD471F-E1F2-4A36-B0FC-A962000DF07F" Type="Boolean">true</XData>
         </XValues>
@@ -1367,7 +1370,7 @@
         <XData Name="Fill" ID="7152B5B8-EE22-4D84-9EA1-50AA254DA63D" Type="Color">{A=255;R=127;G=255;B=212}</XData>
         <XLinkData Name="Source" ID="8A8851EB-B6CA-414F-B55A-C22A6A0F3753" Type="String" ElementID="BAA2CA39-56F6-46F6-80DD-4404D49C3F6C" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">BAA2CA39-56F6-46F6-80DD-4404D49C3F6C</XLinkData>
         <XLinkData Name="Target" ID="6461BED3-F1A0-4910-985D-9F0B0058D8BF" Type="String" ElementID="C2674FB1-F96E-4912-BF3B-9888681DC7C8" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">C2674FB1-F96E-4912-BF3B-9888681DC7C8</XLinkData>
-        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=1300;Y=392}|{X=1269.7350000000001;Y=392}|{X=1269.7350000000001;Y=488}|{X=1239.47;Y=488}</XData>
+        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=1300;Y=424}|{X=1235.735;Y=424}|{X=1235.735;Y=532}</XData>
       </XValues>
     </XORMReference>
     <XORMTable ID="0D579645-F432-422F-AD06-AAB962958513" Name="CORxFavorito">
@@ -1441,7 +1444,7 @@
         <XData Name="Fill" ID="7152B5B8-EE22-4D84-9EA1-50AA254DA63D" Type="Color">{A=255;R=255;G=140;B=0}</XData>
         <XLinkData Name="Source" ID="8A8851EB-B6CA-414F-B55A-C22A6A0F3753" Type="String" ElementID="78CE036D-F0BD-4003-A1AF-F94EEB080E43" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">78CE036D-F0BD-4003-A1AF-F94EEB080E43</XLinkData>
         <XLinkData Name="Target" ID="6461BED3-F1A0-4910-985D-9F0B0058D8BF" Type="String" ElementID="F1E72850-DF8D-49A8-8647-A413FE98936F" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">F1E72850-DF8D-49A8-8647-A413FE98936F</XLinkData>
-        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=1441.343333333333;Y=424}|{X=1461.343333333333;Y=424}|{X=1461.343333333333;Y=638}|{X=746.453333333333;Y=638}</XData>
+        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=1300;Y=408}|{X=1131.2266666666665;Y=408}|{X=1131.2266666666665;Y=747}|{X=962.453333333333;Y=747}</XData>
       </XValues>
     </XORMReference>
     <XORMStateReference ID="91D14E10-3000-453F-A60E-C98EA012F459">
@@ -1449,7 +1452,7 @@
         <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">91D14E10-3000-453F-A60E-C98EA012F459</XData>
         <XLinkData Name="Source" ID="8A8851EB-B6CA-414F-B55A-C22A6A0F3753" Type="String" ElementID="681C35DA-4142-44AE-997A-23576D233A31" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">681C35DA-4142-44AE-997A-23576D233A31</XLinkData>
         <XLinkData Name="Target" ID="6461BED3-F1A0-4910-985D-9F0B0058D8BF" Type="String" ElementID="C819571D-25DF-4B56-B72C-482081863EC8" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">C819571D-25DF-4B56-B72C-482081863EC8</XLinkData>
-        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=583;Y=682}|{X=413.97333333333347;Y=682}|{X=413.97333333333347;Y=109}|{X=244.946666666667;Y=109}</XData>
+        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=799;Y=791}|{X=521.9733333333336;Y=791}|{X=521.9733333333336;Y=108.99999999999989}|{X=244.946666666667;Y=109}</XData>
       </XValues>
     </XORMStateReference>
     <XORMStateReference ID="DF3AB750-0B41-4D22-8CE6-266520EA9D8A">
@@ -1457,8 +1460,21 @@
         <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">DF3AB750-0B41-4D22-8CE6-266520EA9D8A</XData>
         <XLinkData Name="Source" ID="8A8851EB-B6CA-414F-B55A-C22A6A0F3753" Type="String" ElementID="801287BC-3EA8-469E-BA8B-F9E7714F3DAD" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">801287BC-3EA8-469E-BA8B-F9E7714F3DAD</XLinkData>
         <XLinkData Name="Target" ID="6461BED3-F1A0-4910-985D-9F0B0058D8BF" Type="String" ElementID="C819571D-25DF-4B56-B72C-482081863EC8" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">C819571D-25DF-4B56-B72C-482081863EC8</XLinkData>
-        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=851;Y=609}|{X=547.9733333333336;Y=609}|{X=547.9733333333336;Y=108.99999999999994}|{X=244.946666666667;Y=109}</XData>
+        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=851;Y=593}|{X=547.9733333333336;Y=593}|{X=547.9733333333336;Y=109.00000000000006}|{X=244.946666666667;Y=109}</XData>
       </XValues>
     </XORMStateReference>
+    <XORMTable ID="033fc58d-d413-41fa-8a50-80cecae3ea86" Name="CORxUsuario">
+      <XValues>
+        <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">033fc58d-d413-41fa-8a50-80cecae3ea86</XData>
+        <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">CORxUsuario</XData>
+        <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=974;Y=34;Width=200;Height=28}</XData>
+        <XData Name="Fill" ID="7152B5B8-EE22-4D84-9EA1-50AA254DA63D" Type="Color">{A=255;R=127;G=255;B=0}</XData>
+        <XData Name="IsShadow" ID="7E3F9A2C-D1B8-4E6F-A3C5-2D9F7B1E4A6C" Type="Boolean">true</XData>
+        <XData Name="ShadowDocumentID" ID="B4A7D3F1-8C2E-4A9B-D6F4-3E1C8B5D2A7F" Type="String">0bf1df34-c9ca-4691-9448-469ff149f48c</XData>
+        <XData Name="ShadowDocumentName" ID="C9E2B6A4-F3D7-4C1E-B8A3-5D2F9C7E1B4A" Type="String">ORM Model</XData>
+        <XData Name="ShadowTableID" ID="D6F4C1B8-A2E9-4F3B-C7D1-8E5B4A9F6C2D" Type="String">C4507496-5321-477F-BDCA-5ADDE2A370A0</XData>
+        <XData Name="ShadowTableName" ID="E1A8F5C3-B7D4-4A2C-E9B6-4F1D8A3C7E5B" Type="String">CORxUsuario</XData>
+      </XValues>
+    </XORMTable>
   </XORMDesign>
 </XORMDocument>

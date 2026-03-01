@@ -29,7 +29,11 @@
         RequestSeedData: "RequestSeedData",
         SeedDataLoaded: "SeedDataLoaded",
         SaveSeedData: "SaveSeedData",
-        SeedDataSaved: "SeedDataSaved"
+        SeedDataSaved: "SeedDataSaved",
+        // Shadow table picker
+        RequestShadowTablePicker: "RequestShadowTablePicker",
+        ShadowTablePickerData: "ShadowTablePickerData",
+        AddShadowTable: "AddShadowTable"
     };
 
     let _Model = { DesignID: null, Tables: [], References: [] };
@@ -46,6 +50,7 @@
     let _SeedEditor = null; // { TableID, Columns, Rows, OriginalRows, SelectedRows: Set<number> }
     let _SeedNextNewId = 0;
     let _GuidSeq = 0;
+    let _ShadowPickerData = null;
 
     // Data type icons mapping - returns SVG path or emoji
     const DataTypeIcons = {
@@ -156,6 +161,10 @@
             case XMessageType.SeedDataSaved:
                 OnSeedDataSaved(pMsg.Payload);
                 break;
+
+            case XMessageType.ShadowTablePickerData:
+                OpenShadowPickerModal(pMsg.Payload);
+                break;
         }
     }
 
@@ -173,6 +182,9 @@
             {
                 case "add-table":
                     SendMessage(XMessageType.AddTable, { X: _ContextMenuPosition.X, Y: _ContextMenuPosition.Y });
+                    break;
+                case "add-shadow-table":
+                    SendMessage(XMessageType.RequestShadowTablePicker, { X: _ContextMenuPosition.X, Y: _ContextMenuPosition.Y });
                     break;
                 case "delete-selected":
                     SendMessage(XMessageType.DeleteSelected, {});
@@ -329,6 +341,20 @@
         _ContextMenu.classList.remove("visible");
         _TableContextMenu.style.left = pX + "px";
         _TableContextMenu.style.top = pY + "px";
+
+        const table = _Model.Tables.find(function(t) { return t.ID === pTableID; });
+        const isShadow = table && table.IsShadow;
+        const shadowRestricted = ["add-field", "edit-seed-data", "rename-table"];
+        const items = _TableContextMenu.querySelectorAll(".context-menu-item");
+        for (const item of items)
+        {
+            const action = item.getAttribute("data-action");
+            item.style.display = (isShadow && shadowRestricted.indexOf(action) >= 0) ? "none" : "";
+        }
+        const seps = _TableContextMenu.querySelectorAll(".context-menu-separator");
+        for (const sep of seps)
+            sep.style.display = isShadow ? "none" : "";
+
         _TableContextMenu.classList.add("visible");
     }
 
@@ -386,8 +412,9 @@
 
     function CreateTableElement(pTable)
     {
+        const isShadow = !!pTable.IsShadow;
         const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
-        g.setAttribute("class", "orm-table");
+        g.setAttribute("class", "orm-table" + (isShadow ? " shadow-table" : ""));
         g.setAttribute("data-id", pTable.ID);
         g.setAttribute("transform", "translate(" + pTable.X + "," + pTable.Y + ")");
 
@@ -395,11 +422,9 @@
         const headerHeight = 28;
         const fieldHeight = 16;
         
-        // Calculate height based on number of fields
-        // Empty table = only header height (just the title bar)
-        // Table with fields = header + (fieldCount * fieldHeight) + padding
+        // Shadow tables render header only — no body or fields
         // ALWAYS calculate - never use pTable.Height to ensure consistency
-        const fieldCount = (pTable.Fields && pTable.Fields.length) || 0;
+        const fieldCount = isShadow ? 0 : ((pTable.Fields && pTable.Fields.length) || 0);
         const bodyHeight = fieldCount > 0 ? fieldCount * fieldHeight + 12 : 0;
         const height = headerHeight + bodyHeight;
 
@@ -451,7 +476,7 @@
         title.textContent = pTable.Name || "Unnamed";
         g.appendChild(title);
 
-        // Apply FillProp to header if defined — must run after icon and title are created
+        // Apply FillProp to header if defined (shadow tables inherit the original's colour)
         if (pTable.FillProp)
         {
             const cssColor = ArgbToCssColor(pTable.FillProp);
@@ -463,6 +488,39 @@
             const iconColor = luminance > 0.35 ? "rgba(0,0,0,0.75)" : "rgba(255,255,255,0.8)";
             title.style.fill = textColor;
             icon.style.fill = iconColor;
+        }
+
+        // Shadow table: ghost styling + source document badge
+        if (isShadow)
+        {
+            // Only apply grey header when no colour was inherited from the original
+            if (!pTable.FillProp)
+            {
+                header.style.fill = "#555";
+                headerMask.style.fill = "#555";
+                title.style.fill = "#bbb";
+                icon.style.fill = "rgba(180,180,180,0.7)";
+            }
+            title.style.fontStyle = "italic";
+            rect.style.strokeDasharray = "6 3";
+            rect.style.stroke = "#666";
+            rect.style.fill = "rgba(60,60,60,0.4)";
+            if (pTable.ShadowDocumentName)
+            {
+                const badge = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                badge.setAttribute("class", "orm-shadow-badge");
+                badge.setAttribute("x", width - 5);
+                badge.setAttribute("y", 11);
+                badge.setAttribute("text-anchor", "end");
+                badge.textContent = "\u2197 " + pTable.ShadowDocumentName;
+                // Adapt badge colour to match the header contrast
+                if (pTable.FillProp)
+                {
+                    const luminance = GetLuminance(pTable.FillProp);
+                    badge.style.fill = luminance > 0.35 ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.7)";
+                }
+                g.appendChild(badge);
+            }
         }
 
         if (pTable.Fields && pTable.Fields.length > 0)
@@ -658,7 +716,8 @@
         });
 
         pElement.addEventListener("dblclick", function(e) {
-            ShowRenameInput(pTable.ID);
+            if (!pTable.IsShadow)
+                ShowRenameInput(pTable.ID);
         });
 
         pElement.addEventListener("contextmenu", function(e) {
@@ -1431,6 +1490,117 @@
     }
 
     document.addEventListener("DOMContentLoaded", Initialize);
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // SHADOW TABLE PICKER
+    // ═══════════════════════════════════════════════════════════════════════
+
+    function OpenShadowPickerModal(pPayload)
+    {
+        if (!pPayload || !pPayload.Models)
+            return;
+
+        _ShadowPickerData = pPayload;
+
+        const overlay = document.getElementById("shadow-picker-overlay");
+        const searchInput = document.getElementById("shadow-search");
+        const status = document.getElementById("shadow-status");
+
+        searchInput.value = "";
+        status.textContent = "";
+        BuildShadowTree(pPayload.Models, "");
+
+        overlay.style.display = "flex";
+
+        document.getElementById("shadow-picker-close").onclick = CloseShadowPickerModal;
+        document.getElementById("shadow-btn-cancel").onclick = CloseShadowPickerModal;
+
+        overlay.addEventListener("mousedown", function(e) {
+            if (e.target === overlay)
+                CloseShadowPickerModal();
+        }, { once: true });
+
+        searchInput.oninput = function() {
+            BuildShadowTree(pPayload.Models, searchInput.value);
+        };
+
+        searchInput.onkeydown = function(e) {
+            if (e.key === "Escape")
+                CloseShadowPickerModal();
+        };
+
+        overlay.focus();
+        searchInput.focus();
+    }
+
+    function CloseShadowPickerModal()
+    {
+        const overlay = document.getElementById("shadow-picker-overlay");
+        if (overlay)
+            overlay.style.display = "none";
+        _ShadowPickerData = null;
+    }
+
+    function BuildShadowTree(pModels, pFilter)
+    {
+        const tree = document.getElementById("shadow-tree");
+        tree.innerHTML = "";
+
+        const filter = (pFilter || "").toLowerCase().trim();
+        let visibleCount = 0;
+        let totalCount = 0;
+
+        for (const model of pModels)
+        {
+            const matchingTables = model.Tables.filter(function(t) {
+                totalCount++;
+                return !filter || t.Name.toLowerCase().indexOf(filter) >= 0;
+            });
+
+            if (matchingTables.length === 0)
+                continue;
+
+            visibleCount += matchingTables.length;
+
+            const groupEl = document.createElement("div");
+            groupEl.className = "shadow-group";
+            groupEl.textContent = model.ModelName || model.DocumentName;
+            tree.appendChild(groupEl);
+
+            for (const tbl of matchingTables)
+            {
+                const itemEl = document.createElement("div");
+                itemEl.className = "shadow-table-item";
+                itemEl.textContent = tbl.Name;
+                itemEl.title = model.DocumentName + " \u203a " + tbl.Name;
+
+                itemEl.addEventListener("click", (function(m, t) {
+                    return function() {
+                        if (!_ShadowPickerData)
+                            return;
+                        SendMessage(XMessageType.AddShadowTable, {
+                            X: _ShadowPickerData.X,
+                            Y: _ShadowPickerData.Y,
+                            ModelName: m.ModelName,
+                            DocumentID: m.DocumentID,
+                            DocumentName: m.DocumentName,
+                            ModuleID: m.ModuleID,
+                            ModuleName: m.ModuleName,
+                            TableID: t.ID,
+                            TableName: t.Name
+                        });
+                        CloseShadowPickerModal();
+                    };
+                })(model, tbl));
+
+                tree.appendChild(itemEl);
+            }
+        }
+
+        const statusEl = document.getElementById("shadow-status");
+        if (statusEl)
+            statusEl.textContent = visibleCount + " of " + totalCount + " tables";
+    }
 
     // ═══════════════════════════════════════════════════════════════════════
     // SEED DATA EDITOR

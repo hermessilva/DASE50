@@ -26,7 +26,11 @@ export const XDesignerMessageType = {
     RequestSeedData: "RequestSeedData",
     SeedDataLoaded: "SeedDataLoaded",
     SaveSeedData: "SaveSeedData",
-    SeedDataSaved: "SeedDataSaved"
+    SeedDataSaved: "SeedDataSaved",
+    // Shadow table picker
+    RequestShadowTablePicker: "RequestShadowTablePicker",
+    ShadowTablePickerData: "ShadowTablePickerData",
+    AddShadowTable: "AddShadowTable"
 } as const;
 
 export type TDesignerMessageType = typeof XDesignerMessageType[keyof typeof XDesignerMessageType];

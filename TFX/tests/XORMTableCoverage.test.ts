@@ -291,4 +291,60 @@ describe("XORMTable Coverage Tests", () => {
             expect(table.Bounds.Height).toBe(initialHeight);
         });
     });
+
+    describe("Shadow properties", () => {
+
+        it("should get and set IsShadow", () => {
+            const table = new XORMTable();
+            table.ID = XGuid.NewValue();
+            expect(table.IsShadow).toBe(false);
+            table.IsShadow = true;
+            expect(table.IsShadow).toBe(true);
+        });
+
+        it("should get and set ShadowDocumentID", () => {
+            const table = new XORMTable();
+            table.ID = XGuid.NewValue();
+            const id = XGuid.NewValue();
+            table.ShadowDocumentID = id;
+            expect(table.ShadowDocumentID).toBe(id);
+        });
+
+        it("should get and set ShadowDocumentName", () => {
+            const table = new XORMTable();
+            table.ID = XGuid.NewValue();
+            table.ShadowDocumentName = "FolderX21/CEPx";
+            expect(table.ShadowDocumentName).toBe("FolderX21/CEPx");
+        });
+
+        it("should get and set ShadowTableID", () => {
+            const table = new XORMTable();
+            table.ID = XGuid.NewValue();
+            const id = XGuid.NewValue();
+            table.ShadowTableID = id;
+            expect(table.ShadowTableID).toBe(id);
+        });
+
+        it("should get and set ShadowTableName", () => {
+            const table = new XORMTable();
+            table.ID = XGuid.NewValue();
+            table.ShadowTableName = "CORxEmpresa";
+            expect(table.ShadowTableName).toBe("CORxEmpresa");
+        });
+
+        it("should get and set ShadowModuleID", () => {
+            const table = new XORMTable();
+            table.ID = XGuid.NewValue();
+            const id = XGuid.NewValue();
+            table.ShadowModuleID = id;
+            expect(table.ShadowModuleID).toBe(id);
+        });
+
+        it("should get and set ShadowModuleName", () => {
+            const table = new XORMTable();
+            table.ID = XGuid.NewValue();
+            table.ShadowModuleName = "CoreModule";
+            expect(table.ShadowModuleName).toBe("CoreModule");
+        });
+    });
 });
