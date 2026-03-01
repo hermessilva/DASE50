@@ -65,19 +65,6 @@ export class XORMPKField extends XORMField
     }
 
     /**
-     * Campo PK nunca pode ser nulo
-     */
-    public override get IsNullable(): boolean
-    {
-        return false;
-    }
-
-    public override set IsNullable(_pValue: boolean)
-    {
-        // Ignora tentativa de mudar nullable em PK
-    }
-
-    /**
      * DataType do campo PK
      * Só pode ser definido uma vez (na criação)
      */

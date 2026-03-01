@@ -27,6 +27,7 @@ interface IAddRelationPayload
     SourceID: string;
     TargetID: string;
     Name?: string;
+    IsOneToOne?: boolean;
 }
 
 interface IAddFieldPayload
@@ -59,6 +60,20 @@ interface IReorderFieldPayload
 {
     FieldID: string;
     NewIndex: number;
+}
+
+interface IRequestSeedDataPayload
+{
+    TableID: string;
+}
+
+interface ISaveSeedDataPayload
+{
+    TableID: string;
+    Rows: Array<{
+        TupleID: string;
+        Values: Record<string, string>;
+    }>;
 }
 
 interface IDesignerMessage
@@ -321,8 +336,53 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
                 await this.OnReloadDataTypes(pPanel, pState);
                 break;
 
+            case XDesignerMessageType.RequestSeedData:
+                this.OnRequestSeedData(pPanel, pState, payload as IRequestSeedDataPayload);
+                break;
+
+            case XDesignerMessageType.SaveSeedData:
+                await this.OnSaveSeedData(pPanel, pState, payload as ISaveSeedDataPayload);
+                break;
+
             default:
                 console.warn("Unknown message type:", type);
+        }
+    }
+
+    OnRequestSeedData(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: IRequestSeedDataPayload): void
+    {
+        if (!pPayload?.TableID)
+            return;
+
+        const seedData = pState.Bridge.GetSeedData(pPayload.TableID);
+        if (!seedData)
+        {
+            GetLogService().Warn(`GetSeedData: table not found: ${pPayload.TableID}`);
+            return;
+        }
+
+        pPanel.webview.postMessage({
+            Type: XDesignerMessageType.SeedDataLoaded,
+            Payload: seedData
+        });
+    }
+
+    async OnSaveSeedData(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: ISaveSeedDataPayload): Promise<void>
+    {
+        if (!pPayload?.TableID || !Array.isArray(pPayload.Rows))
+            return;
+
+        const result = pState.Bridge.SaveSeedData(pPayload.TableID, pPayload.Rows);
+
+        pPanel.webview.postMessage({
+            Type: XDesignerMessageType.SeedDataSaved,
+            Payload: { TableID: pPayload.TableID, Success: result.Success, Message: result.Message }
+        });
+
+        if (result.Success)
+        {
+            this.NotifyDocumentChanged(pState);
+            await this.SendIssuesUpdate(pPanel, pState);
         }
     }
 
@@ -446,7 +506,8 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         const result = pState.AddReference(
             pPayload.SourceID,
             pPayload.TargetID,
-            pPayload.Name || ""
+            pPayload.Name || "",
+            pPayload.IsOneToOne
         );
 
         if (result.Success)
@@ -632,7 +693,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         pState.IsDirty = true;
     }
 
-    private async SendIssuesUpdate(pPanel: vscode.WebviewPanel, pState: XORMDesignerState): Promise<void>
+    async SendIssuesUpdate(pPanel: vscode.WebviewPanel, pState: XORMDesignerState): Promise<void>
     {
         const issues = await pState.Validate();
         pPanel.webview.postMessage({
@@ -876,11 +937,8 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         <div id="canvas-container">
             <svg id="canvas" xmlns="http://www.w3.org/2000/svg">
                 <defs>
-                    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                        <polygon points="0 0, 10 3.5, 0 7" fill="var(--vscode-foreground, #ccc)"/>
-                    </marker>
-                    <marker id="arrowhead-selected" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                        <polygon points="0 0, 10 3.5, 0 7" fill="var(--vscode-focusBorder, #007acc)"/>
+                    <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+                        <polygon points="0 0, 8 3, 0 6" fill="context-stroke" fill-opacity="0.9"/>
                     </marker>
                 </defs>
                 <g id="relations-layer"></g>
@@ -900,8 +958,54 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
     <div id="table-context-menu" class="context-menu">
         <div class="context-menu-item" data-action="add-field"><span class="icon">➕</span>Add Field</div>
         <div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-action="edit-seed-data"><span class="icon">🗂️</span>Edit Seed Data</div>
+        <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="delete-table"><span class="icon">🗑️</span>Delete Table</div>
         <div class="context-menu-item" data-action="rename-table"><span class="icon">✏️</span>Rename Table</div>
+    </div>
+    <div id="seed-editor-overlay" class="seed-overlay" style="display:none" tabindex="-1">
+        <div id="seed-editor-modal" class="seed-modal" role="dialog" aria-modal="true" aria-labelledby="seed-modal-title">
+            <div class="seed-modal-header">
+                <div class="seed-modal-title-block">
+                    <span class="seed-modal-icon">🗂️</span>
+                    <h2 id="seed-modal-title" class="seed-modal-title"></h2>
+                    <span class="seed-modal-badge" id="seed-row-count"></span>
+                </div>
+                <button id="seed-modal-close" class="seed-modal-close" aria-label="Close" title="Close (Esc)">✕</button>
+            </div>
+            <div class="seed-modal-toolbar">
+                <button id="seed-add-row" class="seed-btn seed-btn-primary" title="Add a new row (Ctrl+Enter)">
+                    <span>➕</span> Add Row
+                </button>
+                <button id="seed-delete-rows" class="seed-btn seed-btn-danger" title="Delete selected rows (Del)">
+                    <span>🗑️</span> Delete
+                </button>
+                <span class="seed-toolbar-sep"></span>
+                <span id="seed-validation-badge" class="seed-validation-badge" style="display:none"></span>
+            </div>
+            <div class="seed-grid-wrapper" id="seed-grid-wrapper">
+                <div class="seed-grid-container" id="seed-grid-container">
+                    <table class="seed-grid" id="seed-grid" cellspacing="0" cellpadding="0">
+                        <thead id="seed-grid-head"></thead>
+                        <tbody id="seed-grid-body"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="seed-modal-footer">
+                <span id="seed-status-msg" class="seed-status-msg"></span>
+                <div class="seed-modal-actions">
+                    <button id="seed-btn-cancel" class="seed-btn seed-btn-secondary">Cancel</button>
+                    <button id="seed-btn-save" class="seed-btn seed-btn-success">
+                        <span>💾</span> Save
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="field-context-menu" class="context-menu">
+        <div class="context-menu-item" data-action="rename-field"><span class="icon">✏️</span>Rename Field</div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-action="delete-field"><span class="icon">🗑️</span>Delete Field</div>
     </div>
     <script src="${jsUri}"></script>
 </body>

@@ -185,19 +185,19 @@ describe("XORMDocument Integration Tests", () => {
 
         // Add fields to customers
         customers.CreatePKField({ Name: "CustomerID", DataType: "Int32" });
-        customers.CreateField({ Name: "CustomerName", DataType: "String", IsNullable: false });
-        customers.CreateField({ Name: "Email", DataType: "String", IsNullable: true });
+        customers.CreateField({ Name: "CustomerName", DataType: "String" });
+        customers.CreateField({ Name: "Email", DataType: "String", IsRequired: false });
 
         // Add fields to orders
         orders.CreatePKField({ Name: "OrderID", DataType: "Int32" });
-        const orderCustomerID = orders.CreateField({ Name: "CustomerID", DataType: "Int32", IsNullable: false });
-        orders.CreateField({ Name: "OrderDate", DataType: "DateTime", IsNullable: false });
-        const orderProductID = orders.CreateField({ Name: "ProductID", DataType: "Int32", IsNullable: false });
+        const orderCustomerID = orders.CreateField({ Name: "CustomerID", DataType: "Int32" });
+        orders.CreateField({ Name: "OrderDate", DataType: "DateTime" });
+        const orderProductID = orders.CreateField({ Name: "ProductID", DataType: "Int32" });
 
         // Add fields to products
         products.CreatePKField({ Name: "ProductID", DataType: "Int32" });
-        products.CreateField({ Name: "ProductName", DataType: "String", IsNullable: false });
-        products.CreateField({ Name: "Price", DataType: "Decimal", IsNullable: false });
+        products.CreateField({ Name: "ProductName", DataType: "String" });
+        products.CreateField({ Name: "Price", DataType: "Decimal" });
 
         // Create references - Source is FIELD, Target is TABLE
         const fkOrderCustomer = doc.Design!.CreateReference({
@@ -325,7 +325,7 @@ describe("XORMDocument Integration Tests", () => {
         console.log("\n=== CUSTOMERS FIELDS ===");
         console.log("Count:", customerFields.length);
         customerFields.forEach(f => {
-            console.log(`- ${f.Name}: ${f.DataType}, PK=${f.IsPrimaryKey}, Null=${f.IsNullable}`);
+            console.log(`- ${f.Name}: ${f.DataType}, PK=${f.IsPrimaryKey}, Req=${f.IsRequired}`);
         });
         
         expect(customerFields.length).toBe(3);

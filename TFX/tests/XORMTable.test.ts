@@ -43,7 +43,7 @@ describe("XORMTable", () =>
             expect(field.DataType).toBe("String");
             expect(field.Length).toBe(0);
             expect(field.IsPrimaryKey).toBe(false); // Regular fields are never PKs
-            expect(field.IsNullable).toBe(true);
+            expect(field.IsRequired).toBe(true);
             expect(field.IsAutoIncrement).toBe(false);
             expect(field.DefaultValue).toBe("");
         });
@@ -55,7 +55,7 @@ describe("XORMTable", () =>
                 Name: "CustomField",
                 DataType: "Int32",
                 Length: 100,
-                IsNullable: false,
+                IsRequired: true,
                 IsAutoIncrement: true,
                 DefaultValue: "0"
             });
@@ -64,7 +64,7 @@ describe("XORMTable", () =>
             expect(field.DataType).toBe("Int32");
             expect(field.Length).toBe(100);
             expect(field.IsPrimaryKey).toBe(false); // Only XORMPKField can be PK
-            expect(field.IsNullable).toBe(false);
+            expect(field.IsRequired).toBe(true);
             expect(field.IsAutoIncrement).toBe(true);
             expect(field.DefaultValue).toBe("0");
         });
@@ -109,7 +109,7 @@ describe("XORMTable", () =>
             expect(pkField.Name).toBe("ID");
             expect(pkField.DataType).toBe("Int32");
             expect(pkField.IsPrimaryKey).toBe(true);
-            expect(pkField.IsNullable).toBe(false);
+            expect(pkField.IsRequired).toBe(true);
         });
 
         it("should create PKField with custom options", () =>

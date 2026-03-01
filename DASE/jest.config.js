@@ -30,5 +30,6 @@ module.exports = {
         }
     },
     setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
-    verbose: true
+    verbose: true,
+    forceExit: true
 };

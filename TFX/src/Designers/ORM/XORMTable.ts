@@ -11,7 +11,6 @@ export interface XICreateFieldOptions
     DataType?: string;
     Length?: number;
     IsRequired?: boolean;
-    IsNullable?: boolean;
     IsAutoIncrement?: boolean;
     DefaultValue?: string;
 }
@@ -122,10 +121,7 @@ export class XORMTable extends XRectangle
         field.DataType = pOptions?.DataType ?? "String";
         field.Length = pOptions?.Length ?? 0;
 
-        if (pOptions?.IsNullable !== undefined)
-            field.IsNullable = pOptions.IsNullable;
-        else
-            field.IsRequired = pOptions?.IsRequired ?? false;
+        field.IsRequired = pOptions?.IsRequired ?? true;
 
         field.IsAutoIncrement = pOptions?.IsAutoIncrement ?? false;
         field.DefaultValue = pOptions?.DefaultValue ?? "";

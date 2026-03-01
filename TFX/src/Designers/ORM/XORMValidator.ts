@@ -151,7 +151,18 @@ export class XORMValidator extends XValidator<XORMDocument, XORMDesign>
             if (!XGuid.IsFullValue(srcID))
                 this.AddError(ref.ID, ref.Name, "Reference source field is not defined.");
             else if (!fieldIDs.has(srcID))
-                this.AddError(ref.ID, ref.Name, "Reference source field not found.");
+            {
+                // Legacy 1:1 pattern: Source may point to a source table (not a field).
+                // Auto-correct by resolving to the table's PK field ID.
+                // ValidateTables (called before this) guarantees every table has a PK field.
+                if (tableIDs.has(srcID))
+                {
+                    const sourceTable = tables.find(t => t.ID === srcID)!;
+                    ref.Source = sourceTable.GetPKField()!.ID;
+                }
+                else
+                    this.AddError(ref.ID, ref.Name, "Reference source field not found.");
+            }
 
             if (!XGuid.IsFullValue(tgtID))
                 this.AddError(ref.ID, ref.Name, "Reference target table is not defined.");

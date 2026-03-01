@@ -288,7 +288,8 @@ export const workspace = {
         writeFile: jest.fn(() => Promise.resolve()),
         delete: jest.fn(() => Promise.resolve()),
         stat: jest.fn(() => Promise.resolve({ type: FileType.File })),
-        createDirectory: jest.fn(() => Promise.resolve())
+        createDirectory: jest.fn(() => Promise.resolve()),
+        readDirectory: jest.fn(() => Promise.resolve([]))
     },
     openTextDocument: jest.fn(),
     workspaceFolders: []

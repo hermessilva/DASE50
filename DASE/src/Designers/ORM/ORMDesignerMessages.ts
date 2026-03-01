@@ -20,7 +20,13 @@ export const XDesignerMessageType = {
     RenameCompleted: "RenameCompleted",
     AlignLines: "AlignLines",
     ReloadDataTypes: "ReloadDataTypes",
-    DataTypesReloaded: "DataTypesReloaded"
+    DataTypesReloaded: "DataTypesReloaded",
+    // Seed / fixture-data editor
+    OpenSeedEditor: "OpenSeedEditor",
+    RequestSeedData: "RequestSeedData",
+    SeedDataLoaded: "SeedDataLoaded",
+    SaveSeedData: "SaveSeedData",
+    SeedDataSaved: "SeedDataSaved"
 } as const;
 
 export type TDesignerMessageType = typeof XDesignerMessageType[keyof typeof XDesignerMessageType];

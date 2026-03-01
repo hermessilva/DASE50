@@ -29,6 +29,13 @@ export interface XORMDataTypeInfo
     
     /** Can this type support auto-increment */
     CanAutoIncrement: boolean;
+
+    /**
+     * Optional GUID used by the legacy C# DASE4VS application to identify this type.
+     * Used during migration of .dsorm files created by the C# version.
+     * TS-native files never write this field.
+     */
+    CSharpTypeID?: string;
 }
 
 /**

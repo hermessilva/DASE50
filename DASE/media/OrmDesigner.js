@@ -23,7 +23,13 @@
         IssuesChanged: "IssuesChanged",
         RequestRename: "RequestRename",
         RenameCompleted: "RenameCompleted",
-        AlignLines: "AlignLines"
+        AlignLines: "AlignLines",
+        // Seed editor
+        OpenSeedEditor: "OpenSeedEditor",
+        RequestSeedData: "RequestSeedData",
+        SeedDataLoaded: "SeedDataLoaded",
+        SaveSeedData: "SaveSeedData",
+        SeedDataSaved: "SeedDataSaved"
     };
 
     let _Model = { DesignID: null, Tables: [], References: [] };
@@ -33,6 +39,13 @@
     let _FieldDragState = null;
     let _ContextMenuPosition = { X: 0, Y: 0 };
     let _ContextMenuTarget = null;
+    let _FieldContextMenuTarget = null;
+    let _Issues = [];
+
+    // Seed editor state
+    let _SeedEditor = null; // { TableID, Columns, Rows, OriginalRows, SelectedRows: Set<number> }
+    let _SeedNextNewId = 0;
+    let _GuidSeq = 0;
 
     // Data type icons mapping - returns SVG path or emoji
     const DataTypeIcons = {
@@ -58,6 +71,30 @@
         return DataTypeIcons[pDataType] || pDataType?.substring(0, 3) || "?";
     }
 
+    function GetLuminance(pHexColor)
+    {
+        if (!pHexColor) return 0;
+        // TFX stores colors as ARGB hex (8 chars, no #): AARRGGBB
+        // HTML #RRGGBB has 7 chars. Normalise to plain RRGGBB in both cases.
+        let hex = pHexColor.startsWith("#") ? pHexColor.slice(1) : pHexColor;
+        if (hex.length === 8) hex = hex.slice(2); // strip alpha byte
+        if (hex.length !== 6) return 0;
+        const r = parseInt(hex.slice(0, 2), 16) / 255;
+        const g = parseInt(hex.slice(2, 4), 16) / 255;
+        const b = parseInt(hex.slice(4, 6), 16) / 255;
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    }
+
+    function ArgbToCssColor(pArgb)
+    {
+        // Convert TFX ARGB hex (AARRGGBB) to CSS #RRGGBB.
+        // If already #RRGGBB pass through unchanged.
+        if (!pArgb) return null;
+        if (pArgb.startsWith("#")) return pArgb;
+        if (pArgb.length === 8) return "#" + pArgb.slice(2);
+        return "#" + pArgb;
+    }
+
     const FKIcon = "🔗";
 
     const _Canvas = document.getElementById("canvas");
@@ -66,6 +103,7 @@
     const _CanvasContainer = document.getElementById("canvas-container");
     const _ContextMenu = document.getElementById("context-menu");
     const _TableContextMenu = document.getElementById("table-context-menu");
+    const _FieldContextMenu = document.getElementById("field-context-menu");
 
     function Initialize()
     {
@@ -107,6 +145,16 @@
                 break;
 
             case XMessageType.IssuesChanged:
+                _Issues = (pMsg.Payload && pMsg.Payload.Issues) ? pMsg.Payload.Issues : [];
+                UpdateIssueVisuals();
+                break;
+
+            case XMessageType.SeedDataLoaded:
+                OpenSeedEditorModal(pMsg.Payload);
+                break;
+
+            case XMessageType.SeedDataSaved:
+                OnSeedDataSaved(pMsg.Payload);
                 break;
         }
     }
@@ -157,6 +205,10 @@
                     if (tableID)
                         SendMessage(XMessageType.AddField, { TableID: tableID, Name: "NewField", DataType: "String" });
                     break;
+                case "edit-seed-data":
+                    if (tableID)
+                        SendMessage(XMessageType.RequestSeedData, { TableID: tableID });
+                    break;
                 case "delete-table":
                     SendMessage(XMessageType.DeleteSelected, {});
                     break;
@@ -167,9 +219,80 @@
             }
         });
 
-        document.addEventListener("click", function(e) {
-            if (!_ContextMenu.contains(e.target) && !_TableContextMenu.contains(e.target))
+        if (_FieldContextMenu)
+        {
+            _FieldContextMenu.addEventListener("click", function(e) {
+                const item = e.target.closest(".context-menu-item");
+                if (!item)
+                    return;
+
+                const action = item.getAttribute("data-action");
+                const fieldID = _FieldContextMenuTarget;
                 HideContextMenu();
+
+                switch (action)
+                {
+                    case "delete-field":
+                        if (fieldID)
+                        {
+                            SendMessage(XMessageType.SelectElement, { ElementID: fieldID });
+                            SendMessage(XMessageType.DeleteSelected, {});
+                        }
+                        break;
+                    case "rename-field":
+                        if (fieldID)
+                            ShowRenameInput(fieldID);
+                        break;
+                }
+            });
+        }
+
+        document.addEventListener("click", function(e) {
+            if (!_ContextMenu.contains(e.target) && !_TableContextMenu.contains(e.target) &&
+                (!_FieldContextMenu || !_FieldContextMenu.contains(e.target)))
+                HideContextMenu();
+        });
+    }
+
+    function ShowFieldContextMenu(pX, pY, pFieldID)
+    {
+        _FieldContextMenuTarget = pFieldID;
+        _ContextMenu.classList.remove("visible");
+        _TableContextMenu.classList.remove("visible");
+        if (_FieldContextMenu)
+        {
+            _FieldContextMenu.style.left = pX + "px";
+            _FieldContextMenu.style.top = pY + "px";
+            _FieldContextMenu.classList.add("visible");
+        }
+    }
+
+    function UpdateIssueVisuals()
+    {
+        const fieldGroups = _TablesLayer.querySelectorAll(".orm-field-group");
+        fieldGroups.forEach(function(fg) {
+            const fieldID = fg.getAttribute("data-field-id");
+            const hasError = _Issues.some(function(issue) {
+                return issue.ElementID === fieldID && issue.Severity >= 2;
+            });
+            const hasWarning = _Issues.some(function(issue) {
+                return issue.ElementID === fieldID;
+            });
+            fg.classList.toggle("has-error", hasError);
+            fg.classList.toggle("has-warning", !hasError && hasWarning);
+        });
+
+        const tables = _TablesLayer.querySelectorAll(".orm-table");
+        tables.forEach(function(t) {
+            const tableID = t.getAttribute("data-id");
+            const hasError = _Issues.some(function(issue) {
+                return issue.ElementID === tableID && issue.Severity >= 2;
+            });
+            const hasWarning = _Issues.some(function(issue) {
+                return issue.ElementID === tableID;
+            });
+            t.classList.toggle("has-error", hasError);
+            t.classList.toggle("has-warning", !hasError && hasWarning);
         });
     }
 
@@ -213,7 +336,10 @@
     {
         _ContextMenu.classList.remove("visible");
         _TableContextMenu.classList.remove("visible");
+        if (_FieldContextMenu)
+            _FieldContextMenu.classList.remove("visible");
         _ContextMenuTarget = null;
+        _FieldContextMenuTarget = null;
     }
 
     function SetupCanvasEvents()
@@ -281,11 +407,8 @@
         rect.setAttribute("class", "orm-table-rect");
         rect.setAttribute("width", width);
         rect.setAttribute("height", height);
-        rect.setAttribute("rx", 4);
-        rect.setAttribute("ry", 4);
-        // Border color matches header color
-        if (pTable.FillProp)
-            rect.style.stroke = pTable.FillProp;
+        rect.setAttribute("rx", 5);
+        rect.setAttribute("ry", 5);
         g.appendChild(rect);
 
         const header = document.createElementNS("http://www.w3.org/2000/svg", "rect");
@@ -301,13 +424,18 @@
         headerMask.setAttribute("y", headerHeight - 4);
         headerMask.setAttribute("width", width);
         headerMask.setAttribute("height", 4);
-        if (pTable.FillProp)
-            headerMask.style.fill = pTable.FillProp;
         g.appendChild(headerMask);
 
-        // Apply FillProp to header if defined
-        if (pTable.FillProp)
-            header.style.fill = pTable.FillProp;
+        // Subtle body background
+        if (fieldCount > 0)
+        {
+            const body = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            body.setAttribute("class", "orm-table-body");
+            body.setAttribute("y", headerHeight);
+            body.setAttribute("width", width);
+            body.setAttribute("height", bodyHeight);
+            g.appendChild(body);
+        }
 
         const icon = document.createElementNS("http://www.w3.org/2000/svg", "text");
         icon.setAttribute("class", "orm-table-icon");
@@ -322,6 +450,20 @@
         title.setAttribute("y", 18);
         title.textContent = pTable.Name || "Unnamed";
         g.appendChild(title);
+
+        // Apply FillProp to header if defined — must run after icon and title are created
+        if (pTable.FillProp)
+        {
+            const cssColor = ArgbToCssColor(pTable.FillProp);
+            header.style.fill = cssColor;
+            headerMask.style.fill = cssColor;
+            // Auto-contrast: use dark text on light backgrounds, white on dark backgrounds
+            const luminance = GetLuminance(pTable.FillProp);
+            const textColor = luminance > 0.35 ? "#1a1a1a" : "white";
+            const iconColor = luminance > 0.35 ? "rgba(0,0,0,0.75)" : "rgba(255,255,255,0.8)";
+            title.style.fill = textColor;
+            icon.style.fill = iconColor;
+        }
 
         if (pTable.Fields && pTable.Fields.length > 0)
         {
@@ -361,8 +503,7 @@
                 fieldText.setAttribute("x", 30);
                 fieldText.setAttribute("y", y);
                 
-                const requiredMarker = field.IsRequired ? "*" : "";
-                fieldText.textContent = (field.Name || field.FieldName || "field") + requiredMarker;
+                fieldText.textContent = field.Name || field.FieldName || "field";
                 fieldGroup.appendChild(fieldText);
 
                 // IsRequired checkbox on the right
@@ -589,6 +730,16 @@
             e.preventDefault();
             e.stopPropagation();
             ShowRenameInput(pField.ID);
+        });
+
+        pElement.addEventListener("contextmenu", function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!pField.IsPrimaryKey)
+            {
+                SendMessage(XMessageType.SelectElement, { ElementID: pField.ID });
+                ShowFieldContextMenu(e.clientX, e.clientY, pField.ID);
+            }
         });
     }
 
@@ -852,8 +1003,13 @@
             SourceTable: pSourceTable,
             Line: line,
             StartX: startX,
-            StartY: startY
+            StartY: startY,
+            IsCtrl: pEvent.ctrlKey
         };
+
+        // Visual feedback: dashed drag line for 1:1 (Ctrl held)
+        if (pEvent.ctrlKey)
+            line.setAttribute("stroke-dasharray", "6 4");
 
         const onMouseMove = function(e) {
             if (!_RelationDragState)
@@ -881,7 +1037,8 @@
             {
                 SendMessage(XMessageType.DragDropAddRelation, {
                     SourceID: _RelationDragState.SourceTable.ID,
-                    TargetID: targetTable.ID
+                    TargetID: targetTable.ID,
+                    IsOneToOne: !!_RelationDragState.IsCtrl
                 });
             }
 
@@ -1067,7 +1224,7 @@
     {
         const table = _Model.Tables.find(t => t.ID === pTableID);
         if (table && table.FillProp)
-            return table.FillProp;
+            return ArgbToCssColor(table.FillProp);
         return "#2d8a4e";
     }
 
@@ -1094,34 +1251,49 @@
         const pointsRaw = pRef.Points && pRef.Points.length >= 2 ? pRef.Points : [];
         const points = SimplifyReferencePoints(pointsRaw, sourceTable, targetTable);
         
+        const lineColor = GetTableColor(pRef.TargetTableID);
+
         if (points.length >= 2)
         {
-            // Renderiza linha roteada com múltiplos segmentos
-            const pathData = BuildPathFromPoints(points);
+            // Hit-area path (wide, transparent) — makes the thin line easy to click
+            const hitPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            hitPath.setAttribute("class", "orm-reference-hit");
+            hitPath.setAttribute("d", BuildPathFromPoints(points));
+            g.appendChild(hitPath);
+
+            // Visible routed path
             const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-            path.setAttribute("class", "orm-fk-line");
-            path.setAttribute("d", pathData);
+            path.setAttribute("class", "orm-fk-line" + (pRef.IsOneToOne ? " orm-fk-line-one-to-one" : ""));
+            path.setAttribute("d", BuildPathFromPoints(points));
             path.setAttribute("fill", "none");
-            path.setAttribute("stroke", GetTableColor(pRef.TargetTableID));
+            path.setAttribute("stroke", lineColor);
+            if (pRef.IsOneToOne)
+                path.setAttribute("stroke-dasharray", "6 4");
+            path.setAttribute("marker-end", "url(#arrowhead)");
             g.appendChild(path);
-
-
         }
         else
         {
-            // Fallback: linha reta simples
+            // Fallback: straight line
             const x1 = sourceTable.X + (sourceTable.Width || 200);
             const y1 = sourceTable.Y + (sourceTable.Height || 150) / 2;
             const x2 = targetTable.X;
             const y2 = targetTable.Y + (targetTable.Height || 150) / 2;
 
+            const hitLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            hitLine.setAttribute("class", "orm-reference-hit");
+            hitLine.setAttribute("x1", x1); hitLine.setAttribute("y1", y1);
+            hitLine.setAttribute("x2", x2); hitLine.setAttribute("y2", y2);
+            g.appendChild(hitLine);
+
             const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-            line.setAttribute("class", "orm-fk-line");
-            line.setAttribute("x1", x1);
-            line.setAttribute("y1", y1);
-            line.setAttribute("x2", x2);
-            line.setAttribute("y2", y2);
-            line.setAttribute("stroke", GetTableColor(pRef.TargetTableID));
+            line.setAttribute("class", "orm-fk-line" + (pRef.IsOneToOne ? " orm-fk-line-one-to-one" : ""));
+            line.setAttribute("x1", x1); line.setAttribute("y1", y1);
+            line.setAttribute("x2", x2); line.setAttribute("y2", y2);
+            line.setAttribute("stroke", lineColor);
+            if (pRef.IsOneToOne)
+                line.setAttribute("stroke-dasharray", "6 4");
+            line.setAttribute("marker-end", "url(#arrowhead)");
             g.appendChild(line);
         }
 
@@ -1259,4 +1431,847 @@
     }
 
     document.addEventListener("DOMContentLoaded", Initialize);
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // SEED DATA EDITOR
+    // ═══════════════════════════════════════════════════════════════════════
+
+    function OpenSeedEditorModal(pPayload)
+    {
+        if (!pPayload || !pPayload.TableID)
+            return;
+
+        _SeedEditor = {
+            TableID: pPayload.TableID,
+            TableName: pPayload.TableName || "Table",
+            Columns: pPayload.Columns || [],
+            Rows: (pPayload.Rows || []).map(function(r) {
+                return { TupleID: r.TupleID, Values: Object.assign({}, r.Values), IsNew: false };
+            }),
+            SelectedRows: new Set()
+        };
+        _SeedNextNewId = 0;
+
+        const overlay = document.getElementById("seed-editor-overlay");
+        const title   = document.getElementById("seed-modal-title");
+
+        title.textContent = "Seed Data — " + _SeedEditor.TableName;
+
+        BuildSeedGrid();
+        UpdateSeedRowCount();
+        SetSeedStatusMessage("");
+        SetSeedValidationBadge(null);
+        document.getElementById("seed-btn-save").disabled = false;
+
+        overlay.style.display = "flex";
+
+        // Close handlers
+        document.getElementById("seed-modal-close").onclick = CloseSeedEditorModal;
+        document.getElementById("seed-btn-cancel").onclick = CloseSeedEditorModal;
+        overlay.addEventListener("mousedown", function(e) {
+            if (e.target === overlay)
+                CloseSeedEditorModal();
+        }, { once: true });
+
+        document.getElementById("seed-add-row").onclick = AddSeedRow;
+        document.getElementById("seed-delete-rows").onclick = DeleteSelectedSeedRows;
+        document.getElementById("seed-btn-save").onclick = SaveSeedEditorData;
+
+        // Keyboard shortcuts — attach to document, guarded by modal open state
+        document.addEventListener("keydown", HandleSeedKeydown);
+
+        overlay.focus();
+    }
+
+    function CloseSeedEditorModal()
+    {
+        const overlay = document.getElementById("seed-editor-overlay");
+        overlay.style.display = "none";
+        document.removeEventListener("keydown", HandleSeedKeydown);
+        _SeedEditor = null;
+    }
+
+    function HandleSeedKeydown(pEvent)
+    {
+        if (pEvent.key === "Escape")
+        {
+            pEvent.preventDefault();
+            CloseSeedEditorModal();
+        }
+        else if (pEvent.key === "Enter" && (pEvent.ctrlKey || pEvent.metaKey))
+        {
+            pEvent.preventDefault();
+            SaveSeedEditorData();
+        }
+        else if (pEvent.key === "Delete" && !IsEditableTarget(pEvent.target))
+        {
+            DeleteSelectedSeedRows();
+        }
+    }
+
+    function IsEditableTarget(pTarget)
+    {
+        return pTarget && (pTarget.tagName === "INPUT" || pTarget.tagName === "SELECT" || pTarget.tagName === "TEXTAREA");
+    }
+
+    // ── Grid rendering ───────────────────────────────────────────────────
+
+    function BuildSeedGrid()
+    {
+        if (!_SeedEditor)
+            return;
+
+        const columns = _SeedEditor.Columns;
+        const rows    = _SeedEditor.Rows;
+
+        // Build header
+        const thead = document.getElementById("seed-grid-head");
+        thead.innerHTML = "";
+        const headerRow = document.createElement("tr");
+
+        // Select-all column
+        const thSelect = document.createElement("th");
+        thSelect.className = "col-select";
+        const selectAllChk = document.createElement("input");
+        selectAllChk.type = "checkbox";
+        selectAllChk.className = "seed-row-checkbox";
+        selectAllChk.title = "Select all";
+        selectAllChk.addEventListener("change", function() {
+            if (this.checked)
+            {
+                for (let i = 0; i < _SeedEditor.Rows.length; i++)
+                    _SeedEditor.SelectedRows.add(i);
+            }
+            else
+            {
+                _SeedEditor.SelectedRows.clear();
+            }
+            UpdateRowSelectionVisuals();
+        });
+        thSelect.appendChild(selectAllChk);
+        headerRow.appendChild(thSelect);
+
+        for (const col of columns)
+        {
+            const th = document.createElement("th");
+            const inner = document.createElement("div");
+            inner.className = "th-inner";
+
+            const nameSpan = document.createElement("span");
+            nameSpan.textContent = col.Name;
+            inner.appendChild(nameSpan);
+
+            if (col.IsPrimaryKey)
+            {
+                const badge = document.createElement("span");
+                badge.className = "seed-col-badge seed-col-pk";
+                badge.textContent = "PK";
+                inner.appendChild(badge);
+            }
+            else if (col.IsForeignKey)
+            {
+                const badge = document.createElement("span");
+                badge.className = "seed-col-badge seed-col-fk";
+                badge.textContent = "FK";
+                inner.appendChild(badge);
+            }
+
+            if (col.IsRequired && !col.IsPrimaryKey)
+            {
+                const req = document.createElement("span");
+                req.className = "seed-col-req";
+                req.textContent = "*";
+                req.title = "Required";
+                inner.appendChild(req);
+            }
+
+            // DataType hint
+            const typeSpan = document.createElement("span");
+            typeSpan.style.cssText = "font-size:9px;opacity:0.5;font-weight:400;text-transform:none;";
+            typeSpan.textContent = " " + GetShortTypeName(col.DataType);
+            inner.appendChild(typeSpan);
+
+            th.appendChild(inner);
+            headerRow.appendChild(th);
+        }
+
+        thead.appendChild(headerRow);
+
+        // Build body
+        const tbody = document.getElementById("seed-grid-body");
+        tbody.innerHTML = "";
+
+        if (rows.length === 0)
+        {
+            const tr = document.createElement("tr");
+            const td = document.createElement("td");
+            td.colSpan = columns.length + 1;
+            td.innerHTML = "<div class='seed-empty-state'><span class='seed-empty-icon'>🗂️</span>No rows yet. Click <b>Add Row</b> to begin.</div>";
+            tr.appendChild(td);
+            tbody.appendChild(tr);
+        }
+        else
+        {
+            for (let i = 0; i < rows.length; i++)
+                tbody.appendChild(BuildSeedGridRow(rows[i], columns, i));
+        }
+    }
+
+    function BuildSeedGridRow(pRow, pColumns, pRowIndex)
+    {
+        const tr = document.createElement("tr");
+        tr.setAttribute("data-row-index", pRowIndex);
+        if (pRow.IsNew)
+            tr.classList.add("seed-row-new");
+        if (_SeedEditor.SelectedRows.has(pRowIndex))
+            tr.classList.add("seed-row-selected");
+
+        // Selection checkbox
+        const tdSelect = document.createElement("td");
+        tdSelect.className = "col-select";
+        const chk = document.createElement("input");
+        chk.type = "checkbox";
+        chk.className = "seed-row-checkbox";
+        chk.checked = _SeedEditor.SelectedRows.has(pRowIndex);
+        chk.addEventListener("change", function() {
+            if (this.checked)
+                _SeedEditor.SelectedRows.add(pRowIndex);
+            else
+                _SeedEditor.SelectedRows.delete(pRowIndex);
+            tr.classList.toggle("seed-row-selected", this.checked);
+            SyncSelectAllCheckbox();
+        });
+        tdSelect.appendChild(chk);
+        tr.appendChild(tdSelect);
+
+        // Data cells
+        for (const col of pColumns)
+        {
+            const td = document.createElement("td");
+            const currentValue = pRow.Values[col.FieldID] !== undefined ? pRow.Values[col.FieldID] : "";
+
+            const widget = BuildCellWidget(col, currentValue, pRow, pColumns);
+            td.appendChild(widget);
+            tr.appendChild(td);
+        }
+
+        // Row click for selection (not on input/select)
+        tr.addEventListener("click", function(e) {
+            if (IsEditableTarget(e.target) || e.target.type === "checkbox")
+                return;
+            const isSelected = _SeedEditor.SelectedRows.has(pRowIndex);
+            if (e.ctrlKey || e.metaKey)
+            {
+                if (isSelected)
+                    _SeedEditor.SelectedRows.delete(pRowIndex);
+                else
+                    _SeedEditor.SelectedRows.add(pRowIndex);
+            }
+            else
+            {
+                _SeedEditor.SelectedRows.clear();
+                _SeedEditor.SelectedRows.add(pRowIndex);
+            }
+            UpdateRowSelectionVisuals();
+        });
+
+        return tr;
+    }
+
+    function BuildCellWidget(pCol, pCurrentValue, pRow, pAllColumns)
+    {
+        // Boolean type → checkbox
+        if (pCol.DataType === "Boolean")
+        {
+            const chk = document.createElement("input");
+            chk.type = "checkbox";
+            chk.className = "seed-cell-checkbox";
+            chk.checked = pCurrentValue === "true" || pCurrentValue === "1";
+            chk.addEventListener("change", function() {
+                pRow.Values[pCol.FieldID] = this.checked ? "true" : "false";
+                ClearCellError(this.parentElement);
+            });
+            return chk;
+        }
+
+        // FK field with options → select
+        if (pCol.IsForeignKey && pCol.FKOptions && pCol.FKOptions.length > 0)
+        {
+            const sel = document.createElement("select");
+            sel.className = "seed-cell-select";
+            sel.title = pCol.FKTableName ? "References: " + pCol.FKTableName : "";
+
+            // Blank option for non-required
+            if (!pCol.IsRequired)
+            {
+                const blankOpt = document.createElement("option");
+                blankOpt.value = "";
+                blankOpt.textContent = "— none —";
+                sel.appendChild(blankOpt);
+            }
+
+            for (const opt of pCol.FKOptions)
+            {
+                const option = document.createElement("option");
+                option.value = opt.Value;
+                option.textContent = opt.Label || opt.Value;
+                if (opt.Value === pCurrentValue)
+                    option.selected = true;
+                sel.appendChild(option);
+            }
+
+            // If current value not in options, add it (data from C#)
+            if (pCurrentValue && !pCol.FKOptions.some(function(o) { return o.Value === pCurrentValue; }))
+            {
+                const orphan = document.createElement("option");
+                orphan.value = pCurrentValue;
+                orphan.textContent = pCurrentValue + " ⚠";
+                orphan.selected = true;
+                sel.appendChild(orphan);
+            }
+
+            sel.addEventListener("change", function() {
+                pRow.Values[pCol.FieldID] = this.value;
+                ClearCellError(this.parentElement);
+            });
+
+            return sel;
+        }
+
+        // Date/DateTime → date input
+        if (pCol.DataType === "Date" || pCol.DataType === "DateTime")
+        {
+            const inp = document.createElement("input");
+            inp.type = pCol.DataType === "Date" ? "date" : "datetime-local";
+            inp.className = "seed-cell-input";
+            inp.value = FormatDateForInput(pCurrentValue, pCol.DataType);
+
+            inp.addEventListener("input", function() {
+                pRow.Values[pCol.FieldID] = this.value;
+                ClearCellError(this.parentElement);
+            });
+            inp.addEventListener("change", function() {
+                pRow.Values[pCol.FieldID] = this.value;
+            });
+
+            return inp;
+        }
+
+        // Number types → numeric input
+        if (IsNumericType(pCol.DataType))
+        {
+            const inp = document.createElement("input");
+            inp.type = "text";
+            inp.inputMode = "numeric";
+            inp.className = "seed-cell-input" + (pCol.IsPrimaryKey ? " seed-cell-pk" : "");
+            inp.value = pCurrentValue;
+            inp.placeholder = pCol.DataType === "Guid" ? "GUID" : "0";
+            if (pCol.IsPrimaryKey && pCurrentValue === "")
+                inp.value = SuggestNextPKValue(pAllColumns, pCol);
+
+            inp.addEventListener("input", function() {
+                pRow.Values[pCol.FieldID] = this.value;
+                ClearCellError(this.parentElement);
+            });
+            inp.addEventListener("blur", function() {
+                const err = ValidateCellValue(pCol, this.value);
+                if (err)
+                    ShowCellError(this.parentElement, err);
+            });
+
+            return inp;
+        }
+
+        // Guid type → text with pattern
+        if (pCol.DataType === "Guid")
+        {
+            const inp = document.createElement("input");
+            inp.type = "text";
+            inp.className = "seed-cell-input" + (pCol.IsPrimaryKey ? " seed-cell-pk" : "");
+            inp.value = pCurrentValue;
+            inp.placeholder = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx";
+            inp.maxLength = 36;
+
+            inp.addEventListener("input", function() {
+                pRow.Values[pCol.FieldID] = this.value;
+                ClearCellError(this.parentElement);
+            });
+            inp.addEventListener("blur", function() {
+                const err = ValidateCellValue(pCol, this.value);
+                if (err)
+                    ShowCellError(this.parentElement, err);
+            });
+
+            return inp;
+        }
+        const inp = document.createElement("input");
+        inp.type = "text";
+        inp.className = "seed-cell-input" + (pCol.IsPrimaryKey ? " seed-cell-pk" : "");
+        inp.value = pCurrentValue;
+
+        if (pCol.DataType === "Text")
+            inp.title = "Text (unlimited length)";
+        else if (pCol.Length && pCol.Length > 0)
+        {
+            inp.maxLength = pCol.Length;
+            inp.title = "Max length: " + pCol.Length;
+        }
+
+        inp.addEventListener("input", function() {
+            pRow.Values[pCol.FieldID] = this.value;
+            ClearCellError(this.parentElement);
+        });
+        inp.addEventListener("blur", function() {
+            const err = ValidateCellValue(pCol, this.value);
+            if (err)
+                ShowCellError(this.parentElement, err);
+        });
+
+        return inp;
+    }
+
+    function SuggestNextPKValue(pAllColumns, pPKColumn)
+    {
+        if (!_SeedEditor)
+            return "";
+
+        if (pPKColumn.DataType === "Guid")
+            return GenerateSequentialGuid();
+
+        // Find max existing PK value and return max+1
+        let max = -1;
+        for (const row of _SeedEditor.Rows)
+        {
+            const val = row.Values[pPKColumn.FieldID];
+            if (val !== undefined && val !== "")
+            {
+                const n = parseInt(val, 10);
+                if (!isNaN(n) && n > max)
+                    max = n;
+            }
+        }
+
+        return String(max + 1);
+    }
+
+    /**
+     * Generates a time-ordered UUID (UUID v7 style).
+     * The first 48 bits are the current timestamp in ms, making values
+     * naturally sortable by creation order while remaining unique.
+     */
+    function GenerateSequentialGuid()
+    {
+        const now = Date.now();
+        _GuidSeq = (_GuidSeq + 1) & 0xFFF;
+
+        // p1 + p2: 48-bit ms timestamp (sortable prefix)
+        const tsHex = now.toString(16).padStart(12, "0");
+        const p1    = tsHex.substring(0, 8);
+        const p2    = tsHex.substring(8, 12);
+
+        // p3: version nibble (7) + 12-bit sequence counter
+        const p3 = "7" + _GuidSeq.toString(16).padStart(3, "0");
+
+        // p4: variant bits (10xx) + 14 random bits
+        const varNibble = (0x8 | (Math.random() * 4 | 0)).toString(16);
+        const randA     = (Math.random() * 0xFFF | 0).toString(16).padStart(3, "0");
+        const p4 = varNibble + randA;
+
+        // p5: 48 random bits
+        const p5 = (Math.random() * 0xFFFFFFFF | 0).toString(16).padStart(8, "0") +
+                   (Math.random() * 0xFFFF     | 0).toString(16).padStart(4, "0");
+
+        return p1 + "-" + p2 + "-" + p3 + "-" + p4 + "-" + p5;
+    }
+
+    // ── Row operations ────────────────────────────────────────────────────
+
+    function AddSeedRow()
+    {
+        if (!_SeedEditor)
+            return;
+
+        const newRow = { TupleID: "NEW_" + (_SeedNextNewId++), Values: {}, IsNew: true };
+
+        // Pre-populate defaults
+        for (const col of _SeedEditor.Columns)
+        {
+            if (col.DataType === "Boolean")
+                newRow.Values[col.FieldID] = "false";
+            else if (col.IsPrimaryKey)
+                newRow.Values[col.FieldID] = SuggestNextPKValue(_SeedEditor.Columns, col);
+            else if (col.IsForeignKey && col.FKOptions && col.FKOptions.length > 0 && col.IsRequired)
+                newRow.Values[col.FieldID] = col.FKOptions[0].Value;
+            else
+                newRow.Values[col.FieldID] = "";
+        }
+
+        _SeedEditor.Rows.push(newRow);
+        _SeedEditor.SelectedRows.clear();
+
+        // Re-render the grid
+        BuildSeedGrid();
+        UpdateSeedRowCount();
+        SetSeedValidationBadge(null);
+
+        // Focus first editable cell of the new row
+        const tbody = document.getElementById("seed-grid-body");
+        const newTR = tbody.lastElementChild;
+        if (newTR)
+        {
+            const firstInput = newTR.querySelector("input:not([type=checkbox]), select");
+            if (firstInput)
+            {
+                firstInput.focus();
+                if (firstInput.type === "text")
+                    firstInput.select();
+                newTR.scrollIntoView({ block: "nearest" });
+            }
+        }
+    }
+
+    function DeleteSelectedSeedRows()
+    {
+        if (!_SeedEditor || _SeedEditor.SelectedRows.size === 0)
+            return;
+
+        const indices = Array.from(_SeedEditor.SelectedRows).sort(function(a, b) { return b - a; });
+        for (const idx of indices)
+            _SeedEditor.Rows.splice(idx, 1);
+
+        _SeedEditor.SelectedRows.clear();
+        BuildSeedGrid();
+        UpdateSeedRowCount();
+        SetSeedValidationBadge(null);
+        SetSeedStatusMessage(indices.length + " row(s) deleted.", "");
+    }
+
+    // ── Selection visuals ─────────────────────────────────────────────────
+
+    function UpdateRowSelectionVisuals()
+    {
+        if (!_SeedEditor)
+            return;
+
+        const tbody = document.getElementById("seed-grid-body");
+        const rows  = tbody.querySelectorAll("tr[data-row-index]");
+
+        rows.forEach(function(tr) {
+            const idx = parseInt(tr.getAttribute("data-row-index"), 10);
+            const selected = _SeedEditor.SelectedRows.has(idx);
+            tr.classList.toggle("seed-row-selected", selected);
+            const chk = tr.querySelector(".seed-row-checkbox");
+            if (chk)
+                chk.checked = selected;
+        });
+
+        SyncSelectAllCheckbox();
+    }
+
+    function SyncSelectAllCheckbox()
+    {
+        if (!_SeedEditor)
+            return;
+        const selectAll = document.querySelector("#seed-grid-head .seed-row-checkbox");
+        if (!selectAll)
+            return;
+        const total = _SeedEditor.Rows.length;
+        const selectedCount = _SeedEditor.SelectedRows.size;
+        selectAll.checked = total > 0 && selectedCount === total;
+        selectAll.indeterminate = selectedCount > 0 && selectedCount < total;
+    }
+
+    function UpdateSeedRowCount()
+    {
+        if (!_SeedEditor)
+            return;
+        const badge = document.getElementById("seed-row-count");
+        const n = _SeedEditor.Rows.length;
+        badge.textContent = n + (n === 1 ? " row" : " rows");
+    }
+
+    // ── Validation ────────────────────────────────────────────────────────
+
+    const NumericTypes = ["Int8", "Int16", "Int32", "Int64", "Decimal", "Float", "Double", "Numeric", "Byte"];
+
+    function IsNumericType(pDataType)
+    {
+        return NumericTypes.indexOf(pDataType) >= 0;
+    }
+
+    function GetShortTypeName(pDataType)
+    {
+        const map = {
+            "String": "str", "Text": "txt", "Int8": "i8", "Int16": "i16",
+            "Int32": "i32", "Int64": "i64", "Decimal": "dec", "Numeric": "num",
+            "Float": "f32", "Double": "f64", "Boolean": "bool",
+            "Date": "date", "DateTime": "dt", "Guid": "guid", "Binary": "bin", "Byte": "byte"
+        };
+        return map[pDataType] || pDataType.toLowerCase().substring(0, 4);
+    }
+
+    function FormatDateForInput(pValue, pDataType)
+    {
+        if (!pValue)
+            return "";
+        // Try to parse and reformat for date/datetime-local inputs
+        try
+        {
+            const d = new Date(pValue);
+            if (isNaN(d.getTime()))
+                return pValue;
+            if (pDataType === "Date")
+                return d.toISOString().substring(0, 10);
+            // datetime-local: YYYY-MM-DDTHH:MM
+            return d.toISOString().substring(0, 16);
+        }
+        catch
+        {
+            return pValue;
+        }
+    }
+
+    function ValidateCellValue(pCol, pValue)
+    {
+        if (!pValue && pValue !== "0" && pValue !== "false")
+        {
+            if (pCol.IsRequired || pCol.IsPrimaryKey)
+                return pCol.Name + " is required.";
+            return null;
+        }
+
+        if (IsNumericType(pCol.DataType))
+        {
+            const n = Number(pValue);
+            if (isNaN(n))
+                return pCol.Name + ": expected a number.";
+            if ((pCol.DataType === "Int8" || pCol.DataType === "Int16" ||
+                 pCol.DataType === "Int32" || pCol.DataType === "Int64") && !Number.isInteger(n))
+                return pCol.Name + ": expected an integer.";
+        }
+
+        if (pCol.DataType === "Guid")
+        {
+            const guidRe = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+            if (!guidRe.test(pValue))
+                return pCol.Name + ": invalid GUID format.";
+        }
+
+        if (pCol.IsForeignKey && pCol.FKOptions && pCol.FKOptions.length > 0)
+        {
+            const valid = pCol.FKOptions.some(function(o) { return o.Value === pValue; });
+            if (!valid)
+                return pCol.Name + ": value not found in " + (pCol.FKTableName || "referenced table") + ".";
+        }
+
+        if (pCol.Length && pCol.Length > 0 && pValue.length > pCol.Length)
+            return pCol.Name + ": max length is " + pCol.Length + " (current: " + pValue.length + ").";
+
+        return null;
+    }
+
+    function ValidateAllSeedRows()
+    {
+        if (!_SeedEditor)
+            return [];
+
+        const errors = [];
+        const pkColumn = _SeedEditor.Columns.find(function(c) { return c.IsPrimaryKey; });
+        const pkValues = new Set();
+
+        for (let i = 0; i < _SeedEditor.Rows.length; i++)
+        {
+            const row = _SeedEditor.Rows[i];
+
+            for (const col of _SeedEditor.Columns)
+            {
+                const value = row.Values[col.FieldID] !== undefined ? row.Values[col.FieldID] : "";
+                const err = ValidateCellValue(col, value);
+                if (err)
+                    errors.push({ Row: i, FieldID: col.FieldID, Message: err });
+            }
+
+            // PK uniqueness
+            if (pkColumn)
+            {
+                const pkVal = row.Values[pkColumn.FieldID];
+                if (pkVal !== undefined && pkVal !== "")
+                {
+                    if (pkValues.has(pkVal))
+                        errors.push({ Row: i, FieldID: pkColumn.FieldID, Message: "Duplicate PK value: " + pkVal });
+                    else
+                        pkValues.add(pkVal);
+                }
+            }
+        }
+
+        return errors;
+    }
+
+    function ShowCellError(pTD, pMessage)
+    {
+        if (!pTD)
+            return;
+        const widget = pTD.querySelector("input, select");
+        if (widget)
+            widget.classList.add("cell-error");
+
+        let errSpan = pTD.querySelector(".seed-cell-error-msg");
+        if (!errSpan)
+        {
+            errSpan = document.createElement("span");
+            errSpan.className = "seed-cell-error-msg";
+            pTD.appendChild(errSpan);
+        }
+        errSpan.textContent = pMessage;
+        pTD.closest("tr").classList.add("seed-row-error");
+    }
+
+    function ClearCellError(pTD)
+    {
+        if (!pTD)
+            return;
+        const widget = pTD.querySelector("input, select");
+        if (widget)
+            widget.classList.remove("cell-error");
+        const errSpan = pTD.querySelector(".seed-cell-error-msg");
+        if (errSpan)
+            errSpan.remove();
+
+        // Only remove row-error class if no other errors remain
+        const tr = pTD.closest("tr");
+        if (tr && tr.querySelectorAll(".seed-cell-error-msg").length === 0)
+            tr.classList.remove("seed-row-error");
+    }
+
+    function HighlightValidationErrors(pErrors)
+    {
+        if (!_SeedEditor)
+            return;
+
+        // Clear existing errors first
+        const tbody = document.getElementById("seed-grid-body");
+        tbody.querySelectorAll(".cell-error").forEach(function(el) { el.classList.remove("cell-error"); });
+        tbody.querySelectorAll(".seed-cell-error-msg").forEach(function(el) { el.remove(); });
+        tbody.querySelectorAll(".seed-row-error").forEach(function(tr) { tr.classList.remove("seed-row-error"); });
+
+        const columns = _SeedEditor.Columns;
+
+        for (const err of pErrors)
+        {
+            const tr = tbody.querySelector("tr[data-row-index='" + err.Row + "']");
+            if (!tr)
+                continue;
+
+            // Column index: +1 because of select column
+            const colIdx = columns.findIndex(function(c) { return c.FieldID === err.FieldID; });
+            if (colIdx < 0)
+                continue;
+
+            const td = tr.querySelectorAll("td")[colIdx + 1];
+            if (td)
+                ShowCellError(td, err.Message);
+
+            tr.scrollIntoView({ block: "nearest" });
+        }
+    }
+
+    function SetSeedValidationBadge(pErrors)
+    {
+        const badge = document.getElementById("seed-validation-badge");
+        if (!pErrors || pErrors.length === 0)
+        {
+            badge.style.display = "none";
+            badge.textContent = "";
+        }
+        else
+        {
+            badge.style.display = "flex";
+            badge.textContent = "⚠ " + pErrors.length + " validation error" + (pErrors.length > 1 ? "s" : "");
+        }
+    }
+
+    // ── Save / Collect ────────────────────────────────────────────────────
+
+    function CollectSeedData()
+    {
+        if (!_SeedEditor)
+            return [];
+
+        return _SeedEditor.Rows.map(function(row) {
+            return {
+                TupleID: row.TupleID.startsWith("NEW_") ? "NEW" : row.TupleID,
+                Values: Object.assign({}, row.Values)
+            };
+        });
+    }
+
+    function SaveSeedEditorData()
+    {
+        if (!_SeedEditor)
+            return;
+
+        // Flush any focused input values
+        const focused = document.activeElement;
+        if (focused && IsEditableTarget(focused))
+            focused.blur();
+
+        // Validate
+        const errors = ValidateAllSeedRows();
+        if (errors.length > 0)
+        {
+            HighlightValidationErrors(errors);
+            SetSeedValidationBadge(errors);
+            SetSeedStatusMessage("Please fix validation errors before saving.", "err");
+            return;
+        }
+
+        SetSeedValidationBadge(null);
+        document.getElementById("seed-btn-save").disabled = true;
+        SetSeedStatusMessage("Saving...", "");
+
+        const rows = CollectSeedData();
+
+        SendMessage(XMessageType.SaveSeedData, {
+            TableID: _SeedEditor.TableID,
+            Rows: rows
+        });
+    }
+
+    function OnSeedDataSaved(pPayload)
+    {
+        if (!_SeedEditor)
+            return;
+
+        const btnSave = document.getElementById("seed-btn-save");
+        if (!btnSave)
+            return;
+
+        if (pPayload && pPayload.Success)
+        {
+            SetSeedStatusMessage("✓ Saved successfully.", "ok");
+            btnSave.disabled = false;
+            // Update internal row IDs so any "NEW" rows get proper IDs on next refresh
+            // Close after brief confirmation
+            setTimeout(CloseSeedEditorModal, 900);
+        }
+        else
+        {
+            const msg = (pPayload && pPayload.Message) ? pPayload.Message : "Failed to save.";
+            SetSeedStatusMessage("✕ " + msg, "err");
+            btnSave.disabled = false;
+        }
+    }
+
+    // ── Status helpers ────────────────────────────────────────────────────
+
+    function SetSeedStatusMessage(pMsg, pType)
+    {
+        const el = document.getElementById("seed-status-msg");
+        if (!el)
+            return;
+        el.textContent = pMsg;
+        el.className = "seed-status-msg" + (pType ? " status-" + pType : "");
+    }
+
 })();

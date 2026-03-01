@@ -817,4 +817,60 @@ describe("XConfigResources", () =>
             expect(json).toContain("\n");
         });
     });
+
+    describe("CSharpTypeID migration fields", () =>
+    {
+        it("should include CSharpTypeID on the Guid type", () =>
+        {
+            const config = XConfigResources.GetORMDataType();
+            const guidType = config.Types.find(t => t.TypeName === "Guid");
+
+            expect(guidType).toBeDefined();
+            expect(guidType!.CSharpTypeID).toBe("8C5DEBC0-4165-4429-B106-1554552F802E");
+        });
+
+        it("should include CSharpTypeID on the Int32 type", () =>
+        {
+            const config = XConfigResources.GetORMDataType();
+            const int32Type = config.Types.find(t => t.TypeName === "Int32");
+
+            expect(int32Type).toBeDefined();
+            expect(int32Type!.CSharpTypeID).toBe("FAADA046-C1B9-4E89-9B64-310E272FC0CC");
+        });
+
+        it("should include CSharpTypeID on the String type", () =>
+        {
+            const config = XConfigResources.GetORMDataType();
+            const stringType = config.Types.find(t => t.TypeName === "String");
+
+            expect(stringType).toBeDefined();
+            expect(stringType!.CSharpTypeID).toBe("8A656713-0DBB-4D25-9CF9-8DA0DBAD4E62");
+        });
+
+        it("should include CSharpTypeID on the Int16 type", () =>
+        {
+            const config = XConfigResources.GetORMDataType();
+            const int16Type = config.Types.find(t => t.TypeName === "Int16");
+
+            expect(int16Type).toBeDefined();
+            expect(int16Type!.CSharpTypeID).toBe("5BD72111-603B-42E5-9488-53A4299E45EB");
+        });
+
+        it("should allow XORMDataTypeInfo without CSharpTypeID (optional field)", () =>
+        {
+            const typeInfo = {
+                TypeName: "CustomType",
+                CanUseInPK: false,
+                HasLength: true,
+                HasScale: false,
+                CanUseInIndex: true,
+                IsUTF8: false,
+                CanAutoIncrement: false
+            };
+
+            // CSharpTypeID is optional — object without it should be valid
+            expect(typeInfo.TypeName).toBe("CustomType");
+            expect((typeInfo as any).CSharpTypeID).toBeUndefined();
+        });
+    });
 });

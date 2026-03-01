@@ -119,10 +119,31 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
             return;
 
         state.UpdateProperty(this._ElementID, pPropertyKey, pValue);
-        
-        // Update internal properties cache but do NOT refresh the view
-        // The user is actively typing in the input - refreshing would cause focus loss
+
+        // Refresh properties list — structure may change (e.g. DataType changes visible fields)
+        const oldKeys = this._Properties.map(p => p.Key).join(",");
         this._Properties = await state.GetProperties(this._ElementID);
+        const newKeys = this._Properties.map(p => p.Key).join(",");
+
+        // Only send UpdateProperties when structure changes; avoids innerHTML re-render on every keystroke
+        if (oldKeys !== newKeys && this._View)
+        {
+            const serializedProperties = this._Properties.map(p => ({
+                Key: p.Key,
+                Name: p.Name,
+                Value: p.Value,
+                Type: p.Type,
+                Options: p.Options,
+                IsReadOnly: p.IsReadOnly,
+                Category: p.Category,
+                Group: p.Group
+            }));
+            this._View.webview.postMessage({
+                Type: "UpdateProperties",
+                ElementID: this._ElementID,
+                Properties: serializedProperties
+            });
+        }
 
         const modelData = await state.GetModelData();
         panel.webview.postMessage({
@@ -130,6 +151,7 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
             Payload: modelData
         });
 
+        await this._DesignerProvider.SendIssuesUpdate(panel, state);
         state.Save();
     }
 
@@ -312,6 +334,14 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
             cursor: pointer;
             min-height: 20px;
         }
+        .datatype-dropdown.disabled {
+            opacity: 0.55;
+            pointer-events: none;
+            cursor: default;
+        }
+        .datatype-dropdown.disabled .datatype-dropdown-selected:hover {
+            background-color: transparent;
+        }
         .datatype-dropdown-selected:hover {
             border-color: var(--vscode-focusBorder);
         }
@@ -381,6 +411,70 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
             text-transform: uppercase;
             letter-spacing: 0.5px;
             opacity: 0.8;
+        }
+        .multifile-dropdown {
+            position: relative;
+            width: 100%;
+        }
+        .multifile-dropdown-selected {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 4px;
+            background-color: var(--vscode-input-background);
+            border: 1px solid var(--vscode-input-border);
+            cursor: pointer;
+            min-height: 20px;
+        }
+        .multifile-dropdown-selected:hover {
+            border-color: var(--vscode-focusBorder);
+        }
+        .multifile-dropdown-text {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 11px;
+        }
+        .multifile-dropdown-arrow {
+            margin-left: auto;
+            font-size: 10px;
+        }
+        .multifile-dropdown-list {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 150px;
+            overflow-y: auto;
+            background-color: var(--vscode-input-background);
+            border: 1px solid var(--vscode-input-border);
+            z-index: 1000;
+        }
+        .multifile-dropdown.open .multifile-dropdown-list {
+            display: block;
+        }
+        .multifile-dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 6px;
+            cursor: pointer;
+        }
+        .multifile-dropdown-item:hover {
+            background-color: var(--vscode-list-hoverBackground);
+        }
+        .multifile-dropdown-item label {
+            cursor: pointer;
+            flex: 1;
+            font-size: 11px;
+        }
+        .multifile-no-options {
+            padding: 4px 6px;
+            opacity: 0.6;
+            font-style: italic;
+            font-size: 11px;
         }
     </style>
 </head>
@@ -559,17 +653,13 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
             return DataTypeIcons[pDataType] || (pDataType ? pDataType.substring(0, 3) : "?");
         }
 
-        console.log("[PropertiesWebview] Script initialized with", initialProperties.length, "properties");
-        
         // Render initial properties immediately
         RenderProperties(initialProperties);
         
         window.addEventListener("message", function(pEvent) {
             const msg = pEvent.data;
-            console.log("[PropertiesWebview] Message received:", msg.Type, msg);
             if (msg.Type === "UpdateProperties")
             {
-                console.log("[PropertiesWebview] UpdateProperties - ElementID:", msg.ElementID, "Properties count:", msg.Properties?.length);
                 currentElementID = msg.ElementID;
                 RenderProperties(msg.Properties);
             }
@@ -577,7 +667,6 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
 
         function RenderProperties(pProperties)
         {
-            console.log("[PropertiesWebview] RenderProperties called with:", pProperties?.length || 0, "properties");
             const container = document.getElementById("properties-container");
             
             if (!pProperties || pProperties.length === 0)
@@ -585,6 +674,12 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                 container.innerHTML = '<div class="no-selection">No element selected</div>';
                 return;
             }
+
+            // Save focus state so we can restore it after DOM replacement
+            const focusedEl = document.activeElement;
+            const focusedKey = focusedEl ? focusedEl.getAttribute("data-key") : null;
+            const selStart = (focusedEl && focusedEl.selectionStart !== undefined) ? focusedEl.selectionStart : null;
+            const selEnd = (focusedEl && focusedEl.selectionEnd !== undefined) ? focusedEl.selectionEnd : null;
 
             const groups = new Map();
             for (const prop of pProperties)
@@ -613,6 +708,17 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
             
             container.innerHTML = html;
             AttachEventHandlers();
+
+            // Restore focus and cursor position after DOM replacement
+            if (focusedKey)
+            {
+                const restored = container.querySelector('[data-key="' + focusedKey + '"]');
+                if (restored && restored.tagName === "INPUT" && restored.type !== "checkbox")
+                {
+                    restored.focus();
+                    try { if (selStart !== null) restored.setSelectionRange(selStart, selEnd); } catch (e) {}
+                }
+            }
         }
 
         function FindColorName(pHex)
@@ -630,13 +736,14 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
         {
             const key = EscapeHtml(pProp.Key);
             const value = pProp.Value !== null && pProp.Value !== undefined ? pProp.Value : "";
-            const readonly = pProp.Key === "ID" ? "readonly" : "";
+            const readonly = pProp.IsReadOnly || pProp.Key === "ID" ? "readonly" : "";
 
             switch (pProp.Type)
             {
                 case "Boolean":
                     const checked = pProp.Value ? "checked" : "";
-                    return '<input type="checkbox" data-key="' + key + '" ' + checked + '>';
+                    const disabledCheck = pProp.IsReadOnly ? " disabled" : "";
+                    return '<input type="checkbox" data-key="' + key + '" ' + checked + disabledCheck + '>';
 
                 case "Number":
                     return '<input type="number" data-key="' + key + '" value="' + value + '" ' + readonly + '>';
@@ -645,8 +752,17 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                     // Use custom datatype dropdown for DataType and PKType properties
                     if (pProp.Key === "DataType" || pProp.Key === "PKType")
                     {
-                        let dataTypeItems = "";
                         const currentValue = String(value);
+                        const currentIcon = GetDataTypeIcon(currentValue);
+                        if (pProp.IsReadOnly)
+                        {
+                            return '<div class="datatype-dropdown disabled" data-key="' + key + '">' +
+                                   '<div class="datatype-dropdown-selected">' +
+                                   '<span class="datatype-dropdown-icon">' + currentIcon + '</span>' +
+                                   '<span class="datatype-dropdown-name">' + EscapeHtml(currentValue) + '</span>' +
+                                   '</div></div>';
+                        }
+                        let dataTypeItems = "";
                         if (pProp.Options)
                         {
                             for (const opt of pProp.Options)
@@ -658,7 +774,6 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                                                  '<span class="datatype-dropdown-name">' + EscapeHtml(opt) + '</span></div>';
                             }
                         }
-                        const currentIcon = GetDataTypeIcon(currentValue);
                         return '<div class="datatype-dropdown" data-key="' + key + '">' +
                                '<div class="datatype-dropdown-selected">' +
                                '<span class="datatype-dropdown-icon">' + currentIcon + '</span>' +
@@ -676,7 +791,7 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                             options += '<option value="' + EscapeHtml(opt) + '" ' + selected + '>' + EscapeHtml(opt) + '</option>';
                         }
                     }
-                    return '<select data-key="' + key + '">' + options + '</select>';
+                    return '<select data-key="' + key + '"' + (pProp.IsReadOnly ? ' disabled' : '') + '>' + options + '</select>';
 
                 case "Color":
                     const hexColor = ConvertToHtmlColor(value);
@@ -696,6 +811,34 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                            '<span class="color-dropdown-arrow">▼</span></div>' +
                            '<div class="color-dropdown-list">' + colorItems + '</div></div>';
 
+                case "MultiFileSelect":
+                    const selectedFiles = value ? String(value).split("|").filter(function(f) { return f.length > 0; }) : [];
+                    const displayText = selectedFiles.length > 0 ? selectedFiles.join(", ") : "(none)";
+                    let checkboxItems = "";
+                    if (pProp.Options && pProp.Options.length > 0)
+                    {
+                        for (const opt of pProp.Options)
+                        {
+                            const isChecked = selectedFiles.indexOf(opt) >= 0 ? "checked" : "";
+                            const cbId = "mf_" + key + "_" + opt.replace(/[^a-zA-Z0-9]/g, "_");
+                            checkboxItems += '<div class="multifile-dropdown-item">' +
+                                '<input type="checkbox" id="' + EscapeHtml(cbId) + '" data-file="' + EscapeHtml(opt) + '" ' + isChecked + '>' +
+                                '<label for="' + EscapeHtml(cbId) + '">' + EscapeHtml(opt) + '</label>' +
+                                '</div>';
+                        }
+                    }
+                    else
+                    {
+                        checkboxItems = '<div class="multifile-no-options">No .dsorm files found</div>';
+                    }
+                    return '<div class="multifile-dropdown" data-key="' + key + '">' +
+                           '<div class="multifile-dropdown-selected">' +
+                           '<span class="multifile-dropdown-text">' + EscapeHtml(displayText) + '</span>' +
+                           '<span class="multifile-dropdown-arrow">▼</span>' +
+                           '</div>' +
+                           '<div class="multifile-dropdown-list">' + checkboxItems + '</div>' +
+                           '</div>';
+
                 default:
                     return '<input type="text" data-key="' + key + '" value="' + EscapeHtml(String(value)) + '" ' + readonly + '>';
             }
@@ -705,6 +848,7 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
         {
             if (!pArgbHex || pArgbHex.length !== 8)
                 return "#000000";
+            // XColor.ToString() returns AARRGGBB — strip alpha, prefix with #
             return "#" + pArgbHex.substring(2);
         }
 
@@ -786,7 +930,7 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
             });
 
             // Handle custom datatype dropdowns
-            const datatypeDropdowns = document.querySelectorAll(".datatype-dropdown");
+            const datatypeDropdowns = document.querySelectorAll(".datatype-dropdown:not(.disabled)");
             datatypeDropdowns.forEach(function(dropdown) {
                 const selected = dropdown.querySelector(".datatype-dropdown-selected");
                 const items = dropdown.querySelectorAll(".datatype-dropdown-item");
@@ -832,12 +976,44 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                 });
             });
 
+            // Handle multifile-select dropdowns
+            const multiFileDropdowns = document.querySelectorAll(".multifile-dropdown");
+            multiFileDropdowns.forEach(function(dropdown) {
+                const selected = dropdown.querySelector(".multifile-dropdown-selected");
+                const key = dropdown.getAttribute("data-key");
+                const textEl = dropdown.querySelector(".multifile-dropdown-text");
+
+                selected.addEventListener("click", function(e) {
+                    e.stopPropagation();
+                    document.querySelectorAll(".color-dropdown.open, .datatype-dropdown.open, .multifile-dropdown.open").forEach(function(d) {
+                        if (d !== dropdown) d.classList.remove("open");
+                    });
+                    dropdown.classList.toggle("open");
+                });
+
+                dropdown.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
+                    cb.addEventListener("change", function(e) {
+                        e.stopPropagation();
+                        const checked = [];
+                        dropdown.querySelectorAll('input[type="checkbox"]').forEach(function(c) {
+                            if (c.checked) checked.push(c.getAttribute("data-file"));
+                        });
+                        const val = checked.join("|");
+                        textEl.textContent = checked.length > 0 ? checked.join(", ") : "(none)";
+                        vscode.postMessage({ Type: "UpdateProperty", PropertyKey: key, Value: val });
+                    });
+                });
+            });
+
             // Close dropdowns when clicking outside
             document.addEventListener("click", function() {
                 document.querySelectorAll(".color-dropdown.open").forEach(function(d) {
                     d.classList.remove("open");
                 });
                 document.querySelectorAll(".datatype-dropdown.open").forEach(function(d) {
+                    d.classList.remove("open");
+                });
+                document.querySelectorAll(".multifile-dropdown.open").forEach(function(d) {
                     d.classList.remove("open");
                 });
             });
@@ -992,6 +1168,70 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
         }
         .color-dropdown-item.selected {
             background-color: var(--vscode-list-activeSelectionBackground);
+        }
+        .multifile-dropdown {
+            position: relative;
+            width: 100%;
+        }
+        .multifile-dropdown-selected {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 4px;
+            background-color: var(--vscode-input-background);
+            border: 1px solid var(--vscode-input-border);
+            cursor: pointer;
+            min-height: 20px;
+        }
+        .multifile-dropdown-selected:hover {
+            border-color: var(--vscode-focusBorder);
+        }
+        .multifile-dropdown-text {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 11px;
+        }
+        .multifile-dropdown-arrow {
+            margin-left: auto;
+            font-size: 10px;
+        }
+        .multifile-dropdown-list {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 150px;
+            overflow-y: auto;
+            background-color: var(--vscode-input-background);
+            border: 1px solid var(--vscode-input-border);
+            z-index: 1000;
+        }
+        .multifile-dropdown.open .multifile-dropdown-list {
+            display: block;
+        }
+        .multifile-dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 6px;
+            cursor: pointer;
+        }
+        .multifile-dropdown-item:hover {
+            background-color: var(--vscode-list-hoverBackground);
+        }
+        .multifile-dropdown-item label {
+            cursor: pointer;
+            flex: 1;
+            font-size: 11px;
+        }
+        .multifile-no-options {
+            padding: 4px 6px;
+            opacity: 0.6;
+            font-style: italic;
+            font-size: 11px;
         }
     </style>
 </head>
@@ -1170,14 +1410,10 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
             return DataTypeIcons[pDataType] || (pDataType ? pDataType.substring(0, 3) : "?");
         }
         
-        console.log("[PropertiesWebview] Script initialized");
-        
         window.addEventListener("message", function(pEvent) {
             const msg = pEvent.data;
-            console.log("[PropertiesWebview] Message received:", msg.Type, msg);
             if (msg.Type === "UpdateProperties")
             {
-                console.log("[PropertiesWebview] UpdateProperties - ElementID:", msg.ElementID, "Properties count:", msg.Properties?.length);
                 currentElementID = msg.ElementID;
                 RenderProperties(msg.Properties);
             }
@@ -1185,7 +1421,6 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
 
         function RenderProperties(pProperties)
         {
-            console.log("[PropertiesWebview] RenderProperties called with:", pProperties);
             const container = document.getElementById("properties-container");
             
             if (!pProperties || pProperties.length === 0)
@@ -1193,6 +1428,12 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                 container.innerHTML = '<div class="no-selection">No element selected</div>';
                 return;
             }
+
+            // Save focus state so we can restore it after DOM replacement
+            const focusedEl = document.activeElement;
+            const focusedKey = focusedEl ? focusedEl.getAttribute("data-key") : null;
+            const selStart = (focusedEl && focusedEl.selectionStart !== undefined) ? focusedEl.selectionStart : null;
+            const selEnd = (focusedEl && focusedEl.selectionEnd !== undefined) ? focusedEl.selectionEnd : null;
 
             const groups = new Map();
             for (const prop of pProperties)
@@ -1221,19 +1462,31 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
             
             container.innerHTML = html;
             AttachEventHandlers();
+
+            // Restore focus and cursor position after DOM replacement
+            if (focusedKey)
+            {
+                const restored = container.querySelector('[data-key="' + focusedKey + '"]');
+                if (restored && restored.tagName === "INPUT" && restored.type !== "checkbox")
+                {
+                    restored.focus();
+                    try { if (selStart !== null) restored.setSelectionRange(selStart, selEnd); } catch (e) {}
+                }
+            }
         }
 
         function GetPropertyEditor(pProp)
         {
             const key = EscapeHtml(pProp.Key);
             const value = pProp.Value !== null && pProp.Value !== undefined ? pProp.Value : "";
-            const readonly = pProp.Key === "ID" ? "readonly" : "";
+            const readonly = pProp.IsReadOnly || pProp.Key === "ID" ? "readonly" : "";
 
             switch (pProp.Type)
             {
                 case "Boolean":
                     const checked = pProp.Value ? "checked" : "";
-                    return '<input type="checkbox" data-key="' + key + '" ' + checked + '>';
+                    const disabledCheck = pProp.IsReadOnly ? " disabled" : "";
+                    return '<input type="checkbox" data-key="' + key + '" ' + checked + disabledCheck + '>';
 
                 case "Number":
                     return '<input type="number" data-key="' + key + '" value="' + value + '" ' + readonly + '>';
@@ -1242,8 +1495,17 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                     // Use custom datatype dropdown for DataType and PKType properties
                     if (pProp.Key === "DataType" || pProp.Key === "PKType")
                     {
-                        let dataTypeItems = "";
                         const currentValue = String(value);
+                        const currentIcon = GetDataTypeIcon(currentValue);
+                        if (pProp.IsReadOnly)
+                        {
+                            return '<div class="datatype-dropdown disabled" data-key="' + key + '">' +
+                                   '<div class="datatype-dropdown-selected">' +
+                                   '<span class="datatype-dropdown-icon">' + currentIcon + '</span>' +
+                                   '<span class="datatype-dropdown-name">' + EscapeHtml(currentValue) + '</span>' +
+                                   '</div></div>';
+                        }
+                        let dataTypeItems = "";
                         if (pProp.Options)
                         {
                             for (const opt of pProp.Options)
@@ -1255,7 +1517,6 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                                                  '<span class="datatype-dropdown-name">' + EscapeHtml(opt) + '</span></div>';
                             }
                         }
-                        const currentIcon = GetDataTypeIcon(currentValue);
                         return '<div class="datatype-dropdown" data-key="' + key + '">' +
                                '<div class="datatype-dropdown-selected">' +
                                '<span class="datatype-dropdown-icon">' + currentIcon + '</span>' +
@@ -1273,7 +1534,7 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                             options += '<option value="' + EscapeHtml(opt) + '" ' + selected + '>' + EscapeHtml(opt) + '</option>';
                         }
                     }
-                    return '<select data-key="' + key + '">' + options + '</select>';
+                    return '<select data-key="' + key + '"' + (pProp.IsReadOnly ? ' disabled' : '') + '>' + options + '</select>';
 
                 case "Color":
                     const hexColor = ConvertToHtmlColor(value);
@@ -1292,6 +1553,34 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                            '<span class="color-dropdown-name">' + selectedColor.name + '</span>' +
                            '<span class="color-dropdown-arrow">▼</span></div>' +
                            '<div class="color-dropdown-list">' + colorItems + '</div></div>';
+
+                case "MultiFileSelect":
+                    const selectedFiles = value ? String(value).split("|").filter(function(f) { return f.length > 0; }) : [];
+                    const displayText = selectedFiles.length > 0 ? selectedFiles.join(", ") : "(none)";
+                    let checkboxItems = "";
+                    if (pProp.Options && pProp.Options.length > 0)
+                    {
+                        for (const opt of pProp.Options)
+                        {
+                            const isChecked = selectedFiles.indexOf(opt) >= 0 ? "checked" : "";
+                            const cbId = "mf_" + key + "_" + opt.replace(/[^a-zA-Z0-9]/g, "_");
+                            checkboxItems += '<div class="multifile-dropdown-item">' +
+                                '<input type="checkbox" id="' + EscapeHtml(cbId) + '" data-file="' + EscapeHtml(opt) + '" ' + isChecked + '>' +
+                                '<label for="' + EscapeHtml(cbId) + '">' + EscapeHtml(opt) + '</label>' +
+                                '</div>';
+                        }
+                    }
+                    else
+                    {
+                        checkboxItems = '<div class="multifile-no-options">No .dsorm files found</div>';
+                    }
+                    return '<div class="multifile-dropdown" data-key="' + key + '">' +
+                           '<div class="multifile-dropdown-selected">' +
+                           '<span class="multifile-dropdown-text">' + EscapeHtml(displayText) + '</span>' +
+                           '<span class="multifile-dropdown-arrow">▼</span>' +
+                           '</div>' +
+                           '<div class="multifile-dropdown-list">' + checkboxItems + '</div>' +
+                           '</div>';
 
                 default:
                     return '<input type="text" data-key="' + key + '" value="' + EscapeHtml(String(value)) + '" ' + readonly + '>';
@@ -1385,7 +1674,7 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
             });
 
             // Handle custom datatype dropdowns
-            const datatypeDropdowns = document.querySelectorAll(".datatype-dropdown");
+            const datatypeDropdowns = document.querySelectorAll(".datatype-dropdown:not(.disabled)");
             datatypeDropdowns.forEach(function(dropdown) {
                 const selected = dropdown.querySelector(".datatype-dropdown-selected");
                 const items = dropdown.querySelectorAll(".datatype-dropdown-item");
@@ -1431,12 +1720,44 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                 });
             });
 
+            // Handle multifile-select dropdowns
+            const multiFileDropdowns = document.querySelectorAll(".multifile-dropdown");
+            multiFileDropdowns.forEach(function(dropdown) {
+                const selected = dropdown.querySelector(".multifile-dropdown-selected");
+                const key = dropdown.getAttribute("data-key");
+                const textEl = dropdown.querySelector(".multifile-dropdown-text");
+
+                selected.addEventListener("click", function(e) {
+                    e.stopPropagation();
+                    document.querySelectorAll(".color-dropdown.open, .datatype-dropdown.open, .multifile-dropdown.open").forEach(function(d) {
+                        if (d !== dropdown) d.classList.remove("open");
+                    });
+                    dropdown.classList.toggle("open");
+                });
+
+                dropdown.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
+                    cb.addEventListener("change", function(e) {
+                        e.stopPropagation();
+                        const checked = [];
+                        dropdown.querySelectorAll('input[type="checkbox"]').forEach(function(c) {
+                            if (c.checked) checked.push(c.getAttribute("data-file"));
+                        });
+                        const val = checked.join("|");
+                        textEl.textContent = checked.length > 0 ? checked.join(", ") : "(none)";
+                        vscode.postMessage({ Type: "UpdateProperty", PropertyKey: key, Value: val });
+                    });
+                });
+            });
+
             // Close dropdowns when clicking outside
             document.addEventListener("click", function() {
                 document.querySelectorAll(".color-dropdown.open").forEach(function(d) {
                     d.classList.remove("open");
                 });
                 document.querySelectorAll(".datatype-dropdown.open").forEach(function(d) {
+                    d.classList.remove("open");
+                });
+                document.querySelectorAll(".multifile-dropdown.open").forEach(function(d) {
                     d.classList.remove("open");
                 });
             });

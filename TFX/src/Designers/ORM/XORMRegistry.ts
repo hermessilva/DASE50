@@ -3,9 +3,16 @@ import { XORMDocument } from "./XORMDocument.js";
 import { XORMDesign } from "./XORMDesign.js";
 import { XORMTable } from "./XORMTable.js";
 import { XORMField } from "./XORMField.js";
+import { XORMFKField } from "./XORMFKField.js";
+import { XORMStateField } from "./XORMStateField.js";
 import { XORMPKField } from "./XORMPKField.js";
 import { XORMReference } from "./XORMReference.js";
 import { XORMStateReference } from "./XORMStateReference.js";
+import { XORMDataSet } from "./XORMDataSet.js";
+import { XORMDataTuple } from "./XORMDataTuple.js";
+import { XFieldValue } from "./XFieldValue.js";
+import { XORMIndex } from "./XORMIndex.js";
+import { XORMIndexField } from "./XORMIndexField.js";
 
 let _Registered = false;
 
@@ -46,24 +53,22 @@ export function RegisterORMElements(): void
         ClassID: "1B77140B-34E5-4651-B734-66F614BB1F6A"
     });
 
-    // C# FK and State field types map to XORMField in TS.
-    // Aliases registered first so the canonical XORMField wins _ByConstructor for serialization.
-    // XORMFKField extends XORMField in C# — deserialized as XORMField in TS.
+    // C# FK and State field types now have their own TS classes.
+    // Each tag maps to its dedicated constructor — XORMFKField and XORMStateField
+    // extend XORMField but carry distinct semantics (IsFK always true, IsVisible for state).
     registry.Register({
         TagName: "XORMFKField",
-        Constructor: XORMField,
+        Constructor: XORMFKField,
         ClassID: "ECECC3B6-FA88-4B38-ACCF-912A3CA55547"
     });
 
-    // XORMStateField extends XORMFKField in C# — deserialized as XORMField in TS.
     registry.Register({
         TagName: "XORMStateField",
-        Constructor: XORMField,
+        Constructor: XORMStateField,
         ClassID: "04723469-0FAC-4244-8E26-D883EE1A7099"
     });
 
-    // Canonical TS TagName registered last — overwrites _ByConstructor so serialization
-    // always emits <XORMField> while deserialization still accepts <XORMFKField>/<XORMStateField>.
+    // Canonical XORMField tag — plain fields with no special FK semantics.
     registry.Register({
         TagName: "XORMField",
         Constructor: XORMField,
@@ -91,9 +96,39 @@ export function RegisterORMElements(): void
         ClassID: "404E9B2A-C6F9-4B3D-88A1-DB30DB965259"
     });
 
-    // C# types not yet implemented in TS — reserved ClassIDs for future migration.
-    // XORMIndex:     22F0A974-7CE7-41E5-AE23-3EE6B49FC848
-    // XORMView:      84F31F62-6445-4DB3-A80E-D7CE61643345
+    // Seed/fixture data containers — non-visual, carry pre-loaded table rows.
+    registry.Register({
+        TagName: "XORMDataSet",
+        Constructor: XORMDataSet,
+        ClassID: "E91EE232-7BCE-4D6A-A206-3AB57EA85C88"
+    });
+
+    registry.Register({
+        TagName: "XORMDataTuple",
+        Constructor: XORMDataTuple,
+        ClassID: "A853318D-7D3C-48B9-8279-BAF404C0344C"
+    });
+
+    registry.Register({
+        TagName: "XFieldValue",
+        Constructor: XFieldValue,
+        ClassID: "31A002BE-A5F3-42C8-BF56-B167149225D0"
+    });
+
+    // Index definitions — attached to tables for DB index modelling.
+    registry.Register({
+        TagName: "XORMIndex",
+        Constructor: XORMIndex,
+        ClassID: "22F0A974-7CE7-41E5-AE23-3EE6B49FC848"
+    });
+
+    registry.Register({
+        TagName: "XORMIndexField",
+        Constructor: XORMIndexField,
+        ClassID: "72DF7447-295F-4906-A53B-B4BE42DC794B"
+    });
+
+    // XORMView reserved ClassID: 84F31F62-6445-4DB3-A80E-D7CE61643345
 
     registry.RegisterChildTag("XORMDocument", "XORMDesign");
     registry.RegisterChildTag("XORMDocument", "XORMDesigner");
@@ -105,6 +140,11 @@ export function RegisterORMElements(): void
     registry.RegisterChildTag("XORMTable", "XORMPKField");
     registry.RegisterChildTag("XORMTable", "XORMFKField");
     registry.RegisterChildTag("XORMTable", "XORMStateField");
+    registry.RegisterChildTag("XORMTable", "XORMDataSet");
+    registry.RegisterChildTag("XORMTable", "XORMIndex");
+    registry.RegisterChildTag("XORMDataSet", "XORMDataTuple");
+    registry.RegisterChildTag("XORMDataTuple", "XFieldValue");
+    registry.RegisterChildTag("XORMIndex", "XORMIndexField");
     registry.RegisterChildTag("XORMDesign", "XORMStateReference");
     registry.RegisterChildTag("XORMDesigner", "XORMStateReference");
 

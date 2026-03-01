@@ -5,129 +5,120 @@
     <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">Complete Test Model</XData>
   </XValues>
   <XORMDesign>
-    <XORMTable ID="7b020844-4c49-48b5-a7a5-d4a39fa553f5" Name="Customers">
+    <XORMTable ID="05094657-8a2b-40f0-87a0-d33d1e4592bc" Name="Customers">
       <XValues>
-        <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">7b020844-4c49-48b5-a7a5-d4a39fa553f5</XData>
+        <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">05094657-8a2b-40f0-87a0-d33d1e4592bc</XData>
         <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">Customers</XData>
         <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=100;Y=150;Width=250;Height=88}</XData>
       </XValues>
-      <XORMPKField ID="aa5a3c02-a121-4fc4-ac7e-7bb268aba0fa" Name="CustomerID">
+      <XORMPKField ID="8194f583-2037-400d-bdeb-29a82d66d5cb" Name="CustomerID">
         <XValues>
-          <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">aa5a3c02-a121-4fc4-ac7e-7bb268aba0fa</XData>
+          <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">8194f583-2037-400d-bdeb-29a82d66d5cb</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">CustomerID</XData>
           <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
           <XData Name="IsAutoIncrement" ID="00000001-0002-0003-0001-000000000006" Type="Boolean">true</XData>
-          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
         </XValues>
       </XORMPKField>
-      <XORMField ID="ac3bbde9-0f09-46d9-9a29-870b49474cc7" Name="CustomerName">
+      <XORMField ID="52493c2d-b1f8-4aaf-9914-709008ddf90b" Name="CustomerName">
         <XValues>
-          <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">ac3bbde9-0f09-46d9-9a29-870b49474cc7</XData>
+          <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">52493c2d-b1f8-4aaf-9914-709008ddf90b</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">CustomerName</XData>
           <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">1</XData>
-          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
         </XValues>
       </XORMField>
-      <XORMField ID="e7480142-ba94-4bb9-aa28-6851a1fb6852" Name="Email">
+      <XORMField ID="c99b5133-823a-4cc5-bef5-3a4028a88cf9" Name="Email">
         <XValues>
-          <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">e7480142-ba94-4bb9-aa28-6851a1fb6852</XData>
+          <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">c99b5133-823a-4cc5-bef5-3a4028a88cf9</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">Email</XData>
           <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">2</XData>
           <XData Name="IsRequired" ID="6DF729B6-538E-4622-AB5C-8FE1E62618A3" Type="Boolean">false</XData>
         </XValues>
       </XORMField>
     </XORMTable>
-    <XORMTable ID="9bd252f5-5513-4293-9209-7f426c2d60b9" Name="Orders">
+    <XORMTable ID="2eb3df8f-6bc9-42ce-b657-ddf710a97971" Name="Orders">
       <XValues>
-        <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">9bd252f5-5513-4293-9209-7f426c2d60b9</XData>
+        <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">2eb3df8f-6bc9-42ce-b657-ddf710a97971</XData>
         <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">Orders</XData>
         <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=450;Y=150;Width=250;Height=104}</XData>
       </XValues>
-      <XORMPKField ID="ef0560fc-4aee-4e95-a50e-7e53459eb9d2" Name="OrderID">
+      <XORMPKField ID="d49654ad-aaeb-4770-a641-fd6cf3ada3a9" Name="OrderID">
         <XValues>
-          <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">ef0560fc-4aee-4e95-a50e-7e53459eb9d2</XData>
+          <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">d49654ad-aaeb-4770-a641-fd6cf3ada3a9</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">OrderID</XData>
           <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
           <XData Name="IsAutoIncrement" ID="00000001-0002-0003-0001-000000000006" Type="Boolean">true</XData>
-          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
         </XValues>
       </XORMPKField>
-      <XORMField ID="9517bd13-a87a-462e-8883-f566fefd075f" Name="CustomerID">
+      <XORMField ID="40af1995-9fa2-4f9c-ae63-a1caa46ad0e4" Name="CustomerID">
         <XValues>
-          <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">9517bd13-a87a-462e-8883-f566fefd075f</XData>
+          <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">40af1995-9fa2-4f9c-ae63-a1caa46ad0e4</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">CustomerID</XData>
           <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">1</XData>
           <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
-          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
         </XValues>
       </XORMField>
-      <XORMField ID="95f3f34c-e3ff-4300-bf05-be97eaa8cacc" Name="OrderDate">
+      <XORMField ID="72e11db4-87eb-425b-815e-7967bb49fd7b" Name="OrderDate">
         <XValues>
-          <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">95f3f34c-e3ff-4300-bf05-be97eaa8cacc</XData>
+          <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">72e11db4-87eb-425b-815e-7967bb49fd7b</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">OrderDate</XData>
           <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">2</XData>
           <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">DateTime</XData>
-          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
         </XValues>
       </XORMField>
-      <XORMField ID="8e9f0b0d-52b2-4f15-8155-8d445d4a8a80" Name="ProductID">
+      <XORMField ID="755304f3-f83a-4176-98d2-09dff5b8be46" Name="ProductID">
         <XValues>
-          <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">8e9f0b0d-52b2-4f15-8155-8d445d4a8a80</XData>
+          <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">755304f3-f83a-4176-98d2-09dff5b8be46</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">ProductID</XData>
           <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">3</XData>
           <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
-          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
         </XValues>
       </XORMField>
     </XORMTable>
-    <XORMTable ID="7802a331-3dd6-40c7-984c-4b937a502ddf" Name="Products">
+    <XORMTable ID="ee0abfac-5e01-4ef2-9467-e328781b337f" Name="Products">
       <XValues>
-        <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">7802a331-3dd6-40c7-984c-4b937a502ddf</XData>
+        <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">ee0abfac-5e01-4ef2-9467-e328781b337f</XData>
         <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">Products</XData>
         <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=800;Y=150;Width=250;Height=88}</XData>
       </XValues>
-      <XORMPKField ID="b58ca5c8-43c1-4074-8a73-7232f63e5986" Name="ProductID">
+      <XORMPKField ID="30ebf35e-3191-4b2a-af62-b2595d900b12" Name="ProductID">
         <XValues>
-          <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">b58ca5c8-43c1-4074-8a73-7232f63e5986</XData>
+          <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">30ebf35e-3191-4b2a-af62-b2595d900b12</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">ProductID</XData>
           <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
           <XData Name="IsAutoIncrement" ID="00000001-0002-0003-0001-000000000006" Type="Boolean">true</XData>
-          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
         </XValues>
       </XORMPKField>
-      <XORMField ID="08642698-6d1a-4dd0-8a25-ab00dd5d51e0" Name="ProductName">
+      <XORMField ID="d1097072-1e07-44c9-b62b-5f27649ca100" Name="ProductName">
         <XValues>
-          <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">08642698-6d1a-4dd0-8a25-ab00dd5d51e0</XData>
+          <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">d1097072-1e07-44c9-b62b-5f27649ca100</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">ProductName</XData>
           <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">1</XData>
-          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
         </XValues>
       </XORMField>
-      <XORMField ID="9f203c45-6cad-496d-a506-03cb95a124a9" Name="Price">
+      <XORMField ID="a648093c-4815-4c45-9fa0-3c5b7befe995" Name="Price">
         <XValues>
-          <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">9f203c45-6cad-496d-a506-03cb95a124a9</XData>
+          <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">a648093c-4815-4c45-9fa0-3c5b7befe995</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">Price</XData>
           <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">2</XData>
           <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Decimal</XData>
-          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
         </XValues>
       </XORMField>
     </XORMTable>
-    <XORMReference ID="eb5ebdc7-4a23-4783-aeae-751d65996cce" Name="FK_Orders_Customers">
+    <XORMReference ID="a9bc0809-4a62-4342-974c-295534aa2596" Name="FK_Orders_Customers">
       <XValues>
-        <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">eb5ebdc7-4a23-4783-aeae-751d65996cce</XData>
+        <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">a9bc0809-4a62-4342-974c-295534aa2596</XData>
         <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">FK_Orders_Customers</XData>
-        <XLinkData Name="Source" ID="8A8851EB-B6CA-414F-B55A-C22A6A0F3753" Type="String" ElementID="9517bd13-a87a-462e-8883-f566fefd075f" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">9517bd13-a87a-462e-8883-f566fefd075f</XLinkData>
-        <XLinkData Name="Target" ID="6461BED3-F1A0-4910-985D-9F0B0058D8BF" Type="String" ElementID="7b020844-4c49-48b5-a7a5-d4a39fa553f5" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">7b020844-4c49-48b5-a7a5-d4a39fa553f5</XLinkData>
+        <XLinkData Name="Source" ID="8A8851EB-B6CA-414F-B55A-C22A6A0F3753" Type="String" ElementID="40af1995-9fa2-4f9c-ae63-a1caa46ad0e4" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">40af1995-9fa2-4f9c-ae63-a1caa46ad0e4</XLinkData>
+        <XLinkData Name="Target" ID="6461BED3-F1A0-4910-985D-9F0B0058D8BF" Type="String" ElementID="05094657-8a2b-40f0-87a0-d33d1e4592bc" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">05094657-8a2b-40f0-87a0-d33d1e4592bc</XLinkData>
         <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=700;Y=202}|{X=100;Y=194}</XData>
       </XValues>
     </XORMReference>
-    <XORMReference ID="74424985-6e1d-4265-8438-ba7856d36f3c" Name="FK_Orders_Products">
+    <XORMReference ID="f0bd4aa2-4f29-4704-a5f1-2d802766c253" Name="FK_Orders_Products">
       <XValues>
-        <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">74424985-6e1d-4265-8438-ba7856d36f3c</XData>
+        <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">f0bd4aa2-4f29-4704-a5f1-2d802766c253</XData>
         <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">FK_Orders_Products</XData>
-        <XLinkData Name="Source" ID="8A8851EB-B6CA-414F-B55A-C22A6A0F3753" Type="String" ElementID="8e9f0b0d-52b2-4f15-8155-8d445d4a8a80" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">8e9f0b0d-52b2-4f15-8155-8d445d4a8a80</XLinkData>
-        <XLinkData Name="Target" ID="6461BED3-F1A0-4910-985D-9F0B0058D8BF" Type="String" ElementID="7802a331-3dd6-40c7-984c-4b937a502ddf" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">7802a331-3dd6-40c7-984c-4b937a502ddf</XLinkData>
+        <XLinkData Name="Source" ID="8A8851EB-B6CA-414F-B55A-C22A6A0F3753" Type="String" ElementID="755304f3-f83a-4176-98d2-09dff5b8be46" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">755304f3-f83a-4176-98d2-09dff5b8be46</XLinkData>
+        <XLinkData Name="Target" ID="6461BED3-F1A0-4910-985D-9F0B0058D8BF" Type="String" ElementID="ee0abfac-5e01-4ef2-9467-e328781b337f" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">ee0abfac-5e01-4ef2-9467-e328781b337f</XLinkData>
         <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=700;Y=202}|{X=800;Y=194}</XData>
       </XValues>
     </XORMReference>
