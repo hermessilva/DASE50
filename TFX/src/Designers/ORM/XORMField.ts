@@ -13,24 +13,23 @@ export class XORMField extends XField
         false
     );
 
-    public static readonly IsNullableProp = XProperty.Register<XORMField, boolean>(
-        (p: XORMField) => p.IsNullable,
-        "00000001-0002-0003-0001-000000000007",
-        "IsNullable",
-        "Is Nullable",
-        true
+    /**
+     * Explicit FK flag — matches C# XORMField.IsFK (GUID: 7CBD471F-...).
+     * Set to true when the field is a foreign key stored/loaded from C# files.
+     * For TS-native files, use IsForeignKey which is computed from XORMReference.
+     */
+    public static readonly IsFKProp = XProperty.Register<XORMField, boolean>(
+        (p: XORMField) => p.IsFK,
+        "7CBD471F-E1F2-4A36-B0FC-A962000DF07F",
+        "IsFK",
+        "Is Foreign Key",
+        false
     );
 
-    public constructor()
-    {
-        super();
-        this.IsNullable = true;
-    }
-
     /**
-     * Indica se este campo é uma chave primária
-     * Para campos regulares, sempre retorna false
-     * XORMPKField sobrescreve este getter
+     * Returns whether this field is a primary key.
+     * Always false for regular fields.
+     * XORMPKField overrides this getter to return true.
      */
     public get IsPrimaryKey(): boolean
     {
@@ -47,28 +46,14 @@ export class XORMField extends XField
         this.SetValue(XORMField.IsAutoIncrementProp, pValue);
     }
 
-    public get IsNullable(): boolean
+    public get IsFK(): boolean
     {
-        return this.GetValue(XORMField.IsNullableProp) as boolean;
+        return this.GetValue(XORMField.IsFKProp) as boolean;
     }
 
-    public set IsNullable(pValue: boolean)
+    public set IsFK(pValue: boolean)
     {
-        this.SetValue(XORMField.IsNullableProp, pValue);
-        // Sincroniza com IsRequired do base
-        super.IsRequired = !pValue;
-    }
-
-    public override get IsRequired(): boolean
-    {
-        return super.IsRequired;
-    }
-
-    public override set IsRequired(pValue: boolean)
-    {
-        super.IsRequired = pValue;
-        // Sincroniza com IsNullable
-        this.SetValue(XORMField.IsNullableProp, !pValue);
+        this.SetValue(XORMField.IsFKProp, pValue);
     }
 
     /**
@@ -89,11 +74,12 @@ export class XORMField extends XField
     }
 
     /**
-     * Checks if this field is a foreign key field (used as source in a reference)
+     * Returns true when the explicit IsFK flag is set (C# file compatibility)
+     * OR when a XORMReference in the design uses this field as its source (TS native).
      */
     public get IsForeignKey(): boolean
     {
-        return this.GetReference() !== null;
+        return this.IsFK || this.GetReference() !== null;
     }
 
     /**

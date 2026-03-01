@@ -531,6 +531,72 @@ describe("XORMValidator", () =>
             expect(error?.Severity).toBe(XDesignerErrorSeverity.Error);
         });
 
+        it("should auto-correct 1:1 reference where Source is a table ID (legacy C# pattern)", () =>
+        {
+            const doc = new XORMDocument();
+
+            const sourceTable = new XORMTable();
+            sourceTable.InitializeNew();
+            sourceTable.Name = "UserProfile";
+            doc.Design.AppendChild(sourceTable);
+            const pkField = sourceTable.CreatePKField({ Name: "ID", DataType: "Int32" });
+
+            const targetTable = new XORMTable();
+            targetTable.InitializeNew();
+            targetTable.Name = "Users";
+            doc.Design.AppendChild(targetTable);
+
+            // Legacy 1:1: Source points to the source TABLE id, not a field id
+            const ref = new XORMReference();
+            ref.InitializeNew();
+            ref.Name = "OneToOne";
+            ref.Source = sourceTable.ID;  // table ID, not field ID
+            ref.Target = targetTable.ID;
+            doc.Design.AppendChild(ref);
+
+            const validator = new XORMValidator();
+            const issues = validator.Validate(doc);
+
+            // No "source field not found" error — it was auto-corrected to the PK field
+            const error = issues.find(i => i.Message.includes("Reference source field not found"));
+            expect(error).toBeUndefined();
+            // The reference Source should now point to the PK field
+            expect(ref.Source).toBe(pkField.ID);
+        });
+
+        it("should auto-correct 1:1 reference when source table initially had no PK field (EnsurePKField creates it)", () =>
+        {
+            const doc = new XORMDocument();
+
+            const sourceTable = new XORMTable();
+            sourceTable.InitializeNew();
+            sourceTable.Name = "UserProfile";
+            doc.Design.AppendChild(sourceTable);
+            // No PK field created initially
+
+            const targetTable = new XORMTable();
+            targetTable.InitializeNew();
+            targetTable.Name = "Users";
+            doc.Design.AppendChild(targetTable);
+
+            // Legacy 1:1: Source points to the source TABLE id, no PK exists yet
+            const ref = new XORMReference();
+            ref.InitializeNew();
+            ref.Name = "OneToOne";
+            ref.Source = sourceTable.ID;
+            ref.Target = targetTable.ID;
+            doc.Design.AppendChild(ref);
+
+            const validator = new XORMValidator();
+            validator.Validate(doc);
+
+            // ValidateTables runs EnsurePKField before ValidateReferences,
+            // so the auto-correction finds the newly created PK field and updates ref.Source.
+            const updatedPK = sourceTable.GetPKField();
+            expect(updatedPK).toBeDefined();
+            expect(ref.Source).toBe(updatedPK!.ID);
+        });
+
         it("should error when reference target table does not exist", () =>
         {
             const doc = new XORMDocument();

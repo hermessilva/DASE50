@@ -123,7 +123,7 @@ describe("XORMFieldMetadataProvider", () =>
             expect(ids).toContain("DataType");
             expect(ids).toContain("Length");
             expect(ids).toContain("Scale");
-            expect(ids).toContain("IsNullable");
+            expect(ids).toContain("IsRequired");
             expect(ids).toContain("IsAutoIncrement");
         });
     });
@@ -355,18 +355,19 @@ describe("XORMFieldMetadataProvider", () =>
         });
     });
 
-    describe("IsNullable rules", () =>
+    describe("IsRequired rules", () =>
     {
-        it("should not be read-only for normal field", () =>
+        it("should be visible for normal field", () =>
         {
-            const metadata = provider.GetMetadata(field, "IsNullable");
-            expect(metadata.IsReadOnly).toBe(false);
+            const metadata = provider.GetMetadata(field, "IsRequired");
+            expect(metadata.IsVisible).toBe(true);
         });
 
-        it("should provide a nullable hint", () =>
+        it("should provide a required hint", () =>
         {
-            const hint = provider.GetMetadata(field, "IsNullable").Hint;
-            expect(hint.length).toBeGreaterThan(0);
+            const hint = provider.GetMetadata(field, "IsRequired").Hint;
+            expect(typeof hint).toBe("string");
+            expect((hint as string).length).toBeGreaterThan(0);
         });
     });
 
@@ -462,7 +463,7 @@ describe("XORMFieldMetadataProvider", () =>
             expect(allMetadata.has("DataType")).toBe(true);
             expect(allMetadata.has("Length")).toBe(true);
             expect(allMetadata.has("Scale")).toBe(true);
-            expect(allMetadata.has("IsNullable")).toBe(true);
+            expect(allMetadata.has("IsRequired")).toBe(true);
             expect(allMetadata.has("IsAutoIncrement")).toBe(true);
         });
 
@@ -507,7 +508,7 @@ describe("XORMFieldMetadataProvider", () =>
             field.DataType = "String";
             field.Length = 100;
             field.Scale = 2;
-            field.IsNullable = false;
+            field.IsRequired = false;
             field.IsAutoIncrement = false;
             field.DefaultValue = "N/A";
 
@@ -515,9 +516,8 @@ describe("XORMFieldMetadataProvider", () =>
             expect(XORMFieldMetadataProvider.GetFieldPropertyValue(field, "DataType")).toBe("String");
             expect(XORMFieldMetadataProvider.GetFieldPropertyValue(field, "Length")).toBe(100);
             expect(XORMFieldMetadataProvider.GetFieldPropertyValue(field, "Scale")).toBe(2);
-            expect(XORMFieldMetadataProvider.GetFieldPropertyValue(field, "IsNullable")).toBe(false);
             expect(XORMFieldMetadataProvider.GetFieldPropertyValue(field, "IsAutoIncrement")).toBe(false);
-            expect(XORMFieldMetadataProvider.GetFieldPropertyValue(field, "IsRequired")).toBe(true);
+            expect(XORMFieldMetadataProvider.GetFieldPropertyValue(field, "IsRequired")).toBe(false);
             expect(XORMFieldMetadataProvider.GetFieldPropertyValue(field, "DefaultValue")).toBe("N/A");
             expect(XORMFieldMetadataProvider.GetFieldPropertyValue(field, "IsPrimaryKey")).toBe(false);
         });
@@ -625,7 +625,7 @@ describe("XORMFieldMetadataProvider", () =>
             expect(provider.HasRule("DataType")).toBe(true);
             expect(provider.HasRule("Length")).toBe(true);
             expect(provider.HasRule("Scale")).toBe(true);
-            expect(provider.HasRule("IsNullable")).toBe(true);
+            expect(provider.HasRule("IsRequired")).toBe(true);
             expect(provider.HasRule("IsAutoIncrement")).toBe(true);
         });
 
@@ -645,7 +645,7 @@ describe("XORMFieldMetadataProvider", () =>
             expect(ids).toContain("DataType");
             expect(ids).toContain("Length");
             expect(ids).toContain("Scale");
-            expect(ids).toContain("IsNullable");
+            expect(ids).toContain("IsRequired");
             expect(ids).toContain("IsAutoIncrement");
         });
     });

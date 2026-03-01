@@ -18,8 +18,8 @@
  *    - Visível apenas para: Numeric, Decimal
  *    - Validação: deve ser <= Length
  * 
- * 4. ISNULLABLE
- *    - Permite definir se o campo aceita valores nulos
+ * 4. ISREQUIRED
+ *    - Indicates if the field is mandatory (default: true)
  * 
  * 5. ISAUTOINCREMENT
  *    - Visível apenas para tipos inteiros: Int32, Int64
@@ -136,7 +136,6 @@ export class XORMFieldMetadataProvider extends XPropertyMetadataProvider<XORMFie
         this.RegisterLengthRules();
         this.RegisterScaleRules();
         this.RegisterRequiredRules();
-        this.RegisterNullableRules();
         this.RegisterAutoIncrementRules();
         this.RegisterNameRules();
     }
@@ -247,18 +246,7 @@ export class XORMFieldMetadataProvider extends XPropertyMetadataProvider<XORMFie
     private RegisterRequiredRules(): void
     {
         this.AddPropertyRule("IsRequired", "Is Required", {
-            IsVisible: () => false, // Esconde IsRequired em favor de IsNullable
             HintProvider: () => "Indicates if the field is mandatory"
-        });
-    }
-
-    /**
-     * Regras para IsNullable
-     */
-    private RegisterNullableRules(): void
-    {
-        this.AddPropertyRule("IsNullable", "Is Nullable", {
-            HintProvider: () => "Indicates if the field accepts null values"
         });
     }
 
@@ -341,7 +329,6 @@ export class XORMFieldMetadataProvider extends XPropertyMetadataProvider<XORMFie
             case "Length": return pElement.Length;
             case "Scale": return pElement.Scale;
             case "IsAutoIncrement": return pElement.IsAutoIncrement;
-            case "IsNullable": return pElement.IsNullable;
             case "IsRequired": return pElement.IsRequired;
             case "DefaultValue": return pElement.DefaultValue;
             case "IsForeignKey": return pElement.IsForeignKey;
@@ -362,7 +349,6 @@ export class XORMFieldMetadataProvider extends XPropertyMetadataProvider<XORMFie
             case "Length": return "Length";
             case "Scale": return "Scale";
             case "IsAutoIncrement": return "Is Auto Increment";
-            case "IsNullable": return "Is Nullable";
             case "IsRequired": return "Is Required";
             case "DefaultValue": return "Default Value";
             case "IsForeignKey": return "Is Foreign Key";
@@ -381,7 +367,6 @@ export class XORMFieldMetadataProvider extends XPropertyMetadataProvider<XORMFie
             "Length",
             "Scale",
             "IsAutoIncrement",
-            "IsNullable",
             "IsRequired",
             "DefaultValue"
         ];

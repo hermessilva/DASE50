@@ -43,6 +43,30 @@ export class XORMDesign extends XDesign
         "dbo"
     );
 
+    public static readonly ParentModelProp = XProperty.Register<XORMDesign, string>(
+        (p: XORMDesign) => p.ParentModel,
+        "C2F5A832-7D4B-4E1F-AC3A-6B7E8D1A4F20",
+        "ParentModel",
+        "Parent Model",
+        ""
+    );
+
+    public static readonly StateControlTableProp = XProperty.Register<XORMDesign, string>(
+        (p: XORMDesign) => p.StateControlTable,
+        "3A8B7C2D-1E4F-4D6A-89C5-2D7E1F8A3B4C",
+        "StateControlTable",
+        "State Control Table",
+        ""
+    );
+
+    public static readonly TenantControlTableProp = XProperty.Register<XORMDesign, string>(
+        (p: XORMDesign) => p.TenantControlTable,
+        "F6E1D9B4-3C2A-4A7E-B8D8-1B4C7E9F2A6D",
+        "TenantControlTable",
+        "Tenant Control Table",
+        ""
+    );
+
     private _TablesWithListeners: Set<string> = new Set<string>();
 
     public constructor()
@@ -58,6 +82,42 @@ export class XORMDesign extends XDesign
     public set Schema(pValue: string)
     {
         this.SetValue(XORMDesign.SchemaProp, pValue);
+    }
+
+    /**
+     * Pipe-separated list of relative parent model file names, e.g. "Auth.dsorm|Common.dsorm".
+     * An empty string means no parent models are selected.
+     */
+    public get ParentModel(): string
+    {
+        return this.GetValue(XORMDesign.ParentModelProp) as string;
+    }
+
+    public set ParentModel(pValue: string)
+    {
+        this.SetValue(XORMDesign.ParentModelProp, pValue);
+    }
+
+    /** Name of the table that controls state (state machine) for this design. */
+    public get StateControlTable(): string
+    {
+        return this.GetValue(XORMDesign.StateControlTableProp) as string;
+    }
+
+    public set StateControlTable(pValue: string)
+    {
+        this.SetValue(XORMDesign.StateControlTableProp, pValue);
+    }
+
+    /** Name of the table that controls tenant isolation for this design. */
+    public get TenantControlTable(): string
+    {
+        return this.GetValue(XORMDesign.TenantControlTableProp) as string;
+    }
+
+    public set TenantControlTable(pValue: string)
+    {
+        this.SetValue(XORMDesign.TenantControlTableProp, pValue);
     }
 
     public override Initialize(): void

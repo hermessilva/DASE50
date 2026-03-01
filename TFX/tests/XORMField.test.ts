@@ -19,7 +19,7 @@ describe("XORMField", () => {
         expect(field.DataType).toBe("String");
         expect(field.Length).toBe(0);
         expect(field.IsPrimaryKey).toBe(false); // Regular fields are never PKs
-        expect(field.IsNullable).toBe(true);
+        expect(field.IsRequired).toBe(true);
         expect(field.IsAutoIncrement).toBe(false);
         expect(field.DefaultValue).toBe("");
     });
@@ -49,13 +49,15 @@ describe("XORMField", () => {
         expect(field.IsPrimaryKey).toBe(false);
     });
 
-    it("should allow getting and setting IsNullable", () => {
+    it("should allow getting and setting IsRequired", () => {
         const field = new XORMField();
-        field.IsNullable = false;
-        expect(field.IsNullable).toBe(false);
-        
-        field.IsNullable = true;
-        expect(field.IsNullable).toBe(true);
+        expect(field.IsRequired).toBe(true); // default is true
+
+        field.IsRequired = false;
+        expect(field.IsRequired).toBe(false);
+
+        field.IsRequired = true;
+        expect(field.IsRequired).toBe(true);
     });
 
     it("should allow getting and setting IsAutoIncrement", () => {
@@ -65,6 +67,22 @@ describe("XORMField", () => {
         
         field.IsAutoIncrement = false;
         expect(field.IsAutoIncrement).toBe(false);
+    });
+
+    it("should default IsFK to false and allow setting it to true", () => {
+        const field = new XORMField();
+        expect(field.IsFK).toBe(false);
+        field.IsFK = true;
+        expect(field.IsFK).toBe(true);
+        field.IsFK = false;
+        expect(field.IsFK).toBe(false);
+    });
+
+    it("should return true for IsForeignKey when IsFK is explicitly set", () => {
+        const field = new XORMField();
+        expect(field.IsForeignKey).toBe(false);
+        field.IsFK = true;
+        expect(field.IsForeignKey).toBe(true);
     });
 
     it("should allow getting and setting DefaultValue", () => {

@@ -1442,7 +1442,7 @@ describe('XORMDesignerEditorProvider', () => {
                 Payload: { SourceID: 'table-1', TargetID: 'table-2', Name: 'FK_Test' } 
             });
 
-            expect(mockState.AddReference).toHaveBeenCalledWith('table-1', 'table-2', 'FK_Test');
+            expect(mockState.AddReference).toHaveBeenCalledWith('table-1', 'table-2', 'FK_Test', undefined);
         });
 
         it('should handle DragDropAddRelation without name', async () => {
@@ -1451,7 +1451,16 @@ describe('XORMDesignerEditorProvider', () => {
                 Payload: { SourceID: 'table-1', TargetID: 'table-2' } 
             });
 
-            expect(mockState.AddReference).toHaveBeenCalledWith('table-1', 'table-2', '');
+            expect(mockState.AddReference).toHaveBeenCalledWith('table-1', 'table-2', '', undefined);
+        });
+
+        it('should handle DragDropAddRelation with IsOneToOne flag', async () => {
+            await provider.HandleMessage(mockPanel, mockState, { 
+                Type: 'DragDropAddRelation', 
+                Payload: { SourceID: 'table-1', TargetID: 'table-2', IsOneToOne: true } 
+            });
+
+            expect(mockState.AddReference).toHaveBeenCalledWith('table-1', 'table-2', '', true);
         });
 
         it('should not post message when AddRelation fails', async () => {

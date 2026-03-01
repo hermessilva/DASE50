@@ -4,7 +4,8 @@ export const XPropertyType = {
     Boolean: "Boolean",
     Enum: "Enum",
     Color: "Color",
-    Rect: "Rect"
+    Rect: "Rect",
+    MultiFileSelect: "MultiFileSelect"
 } as const;
 
 export type TPropertyType = typeof XPropertyType[keyof typeof XPropertyType];

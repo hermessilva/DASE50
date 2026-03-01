@@ -51,11 +51,6 @@ describe("ORM Metadata Providers Coverage", () => {
              expect(meta.Hint).toBe("Automatically generate incremental values for the primary key");
         });
 
-        it("should hide IsNullable", () => {
-            expect(provider.IsPropertyVisible(pkField, "IsNullable")).toBe(false);
-            expect(provider.GetMetadata(pkField, "IsNullable").Hint).toBeDefined();
-        });
-        
         it("should hide Length and Scale", () => {
             expect(provider.IsPropertyVisible(pkField, "Length")).toBe(false);
             expect(provider.IsPropertyVisible(pkField, "Scale")).toBe(false);
@@ -74,7 +69,6 @@ describe("ORM Metadata Providers Coverage", () => {
 
         it("should cover all GetPKFieldPropertyValue switch cases", () => {
             expect(XORMPKFieldMetadataProvider.GetPKFieldPropertyValue(pkField, "IsPrimaryKey")).toBe(true);
-            expect(XORMPKFieldMetadataProvider.GetPKFieldPropertyValue(pkField, "IsNullable")).toBeDefined();
             expect(XORMPKFieldMetadataProvider.GetPKFieldPropertyValue(pkField, "IsAutoIncrement")).toBeDefined();
             expect(XORMPKFieldMetadataProvider.GetPKFieldPropertyValue(pkField, "IsRequired")).toBeDefined();
             expect(XORMPKFieldMetadataProvider.GetPKFieldPropertyValue(pkField, "DefaultValue")).toBeDefined();
@@ -225,7 +219,7 @@ describe("ORM Metadata Providers Coverage", () => {
         it("should return metadata for all property IDs", () => {
             const properties = [
                 "Name", "DataType", "Length", "Scale", 
-                "IsNullable", "IsAutoIncrement", "IsRequired", 
+                "IsAutoIncrement", "IsRequired", 
                 "DefaultValue", "IsForeignKey", "IsPrimaryKey",
                 "Unknown"
             ];
@@ -242,7 +236,6 @@ describe("ORM Metadata Providers Coverage", () => {
             expect(provider.GetPropertyName("DataType")).toBe("Data Type");
             expect(provider.GetPropertyName("Length")).toBe("Length");
             expect(provider.GetPropertyName("Scale")).toBe("Scale");
-            expect(provider.GetPropertyName("IsNullable")).toBe("Is Nullable");
             expect(provider.GetPropertyName("IsAutoIncrement")).toBe("Is Auto Increment");
             expect(provider.GetPropertyName("IsRequired")).toBe("Is Required");
             expect(provider.GetPropertyName("DefaultValue")).toBe("Default Value");
@@ -255,7 +248,6 @@ describe("ORM Metadata Providers Coverage", () => {
             expect(XORMFieldMetadataProvider.GetFieldPropertyValue(field, "DataType")).toBeDefined();
             expect(XORMFieldMetadataProvider.GetFieldPropertyValue(field, "Length")).toBeDefined();
             expect(XORMFieldMetadataProvider.GetFieldPropertyValue(field, "Scale")).toBeDefined();
-            expect(XORMFieldMetadataProvider.GetFieldPropertyValue(field, "IsNullable")).toBeDefined();
             expect(XORMFieldMetadataProvider.GetFieldPropertyValue(field, "IsAutoIncrement")).toBeDefined();
             expect(XORMFieldMetadataProvider.GetFieldPropertyValue(field, "IsRequired")).toBeDefined();
             expect(XORMFieldMetadataProvider.GetFieldPropertyValue(field, "DefaultValue")).toBeDefined();
@@ -306,7 +298,7 @@ describe("ORM Metadata Providers Coverage", () => {
             const pkField = new XORMPKField();
             pkField.InitializeNew();
             
-            const hiddenProps = ["IsRequired", "Length", "Scale", "IsPrimaryKey", "IsNullable"];
+            const hiddenProps = ["IsRequired", "Length", "Scale", "IsPrimaryKey"];
             hiddenProps.forEach(prop => {
                 const meta = pkProvider.GetMetadata(pkField, prop);
                 expect(meta.IsVisible).toBe(false);

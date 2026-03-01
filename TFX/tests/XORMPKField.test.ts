@@ -29,11 +29,6 @@ describe("XORMPKField", () => {
             expect(pkField.Name).toBe("ID");
         });
 
-        it("should have IsNullable always false", () => {
-            const pkField = new XORMPKField();
-            expect(pkField.IsNullable).toBe(false);
-        });
-
         it("should have IsPrimaryKey always true", () => {
             const pkField = new XORMPKField();
             expect(pkField.IsPrimaryKey).toBe(true);
@@ -95,14 +90,6 @@ describe("XORMPKField", () => {
             pkField.LockDataType();
             pkField.DataType = "Guid"; // Should be ignored
             expect(pkField.DataType).toBe("Int64");
-        });
-    });
-
-    describe("IsNullable immutability", () => {
-        it("should always be false regardless of setter call", () => {
-            const pkField = new XORMPKField();
-            pkField.IsNullable = true; // Should be ignored
-            expect(pkField.IsNullable).toBe(false);
         });
     });
 

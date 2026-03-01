@@ -184,12 +184,6 @@ export class XORMPKFieldMetadataProvider extends XPropertyMetadataProvider<XORMP
             IsVisible: () => false,
             HintProvider: () => "This is a primary key field"
         });
-
-        // IsNullable - PK nunca pode ser nulo
-        this.AddPropertyRule("IsNullable", "Is Nullable", {
-            IsVisible: () => false,
-            HintProvider: () => "Primary key fields cannot be nullable"
-        });
     }
 
     /**
@@ -226,7 +220,6 @@ export class XORMPKFieldMetadataProvider extends XPropertyMetadataProvider<XORMP
             case "Scale": return pElement.Scale;
             case "IsPrimaryKey": return pElement.IsPrimaryKey;
             case "IsAutoIncrement": return pElement.IsAutoIncrement;
-            case "IsNullable": return pElement.IsNullable;
             case "IsRequired": return pElement.IsRequired;
             case "DefaultValue": return pElement.DefaultValue;
             case "IsDataTypeLocked": return pElement.IsDataTypeLocked;
@@ -244,7 +237,6 @@ export class XORMPKFieldMetadataProvider extends XPropertyMetadataProvider<XORMP
             case "Name": return "Name";
             case "DataType": return "Data Type";
             case "IsAutoIncrement": return "Is Auto Increment";
-            case "IsNullable": return "Is Nullable";
             case "IsPrimaryKey": return "Is Primary Key";
             default: return pPropertyID;
         }
@@ -262,7 +254,6 @@ export class XORMPKFieldMetadataProvider extends XPropertyMetadataProvider<XORMP
             "Scale",
             "IsPrimaryKey",
             "IsAutoIncrement",
-            "IsNullable",
             "IsRequired",
             "DefaultValue",
             "IsDataTypeLocked"

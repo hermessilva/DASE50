@@ -98,6 +98,9 @@ export class XORMDesignerState
             
             // Load data types from configuration
             await this._Bridge.LoadDataTypes();
+
+            // Load available .dsorm files from the same directory (for ParentModel property)
+            await this._Bridge.LoadAvailableOrmFiles();
             
             // Handle untitled files
             if (uri.scheme === "untitled")
@@ -167,9 +170,9 @@ export class XORMDesignerState
         return result || { Success: false };
     }
 
-    AddReference(pSourceTableID: string, pTargetTableID: string, pName: string): XIOperationResult
+    AddReference(pSourceTableID: string, pTargetTableID: string, pName: string, pIsOneToOne?: boolean): XIOperationResult
     {
-        const result = this._Bridge.AddReference(pSourceTableID, pTargetTableID, pName);
+        const result = this._Bridge.AddReference(pSourceTableID, pTargetTableID, pName, pIsOneToOne);
         if (result?.Success)
             this.IsDirty = true;
         return result || { Success: false };
