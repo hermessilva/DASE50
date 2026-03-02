@@ -39,7 +39,25 @@ export const XDesignerMessageType = {
     AIOrganizeProgress: "AIOrganizeProgress",
     AIOrganizeComplete: "AIOrganizeComplete",
     AIOrganizeError: "AIOrganizeError",
-    AIOrganizeRevert: "AIOrganizeRevert"
+    AIOrganizeRevert: "AIOrganizeRevert",
+    // AI SQL Script Generation
+    CreateSQLScript: "CreateSQLScript",
+    SQLScriptShowPicker: "SQLScriptShowPicker",
+    CreateSQLScriptExecute: "CreateSQLScriptExecute",
+    SQLScriptStart: "SQLScriptStart",
+    SQLScriptProgress: "SQLScriptProgress",
+    SQLScriptComplete: "SQLScriptComplete",
+    SQLScriptError: "SQLScriptError",
+    // AI ORM Code Generation
+    GenerateORMCode: "GenerateORMCode",
+    ORMGenShowPicker: "ORMGenShowPicker",
+    GenerateORMCodeExecute: "GenerateORMCodeExecute",
+    ORMGenBrowseContext: "ORMGenBrowseContext",
+    ORMGenContextLoaded: "ORMGenContextLoaded",
+    ORMGenStart: "ORMGenStart",
+    ORMGenProgress: "ORMGenProgress",
+    ORMGenComplete: "ORMGenComplete",
+    ORMGenError: "ORMGenError"
 } as const;
 
 export type TDesignerMessageType = typeof XDesignerMessageType[keyof typeof XDesignerMessageType];

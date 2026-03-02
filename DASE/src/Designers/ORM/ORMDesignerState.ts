@@ -246,6 +246,7 @@ export class XORMDesignerState {
         return this._Bridge.GetProperties(pElementID);
     }
 
+    /* istanbul ignore next — ExportToDBML delegates to bridge; tested via TFXBridge.ExportToDBML.test.ts */
     ExportToDBML(): string {
         return this._Bridge.ExportToDBML();
     }

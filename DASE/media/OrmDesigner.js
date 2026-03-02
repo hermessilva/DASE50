@@ -42,7 +42,25 @@
         AIOrganizeProgress: "AIOrganizeProgress",
         AIOrganizeComplete: "AIOrganizeComplete",
         AIOrganizeError: "AIOrganizeError",
-        AIOrganizeRevert: "AIOrganizeRevert"
+        AIOrganizeRevert: "AIOrganizeRevert",
+        // AI SQL Script
+        CreateSQLScript: "CreateSQLScript",
+        SQLScriptShowPicker: "SQLScriptShowPicker",
+        CreateSQLScriptExecute: "CreateSQLScriptExecute",
+        SQLScriptStart: "SQLScriptStart",
+        SQLScriptProgress: "SQLScriptProgress",
+        SQLScriptComplete: "SQLScriptComplete",
+        SQLScriptError: "SQLScriptError",
+        // AI ORM Code Generation
+        GenerateORMCode: "GenerateORMCode",
+        ORMGenShowPicker: "ORMGenShowPicker",
+        GenerateORMCodeExecute: "GenerateORMCodeExecute",
+        ORMGenBrowseContext: "ORMGenBrowseContext",
+        ORMGenContextLoaded: "ORMGenContextLoaded",
+        ORMGenStart: "ORMGenStart",
+        ORMGenProgress: "ORMGenProgress",
+        ORMGenComplete: "ORMGenComplete",
+        ORMGenError: "ORMGenError"
     };
 
     let _Model = { DesignID: null, Tables: [], References: [] };
@@ -194,6 +212,50 @@
             case XMessageType.AIOrganizeError:
                 ErrorAIOrganize(pMsg.Payload);
                 break;
+
+            case XMessageType.SQLScriptShowPicker:
+                OpenSQLScriptPickerOverlay(pMsg.Payload);
+                break;
+
+            case XMessageType.SQLScriptStart:
+                StartSQLScriptProgress(pMsg.Payload);
+                break;
+
+            case XMessageType.SQLScriptProgress:
+                UpdateSQLScriptProgress(pMsg.Payload);
+                break;
+
+            case XMessageType.SQLScriptComplete:
+                CompleteSQLScript(pMsg.Payload);
+                break;
+
+            case XMessageType.SQLScriptError:
+                ErrorSQLScript(pMsg.Payload);
+                break;
+
+            case XMessageType.ORMGenShowPicker:
+                OpenORMGenPickerOverlay(pMsg.Payload);
+                break;
+
+            case XMessageType.ORMGenStart:
+                StartORMGenProgress(pMsg.Payload);
+                break;
+
+            case XMessageType.ORMGenProgress:
+                UpdateORMGenProgress(pMsg.Payload);
+                break;
+
+            case XMessageType.ORMGenComplete:
+                CompleteORMGen(pMsg.Payload);
+                break;
+
+            case XMessageType.ORMGenError:
+                ErrorORMGen(pMsg.Payload);
+                break;
+
+            case XMessageType.ORMGenContextLoaded:
+                ORMGenContextFileLoaded(pMsg.Payload);
+                break;
         }
     }
 
@@ -231,6 +293,12 @@
                     break;
                 case "organize-tables-ai":
                     SendMessage(XMessageType.OrganizeTablesAI, {});
+                    break;
+                case "create-sql-script":
+                    SendMessage(XMessageType.CreateSQLScript, {});
+                    break;
+                case "generate-orm-code":
+                    SendMessage(XMessageType.GenerateORMCode, {});
                     break;
             }
         });
@@ -2851,6 +2919,668 @@
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;")
             .replace(/"/g, "&quot;");
+    }
+
+    // ── ORM Code Generation overlay ────────────────────────────────────────────
+
+    const _ORM_TARGETS = [
+        { id: "efcore",     language: "C#",      orm: "EF Core",       ext: ".cs",     icon: "⚙️",  contextLabel: "DbContext file (.cs)" },
+        { id: "prisma",     language: "JS / TS", orm: "Prisma",        ext: ".prisma", icon: "🔺",  contextLabel: "Prisma schema (.prisma)" },
+        { id: "sqlalchemy", language: "Python",  orm: "SQLAlchemy",    ext: ".py",    icon: "🐍",  contextLabel: "Models file (.py)" },
+        { id: "hibernate",  language: "Java",    orm: "Hibernate / JPA", ext: ".java", icon: "☕", contextLabel: "Entity or persistence file (.java, .xml)" },
+        { id: "gorm",       language: "Go",      orm: "GORM",          ext: ".go",    icon: "🐹",  contextLabel: "Go model file (.go)" }
+    ];
+
+    let _ORMGenPickerModels  = [];
+    let _ORMGenSelectedModel = 0;
+    let _ORMGenSelectedORM   = "efcore";
+    let _ORMGenContextContent = "";
+
+    function _ORMGenGetLastModel() {
+        try { return localStorage.getItem("dase.ormgen.lastModel") || ""; }
+        catch { return ""; }
+    }
+    function _ORMGenSaveLastModel(pName) {
+        try { localStorage.setItem("dase.ormgen.lastModel", pName || ""); }
+        catch { /* storage unavailable */ }
+    }
+    function _ORMGenGetLastORM() {
+        try { return localStorage.getItem("dase.ormgen.lastORM") || "efcore"; }
+        catch { return "efcore"; }
+    }
+    function _ORMGenSaveLastORM(pId) {
+        try { localStorage.setItem("dase.ormgen.lastORM", pId || "efcore"); }
+        catch { /* storage unavailable */ }
+    }
+
+    function _ORMGenSetModelLabel(pIndex) {
+        const nameEl = document.getElementById("orm-gen-model-selector-name");
+        const costEl = document.getElementById("orm-gen-model-selector-cost");
+        const m = _ORMGenPickerModels[pIndex];
+        if (!m || !nameEl) return;
+        nameEl.textContent = m.name;
+        if (costEl) costEl.textContent = m.costLabel || "";
+        _ORMGenSaveLastModel(m.name);
+    }
+
+    function _ORMGenBuildModelDropdown(pPayload) {
+        const dd   = document.getElementById("orm-gen-model-dropdown");
+        const btn  = document.getElementById("orm-gen-model-selector-btn");
+        const models = pPayload.models || [];
+        _ORMGenPickerModels = models;
+        if (!dd || models.length === 0) return;
+
+        const lastModel = _ORMGenGetLastModel();
+        let best = 0;
+        for (let i = 0; i < models.length; i++) {
+            if (models[i].name === lastModel) { best = i; break; }
+        }
+        _ORMGenSelectedModel = best;
+        _ORMGenSetModelLabel(best);
+
+        let grouped = {};
+        for (let i = 0; i < models.length; i++) {
+            const v = models[i].vendor || "Other";
+            if (!grouped[v]) grouped[v] = [];
+            grouped[v].push({ idx: i, m: models[i] });
+        }
+
+        let html = "";
+        for (const vendor in grouped) {
+            html += "<div class=\"ai-model-group-label\">" + EscapeHtml(vendor) + "</div>";
+            for (const item of grouped[vendor]) {
+                const costLabel = item.m.costLabel || "";
+                html += "<div class=\"ai-model-option\" data-idx=\"" + item.idx + "\">" +
+                    "<span class=\"ai-model-name\">" + EscapeHtml(item.m.name) + "</span>" +
+                    (costLabel ? "<span class=\"ai-model-cost\">" + EscapeHtml(costLabel) + "</span>" : "") +
+                    "</div>";
+            }
+        }
+        dd.innerHTML = html;
+
+        dd.querySelectorAll(".ai-model-option").forEach(function (el) {
+            el.addEventListener("click", function () {
+                _ORMGenSelectedModel = parseInt(el.getAttribute("data-idx"), 10);
+                _ORMGenSetModelLabel(_ORMGenSelectedModel);
+                dd.style.display = "none";
+                _ORMGenUpdatePromptPreview(pPayload);
+            });
+        });
+
+        btn.onclick = function () {
+            dd.style.display = (dd.style.display === "none") ? "block" : "none";
+        };
+    }
+
+    function _ORMGenSetTargetLabel(pId) {
+        const t = _ORM_TARGETS.find(function (x) { return x.id === pId; }) || _ORM_TARGETS[0];
+        const nameEl = document.getElementById("orm-gen-target-name");
+        if (nameEl) nameEl.textContent = t.icon + " " + t.language + " / " + t.orm;
+        const ctxLabel = document.getElementById("orm-gen-context-label");
+        if (ctxLabel) ctxLabel.textContent = t.contextLabel;
+        _ORMGenSaveLastORM(pId);
+    }
+
+    function _ORMGenBuildTargetDropdown(pPayload) {
+        const dd  = document.getElementById("orm-gen-target-dropdown");
+        const btn = document.getElementById("orm-gen-target-btn");
+        if (!dd) return;
+
+        const lastORM = _ORMGenGetLastORM();
+        const found   = _ORM_TARGETS.find(function (t) { return t.id === lastORM; });
+        _ORMGenSelectedORM = found ? found.id : "efcore";
+        _ORMGenSetTargetLabel(_ORMGenSelectedORM);
+
+        let html = "";
+        for (const t of _ORM_TARGETS) {
+            html += "<div class=\"ai-model-option\" data-ormid=\"" + t.id + "\">" +
+                "<span class=\"ai-model-name\">" + EscapeHtml(t.icon + " " + t.language + " / " + t.orm) + "</span>" +
+                "<span class=\"ai-model-cost\">" + EscapeHtml(t.ext) + "</span>" +
+                "</div>";
+        }
+        dd.innerHTML = html;
+
+        dd.querySelectorAll(".ai-model-option").forEach(function (el) {
+            el.addEventListener("click", function () {
+                _ORMGenSelectedORM = el.getAttribute("data-ormid");
+                _ORMGenSetTargetLabel(_ORMGenSelectedORM);
+                dd.style.display = "none";
+                _ORMGenContextContent = "";
+                const fileEl = document.getElementById("orm-gen-context-file");
+                if (fileEl) fileEl.textContent = "None selected";
+                _ORMGenUpdatePromptPreview(pPayload);
+            });
+        });
+
+        btn.onclick = function () {
+            dd.style.display = (dd.style.display === "none") ? "block" : "none";
+        };
+    }
+
+    function _ORMGenUpdatePromptPreview(pPayload) {
+        const el = document.getElementById("orm-gen-prompt-preview");
+        if (!el) return;
+        const t    = _ORM_TARGETS.find(function (x) { return x.id === _ORMGenSelectedORM; }) || _ORM_TARGETS[0];
+        const ormLabel = t.language + " / " + t.orm;
+        const tc       = pPayload && pPayload.tableCount ? pPayload.tableCount : 0;
+        const rc       = pPayload && pPayload.refCount   ? pPayload.refCount   : 0;
+        const hc       = !!_ORMGenContextContent;
+        el.value =
+            "Target ORM: " + ormLabel + "\n\n" +
+            "Model: " + tc + " table" + (tc !== 1 ? "s" : "") + ", " +
+            rc + " FK reference" + (rc !== 1 ? "s" : "") + "\n\n" +
+            "The AI will receive the full DBML schema and generate:\n" +
+            "  • Entity / model classes for every table\n" +
+            "  • Primary key and identity configuration\n" +
+            "  • Foreign key associations and navigation properties\n" +
+            "  • " + ormLabel + "-specific annotations and conventions\n" +
+            (hc ? "  • Code adapted to match your existing context file\n\n" : "\n") +
+            "Output: single source file saved alongside the .dsorm model.";
+    }
+
+    function OpenORMGenPickerOverlay(pPayload) {
+        if (!pPayload) return;
+        const overlay = document.getElementById("orm-gen-overlay");
+        const modal   = document.getElementById("orm-gen-modal");
+        if (!overlay || !modal) return;
+
+        _ORMGenContextContent = "";
+        const fileEl = document.getElementById("orm-gen-context-file");
+        if (fileEl) fileEl.textContent = "None selected";
+
+        overlay.style.display = "flex";
+        overlay.removeAttribute("aria-hidden");
+
+        const badge = document.getElementById("orm-gen-model-badge");
+        if (badge) badge.textContent = "";
+        document.getElementById("orm-gen-status-dot").className = "ai-status-dot ai-status-dot--idle";
+        document.getElementById("orm-gen-picker-section").style.display  = "block";
+        document.getElementById("orm-gen-progress-section").style.display = "none";
+        document.getElementById("orm-gen-steps-list").style.display       = "none";
+        document.getElementById("orm-gen-result-section").style.display   = "none";
+        const footer = document.getElementById("orm-gen-modal-footer");
+        footer.innerHTML = "<button id=\"orm-gen-cancel-btn\" class=\"seed-btn seed-btn-secondary\">Cancel</button>" +
+            "<button id=\"orm-gen-execute-btn\" class=\"seed-btn seed-btn-primary\">Generate</button>";
+        document.getElementById("orm-gen-cancel-btn").onclick  = CloseORMGenOverlay;
+        document.getElementById("orm-gen-execute-btn").onclick = function () {
+            SendMessage(XMessageType.GenerateORMCodeExecute, {
+                ModelIndex:     _ORMGenSelectedModel,
+                OrmId:          _ORMGenSelectedORM,
+                ContextContent: _ORMGenContextContent
+            });
+        };
+
+        const browseBtn = document.getElementById("orm-gen-browse-btn");
+        if (browseBtn) {
+            browseBtn.onclick = function () {
+                SendMessage(XMessageType.ORMGenBrowseContext, { OrmId: _ORMGenSelectedORM });
+            };
+        }
+
+        _ORMGenBuildModelDropdown(pPayload);
+        _ORMGenBuildTargetDropdown(pPayload);
+        _ORMGenUpdatePromptPreview(pPayload);
+
+        document.addEventListener("keydown", _ORMGenKeyHandler);
+        overlay.addEventListener("click",   _ORMGenOverlayClickHandler);
+    }
+
+    function _ORMGenKeyHandler(e) {
+        if (e.key === "Escape") CloseORMGenOverlay();
+    }
+    function _ORMGenOverlayClickHandler(e) {
+        if (e.target.id === "orm-gen-overlay") CloseORMGenOverlay();
+    }
+
+    function ORMGenContextFileLoaded(pPayload) {
+        if (!pPayload) return;
+        _ORMGenContextContent = pPayload.content || "";
+        const fileEl = document.getElementById("orm-gen-context-file");
+        if (fileEl) fileEl.textContent = pPayload.fileName || "Unknown";
+    }
+
+    function StartORMGenProgress(pPayload) {
+        document.getElementById("orm-gen-picker-section").style.display   = "none";
+        document.getElementById("orm-gen-progress-section").style.display = "block";
+        document.getElementById("orm-gen-steps-list").style.display       = "block";
+        document.getElementById("orm-gen-status-dot").className = "ai-status-dot ai-status-dot--running";
+
+        const badge = document.getElementById("orm-gen-model-badge");
+        if (badge && pPayload) badge.textContent = (pPayload.vendor || "") + " " + (pPayload.model || "");
+
+        const fill  = document.getElementById("orm-gen-progress-fill");
+        const label = document.getElementById("orm-gen-progress-label");
+        if (fill)  fill.style.width = "5%";
+        if (label) label.textContent = "Starting…";
+
+        const footer = document.getElementById("orm-gen-modal-footer");
+        footer.innerHTML = "<button id=\"orm-gen-cancel-btn\" class=\"seed-btn seed-btn-secondary\">Cancel</button>";
+        document.getElementById("orm-gen-cancel-btn").onclick = CloseORMGenOverlay;
+    }
+
+    function UpdateORMGenProgress(pPayload) {
+        if (!pPayload) return;
+        const fill   = document.getElementById("orm-gen-progress-fill");
+        const label  = document.getElementById("orm-gen-progress-label");
+        const steps  = document.getElementById("orm-gen-steps-list");
+        if (fill)  fill.style.width = (pPayload.percent || 0) + "%";
+        if (label) label.textContent = pPayload.message || "";
+        if (steps && pPayload.step && pPayload.step !== "streaming") {
+            const li = document.createElement("div");
+            li.className = "ai-step-item";
+            li.innerHTML = "<span class=\"ai-step-text\">" + EscapeHtml(pPayload.message || "") + "</span>";
+            steps.appendChild(li);
+        }
+    }
+
+    function CompleteORMGen(pPayload) {
+        const fill   = document.getElementById("orm-gen-progress-fill");
+        const label  = document.getElementById("orm-gen-progress-label");
+        const result = document.getElementById("orm-gen-result-section");
+        const info   = document.getElementById("orm-gen-result-info");
+
+        if (fill)  { fill.style.width = "100%"; fill.className = "ai-progress-bar-fill ai-progress-bar-fill--done"; }
+        if (label) label.textContent = "Done!";
+        document.getElementById("orm-gen-status-dot").className = "ai-status-dot ai-status-dot--done";
+
+        if (result && info && pPayload && pPayload.success) {
+            result.style.display = "block";
+            info.innerHTML =
+                "<div><span class=\"sql-result-label\">File</span><span class=\"sql-result-value\">" +
+                EscapeHtml(pPayload.fileName || "") + "</span></div>" +
+                "<div><span class=\"sql-result-label\">ORM</span><span class=\"sql-result-value\">" +
+                EscapeHtml(pPayload.orm || "") + "</span></div>" +
+                "<div><span class=\"sql-result-label\">Lines</span><span class=\"sql-result-value\">" +
+                EscapeHtml(String(pPayload.lineCount || 0)) + "</span></div>";
+        }
+
+        const footer = document.getElementById("orm-gen-modal-footer");
+        footer.innerHTML = "<button id=\"orm-gen-close-btn\" class=\"seed-btn seed-btn-primary\">Close</button>";
+        document.getElementById("orm-gen-close-btn").onclick = CloseORMGenOverlay;
+    }
+
+    function ErrorORMGen(pPayload) {
+        const fill  = document.getElementById("orm-gen-progress-fill");
+        const label = document.getElementById("orm-gen-progress-label");
+        if (fill)  { fill.className = "ai-progress-bar-fill ai-progress-bar-fill--error"; }
+        if (label) label.textContent = (pPayload && pPayload.message) ? pPayload.message : "Error";
+        document.getElementById("orm-gen-status-dot").className = "ai-status-dot ai-status-dot--error";
+
+        const footer = document.getElementById("orm-gen-modal-footer");
+        footer.innerHTML = "<button id=\"orm-gen-close-btn\" class=\"seed-btn seed-btn-secondary\">Close</button>";
+        document.getElementById("orm-gen-close-btn").onclick = CloseORMGenOverlay;
+    }
+
+    function CloseORMGenOverlay() {
+        const overlay = document.getElementById("orm-gen-overlay");
+        if (overlay) {
+            overlay.style.display = "none";
+            overlay.setAttribute("aria-hidden", "true");
+        }
+        document.removeEventListener("keydown", _ORMGenKeyHandler);
+    }
+
+
+    // ── SQL Script Generation overlay ─────────────────────────────────────────
+
+    let _SQLPickerModels   = [];
+    let _SQLSelectedModel  = 0;
+    let _SQLSelectedDB     = "sqlserver";
+    let _SQLCustomDB       = "";
+
+    const _SQL_DATABASES = [
+        { id: "sqlserver",  label: "SQL Server"  },
+        { id: "oracle",     label: "Oracle"      },
+        { id: "postgresql", label: "PostgreSQL"  },
+        { id: "mysql",      label: "MySQL"        },
+        { id: "another",    label: "Another\u2026" }
+    ];
+
+    // --- persistence helpers ---
+
+    function _SQLGetLastModel() {
+        try { return localStorage.getItem("dase.sql.lastModel") || ""; }
+        catch { return ""; }
+    }
+    function _SQLSaveLastModel(pName) {
+        try { localStorage.setItem("dase.sql.lastModel", pName || ""); }
+        catch { /* storage unavailable */ }
+    }
+    function _SQLGetLastDB() {
+        try { return localStorage.getItem("dase.sql.lastDB") || "sqlserver"; }
+        catch { return "sqlserver"; }
+    }
+    function _SQLSaveLastDB(pId) {
+        try { localStorage.setItem("dase.sql.lastDB", pId || "sqlserver"); }
+        catch { /* storage unavailable */ }
+    }
+
+    // --- label helpers ---
+
+    function _SQLSetModelLabel(pIndex) {
+        const m = _SQLPickerModels[pIndex];
+        if (!m) return;
+        document.getElementById("sql-model-selector-name").textContent = m.name;
+        const costEl = document.getElementById("sql-model-selector-cost");
+        if (costEl) {
+            costEl.textContent   = m.costLabel || "";
+            costEl.style.display = m.costLabel ? "" : "none";
+        }
+    }
+
+    function _SQLSetDBLabel(pId) {
+        const db = _SQL_DATABASES.find(function (d) { return d.id === pId; });
+        const label = db ? db.label : pId;
+        const nameEl = document.getElementById("sql-db-selector-name");
+        if (nameEl) nameEl.textContent = label;
+        // Show / hide custom-DB text field
+        const customRow = document.getElementById("sql-custom-db-row");
+        if (customRow) customRow.style.display = (pId === "another") ? "flex" : "none";
+    }
+
+    // --- dropdown builders ---
+
+    function _SQLBuildModelDropdown() {
+        const dropdown = document.getElementById("sql-model-dropdown");
+        dropdown.innerHTML = "";
+        for (let i = 0; i < _SQLPickerModels.length; i++) {
+            const m   = _SQLPickerModels[i];
+            const row = document.createElement("div");
+            row.className = "ai-model-row" + (i === _SQLSelectedModel ? " ai-model-row--selected" : "");
+            row.setAttribute("data-index", String(i));
+            const costLabel = m.costLabel || "";
+            row.innerHTML =
+                "<span class=\"ai-model-check\">\u2713</span>" +
+                "<span class=\"ai-model-name\">" + EscapeHtml(m.name) + "</span>" +
+                (costLabel ? "<span class=\"ai-model-cost\">" + EscapeHtml(costLabel) + "</span>" : "");
+            row.addEventListener("click", function (e) {
+                e.stopPropagation();
+                const rows = dropdown.querySelectorAll(".ai-model-row");
+                rows.forEach(function (r) { r.classList.remove("ai-model-row--selected"); });
+                row.classList.add("ai-model-row--selected");
+                _SQLSelectedModel = parseInt(row.getAttribute("data-index"), 10);
+                _SQLSetModelLabel(_SQLSelectedModel);
+                _SQLSaveLastModel(_SQLPickerModels[_SQLSelectedModel]?.name || "");
+                dropdown.style.display = "none";
+            });
+            dropdown.appendChild(row);
+        }
+        const sel = dropdown.querySelector(".ai-model-row--selected");
+        if (sel) setTimeout(function () { sel.scrollIntoView({ block: "nearest" }); }, 0);
+    }
+
+    function _SQLBuildDBDropdown() {
+        const dropdown = document.getElementById("sql-db-dropdown");
+        dropdown.innerHTML = "";
+        for (let i = 0; i < _SQL_DATABASES.length; i++) {
+            const db  = _SQL_DATABASES[i];
+            const row = document.createElement("div");
+            row.className = "ai-model-row" + (db.id === _SQLSelectedDB ? " ai-model-row--selected" : "");
+            row.setAttribute("data-id", db.id);
+            row.innerHTML =
+                "<span class=\"ai-model-check\">\u2713</span>" +
+                "<span class=\"ai-model-name\">" + EscapeHtml(db.label) + "</span>";
+            row.addEventListener("click", function (e) {
+                e.stopPropagation();
+                const rows = dropdown.querySelectorAll(".ai-model-row");
+                rows.forEach(function (r) { r.classList.remove("ai-model-row--selected"); });
+                row.classList.add("ai-model-row--selected");
+                _SQLSelectedDB = row.getAttribute("data-id");
+                _SQLSetDBLabel(_SQLSelectedDB);
+                _SQLSaveLastDB(_SQLSelectedDB);
+                dropdown.style.display = "none";
+                // Update prompt preview
+                _SQLUpdatePromptPreview();
+            });
+            dropdown.appendChild(row);
+        }
+    }
+
+    function _SQLUpdatePromptPreview() {
+        const previewEl  = document.getElementById("sql-prompt-preview");
+        const dbNameEl   = document.getElementById("sql-db-selector-name");
+        const customEl   = document.getElementById("sql-custom-db-input");
+        if (!previewEl) return;
+        let dbLabel = (dbNameEl ? dbNameEl.textContent : "SQL Server") || "SQL Server";
+        if (_SQLSelectedDB === "another" && customEl && customEl.value.trim())
+            dbLabel = customEl.value.trim();
+        previewEl.value = _SQLBuildLocalPreview(dbLabel);
+    }
+
+    function _SQLBuildLocalPreview(pDbLabel) {
+        const count = _SQLPickerModels.length > 0 ? document.getElementById("sql-model-badge")?.textContent || "" : "";
+        return (
+            "Target database: " + pDbLabel + "\n\n" +
+            (count ? count + "\n\n" : "") +
+            "The AI will receive the full DBML schema and generate:\n" +
+            "  \u2022 CREATE TABLE with " + pDbLabel + "-specific data types\n" +
+            "  \u2022 PRIMARY KEY constraints and auto-increment identities\n" +
+            "  \u2022 FOREIGN KEY constraints (ON DELETE NO ACTION)\n" +
+            "  \u2022 CREATE INDEX for every FK column\n" +
+            "  \u2022 DROP / IF NOT EXISTS safety guards\n" +
+            "  \u2022 Schema-prefixed identifiers\n" +
+            "  \u2022 Descriptive SQL comments per table\n\n" +
+            "Output: .sql file saved alongside the .dsorm model."
+        );
+    }
+
+    // --- phase 1: open picker ---
+
+    function OpenSQLScriptPickerOverlay(pPayload) {
+        const overlay = document.getElementById("sql-overlay");
+        if (!overlay) return;
+
+        _SQLPickerModels  = (pPayload && pPayload.models) ? pPayload.models : [];
+        _SQLSelectedDB    = _SQLGetLastDB();
+        _SQLCustomDB      = "";
+
+        // Reset sections
+        document.getElementById("sql-picker-section").style.display   = "block";
+        document.getElementById("sql-progress-section").style.display = "none";
+        document.getElementById("sql-steps-list").style.display        = "none";
+        document.getElementById("sql-result-section").style.display   = "none";
+        document.getElementById("sql-model-dropdown").style.display   = "none";
+        document.getElementById("sql-db-dropdown").style.display      = "none";
+
+        document.getElementById("sql-modal-icon").textContent  = "\uD83D\uDDC4\uFE0F";
+        document.getElementById("sql-modal-title").textContent = "Create SQL Script";
+        const badgeEl = document.getElementById("sql-model-badge");
+        if (badgeEl) {
+            const tbl = pPayload?.tableCount ?? 0;
+            const ref = pPayload?.refCount   ?? 0;
+            badgeEl.textContent = tbl + " table" + (tbl !== 1 ? "s" : "") +
+                                  " \u00B7 " + ref + " FK" + (ref !== 1 ? "s" : "");
+        }
+
+        // Pre-select model
+        const lastModel = _SQLGetLastModel();
+        _SQLSelectedModel = 0;
+        for (let i = 0; i < _SQLPickerModels.length; i++) {
+            if (lastModel && _SQLPickerModels[i].name === lastModel) {
+                _SQLSelectedModel = i;
+                break;
+            }
+        }
+        _SQLSetModelLabel(_SQLSelectedModel);
+
+        // DB selector
+        _SQLSetDBLabel(_SQLSelectedDB);
+
+        // Prompt preview
+        const promptEl = document.getElementById("sql-prompt-preview");
+        if (promptEl) promptEl.value = (pPayload && pPayload.promptPreview) ? pPayload.promptPreview : _SQLBuildLocalPreview("SQL Server");
+
+        // Custom DB input change
+        const customEl = document.getElementById("sql-custom-db-input");
+        if (customEl) {
+            customEl.value = "";
+            customEl.oninput = function () {
+                _SQLCustomDB = customEl.value;
+                _SQLUpdatePromptPreview();
+            };
+        }
+
+        // Wire model selector
+        const modelBtn = document.getElementById("sql-model-selector-btn");
+        modelBtn.onclick = function (e) {
+            e.stopPropagation();
+            const dd = document.getElementById("sql-model-dropdown");
+            if (dd.style.display === "none") {
+                const rect = modelBtn.getBoundingClientRect();
+                dd.style.top   = (rect.bottom + 4) + "px";
+                dd.style.left  = rect.left + "px";
+                dd.style.width = rect.width + "px";
+                _SQLBuildModelDropdown();
+                dd.style.display = "block";
+                document.addEventListener("click", function _closeSQLModelDD() {
+                    dd.style.display = "none";
+                    document.removeEventListener("click", _closeSQLModelDD);
+                });
+            } else {
+                dd.style.display = "none";
+            }
+        };
+
+        // Wire DB selector
+        const dbBtn = document.getElementById("sql-db-selector-btn");
+        dbBtn.onclick = function (e) {
+            e.stopPropagation();
+            const dd = document.getElementById("sql-db-dropdown");
+            if (dd.style.display === "none") {
+                const rect = dbBtn.getBoundingClientRect();
+                dd.style.top   = (rect.bottom + 4) + "px";
+                dd.style.left  = rect.left + "px";
+                dd.style.width = rect.width + "px";
+                _SQLBuildDBDropdown();
+                dd.style.display = "block";
+                document.addEventListener("click", function _closeSQLDBDD() {
+                    dd.style.display = "none";
+                    document.removeEventListener("click", _closeSQLDBDD);
+                });
+            } else {
+                dd.style.display = "none";
+            }
+        };
+
+        // Wire status dot
+        const statusDot = document.getElementById("sql-status-dot");
+        statusDot.className = "ai-status-dot ai-status-dot--idle";
+
+        // Footer: Cancel + Generate
+        const footer = document.getElementById("sql-modal-footer");
+        footer.innerHTML =
+            "<button id=\"sql-cancel-btn\" class=\"seed-btn seed-btn-secondary\">Cancel</button>" +
+            "<button id=\"sql-execute-btn\" class=\"seed-btn seed-btn-primary\">Generate</button>";
+
+        document.getElementById("sql-cancel-btn").onclick  = CloseSQLScriptOverlay;
+        document.getElementById("sql-execute-btn").onclick = function () {
+            const customDB = (document.getElementById("sql-custom-db-input")?.value || "").trim();
+            SendMessage(XMessageType.CreateSQLScriptExecute, {
+                ModelIndex: _SQLSelectedModel,
+                Database:   _SQLSelectedDB,
+                CustomDB:   customDB
+            });
+        };
+
+        overlay.style.display = "flex";
+        overlay.setAttribute("aria-hidden", "false");
+    }
+
+    // --- phase 2: progress ---
+
+    function StartSQLScriptProgress(pPayload) {
+        document.getElementById("sql-picker-section").style.display   = "none";
+        document.getElementById("sql-progress-section").style.display = "block";
+        document.getElementById("sql-steps-list").style.display        = "block";
+        document.getElementById("sql-steps-list").innerHTML            = "";
+        document.getElementById("sql-result-section").style.display   = "none";
+
+        document.getElementById("sql-progress-fill").style.width    = "0%";
+        document.getElementById("sql-progress-fill").className      = "ai-progress-bar-fill";
+        document.getElementById("sql-progress-label").textContent   = "Initializing\u2026";
+        document.getElementById("sql-modal-icon").textContent       = "\uD83D\uDDC4\uFE0F";
+        document.getElementById("sql-status-dot").className         = "ai-status-dot ai-status-dot--running";
+
+        const badge = document.getElementById("sql-model-badge");
+        if (badge && pPayload) {
+            const vendor = pPayload.vendor ? " \u00B7 " + pPayload.vendor : "";
+            badge.textContent = (pPayload.model || "") + vendor +
+                (pPayload.database ? " \u00B7 " + pPayload.database : "");
+        }
+
+        // Footer: only Cancel while running
+        const footer = document.getElementById("sql-modal-footer");
+        footer.innerHTML = "<button id=\"sql-cancel-btn\" class=\"seed-btn seed-btn-secondary\">Cancel</button>";
+        document.getElementById("sql-cancel-btn").onclick = CloseSQLScriptOverlay;
+    }
+
+    function UpdateSQLScriptProgress(pPayload) {
+        if (!pPayload) return;
+        const fill  = document.getElementById("sql-progress-fill");
+        const label = document.getElementById("sql-progress-label");
+        if (fill  && pPayload.percent !== undefined) fill.style.width = Math.min(pPayload.percent, 100) + "%";
+        if (label && pPayload.message)               label.textContent = pPayload.message;
+
+        if (pPayload.step && pPayload.step !== "streaming") {
+            const list = document.getElementById("sql-steps-list");
+            const item = document.createElement("div");
+            item.className = "ai-step-item";
+            item.innerHTML = "<span class=\"ai-step-check\">\u2713</span><span class=\"ai-step-text\">" +
+                EscapeHtml(pPayload.message) + "</span>";
+            list.appendChild(item);
+            list.scrollTop = list.scrollHeight;
+        }
+    }
+
+    // --- phase 3: complete ---
+
+    function CompleteSQLScript(pPayload) {
+        const fill  = document.getElementById("sql-progress-fill");
+        const label = document.getElementById("sql-progress-label");
+        if (fill)  { fill.style.width = "100%"; fill.className = "ai-progress-bar-fill ai-progress-bar-fill--done"; }
+        if (label && pPayload?.fileName) label.textContent = "Saved \u2014 " + pPayload.fileName;
+
+        document.getElementById("sql-status-dot").className = "ai-status-dot ai-status-dot--done";
+        document.getElementById("sql-modal-icon").textContent = "\u2705";
+
+        const resultSect = document.getElementById("sql-result-section");
+        const info       = document.getElementById("sql-result-info");
+        if (resultSect) resultSect.style.display = "block";
+        if (info && pPayload) {
+            info.innerHTML =
+                "<div class=\"sql-result-row\"><span class=\"sql-result-label\">File</span><span class=\"sql-result-value\">" +
+                EscapeHtml(pPayload.fileName || "") + "</span></div>" +
+                "<div class=\"sql-result-row\"><span class=\"sql-result-label\">Database</span><span class=\"sql-result-value\">" +
+                EscapeHtml(pPayload.database || "") + "</span></div>" +
+                "<div class=\"sql-result-row\"><span class=\"sql-result-label\">Lines</span><span class=\"sql-result-value\">" +
+                (pPayload.lineCount || 0) + "</span></div>";
+        }
+
+        const footer = document.getElementById("sql-modal-footer");
+        footer.innerHTML = "<button id=\"sql-close-btn\" class=\"seed-btn seed-btn-primary\">Close</button>";
+        document.getElementById("sql-close-btn").onclick = CloseSQLScriptOverlay;
+    }
+
+    // --- error ---
+
+    function ErrorSQLScript(pPayload) {
+        const fill  = document.getElementById("sql-progress-fill");
+        const label = document.getElementById("sql-progress-label");
+        if (fill)  { fill.className = "ai-progress-bar-fill ai-progress-bar-fill--error"; }
+        if (label) label.textContent = (pPayload && pPayload.message) ? pPayload.message : "Error";
+        document.getElementById("sql-status-dot").className = "ai-status-dot ai-status-dot--error";
+
+        const footer = document.getElementById("sql-modal-footer");
+        footer.innerHTML = "<button id=\"sql-close-btn\" class=\"seed-btn seed-btn-secondary\">Close</button>";
+        document.getElementById("sql-close-btn").onclick = CloseSQLScriptOverlay;
+    }
+
+    function CloseSQLScriptOverlay() {
+        const overlay = document.getElementById("sql-overlay");
+        if (overlay) {
+            overlay.style.display = "none";
+            overlay.setAttribute("aria-hidden", "true");
+        }
     }
 
 })();

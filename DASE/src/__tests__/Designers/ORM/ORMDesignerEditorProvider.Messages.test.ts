@@ -1125,4 +1125,154 @@ describe('XORMDesignerEditorProvider', () => {
         });
     });
 
+    describe('CreateSQLScript message', () => {
+        let mockPanel: any;
+        let mockState: any;
+
+        beforeEach(() => {
+            mockPanel = createMockWebviewPanel();
+            mockState = {
+                GetModelData: jest.fn().mockReturnValue({ Tables: [], References: [] }),
+                Validate: jest.fn().mockReturnValue([]),
+                GetProperties: jest.fn().mockReturnValue([]),
+                Bridge: { LastSyncMutated: false, GetAllDataTypes: jest.fn().mockReturnValue([]) },
+                IsDirty: false,
+                Document: { uri: Uri.file('/test/model.dsorm') },
+                IssueService: { SetIssues: jest.fn() },
+                SelectionService: { HasSelection: false, PrimaryID: null }
+            };
+        });
+
+        it('should execute Dase.CreateSQLScript command', async () => {
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'CreateSQLScript',
+                Payload: {}
+            });
+
+            expect(vscode.commands.executeCommand).toHaveBeenCalledWith('Dase.CreateSQLScript');
+        });
+    });
+
+    describe('CreateSQLScriptExecute message', () => {
+        let mockPanel: any;
+        let mockState: any;
+
+        beforeEach(() => {
+            mockPanel = createMockWebviewPanel();
+            mockState = {
+                GetModelData: jest.fn().mockReturnValue({ Tables: [], References: [] }),
+                Validate: jest.fn().mockReturnValue([]),
+                GetProperties: jest.fn().mockReturnValue([]),
+                Bridge: { LastSyncMutated: false, GetAllDataTypes: jest.fn().mockReturnValue([]) },
+                IsDirty: false,
+                Document: { uri: Uri.file('/test/model.dsorm') },
+                IssueService: { SetIssues: jest.fn() },
+                SelectionService: { HasSelection: false, PrimaryID: null }
+            };
+        });
+
+        it('should execute Dase.CreateSQLScriptExecute with payload fields', async () => {
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'CreateSQLScriptExecute',
+                Payload: { ModelIndex: 2, Database: 'postgresql', CustomDB: '' }
+            });
+
+            expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+                'Dase.CreateSQLScriptExecute', 2, 'postgresql', ''
+            );
+        });
+
+        it('should pass CustomDB when database is "another"', async () => {
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'CreateSQLScriptExecute',
+                Payload: { ModelIndex: 0, Database: 'another', CustomDB: 'Firebird' }
+            });
+
+            expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+                'Dase.CreateSQLScriptExecute', 0, 'another', 'Firebird'
+            );
+        });
+
+        it('should default ModelIndex to 0 when missing', async () => {
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'CreateSQLScriptExecute',
+                Payload: { Database: 'mysql' }
+            });
+
+            expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+                'Dase.CreateSQLScriptExecute', 0, 'mysql', ''
+            );
+        });
+
+        it('should default Database to sqlserver when missing', async () => {
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'CreateSQLScriptExecute',
+                Payload: { ModelIndex: 1 }
+            });
+
+            expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+                'Dase.CreateSQLScriptExecute', 1, 'sqlserver', ''
+            );
+        });
+    });
+
+    describe('GenerateORMCode message', () => {
+        it('should execute Dase.GenerateORMCode command', async () => {
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'GenerateORMCode',
+                Payload: {}
+            });
+
+            expect(vscode.commands.executeCommand).toHaveBeenCalledWith('Dase.GenerateORMCode');
+        });
+    });
+
+    describe('GenerateORMCodeExecute message', () => {
+        it('should execute Dase.GenerateORMCodeExecute with payload fields', async () => {
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'GenerateORMCodeExecute',
+                Payload: { ModelIndex: 1, OrmId: 'prisma', ContextContent: 'schema...' }
+            });
+
+            expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+                'Dase.GenerateORMCodeExecute', 1, 'prisma', 'schema...'
+            );
+        });
+
+        it('should use defaults when payload fields are missing', async () => {
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'GenerateORMCodeExecute',
+                Payload: {}
+            });
+
+            expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+                'Dase.GenerateORMCodeExecute', 0, 'efcore', ''
+            );
+        });
+    });
+
+    describe('ORMGenBrowseContext message', () => {
+        it('should execute Dase.ORMGenBrowseContext with OrmId', async () => {
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'ORMGenBrowseContext',
+                Payload: { OrmId: 'sqlalchemy' }
+            });
+
+            expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+                'Dase.ORMGenBrowseContext', 'sqlalchemy'
+            );
+        });
+
+        it('should default OrmId to efcore when missing', async () => {
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'ORMGenBrowseContext',
+                Payload: {}
+            });
+
+            expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+                'Dase.ORMGenBrowseContext', 'efcore'
+            );
+        });
+    });
+
 });

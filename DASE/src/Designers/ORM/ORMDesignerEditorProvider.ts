@@ -87,6 +87,18 @@ interface IOrganizeTablesAIExecutePayload {
     ModelIndex: number;
 }
 
+interface ICreateSQLScriptExecutePayload {
+    ModelIndex: number;
+    Database: string;
+    CustomDB: string;
+}
+
+interface IGenerateORMCodeExecutePayload {
+    ModelIndex:     number;
+    OrmId:          string;
+    ContextContent: string;
+}
+
 interface IDesignerMessage {
     Type: string;
     Payload?: unknown;
@@ -368,6 +380,56 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
             case XDesignerMessageType.AIOrganizeRevert:
                 vscode.commands.executeCommand("Dase.OrganizeTablesAIRevert");
                 break;
+
+            // ----------------------------------------------------
+            // AI SQL Script Generation
+            // ----------------------------------------------------
+            case XDesignerMessageType.CreateSQLScript:
+                vscode.commands.executeCommand("Dase.CreateSQLScript");
+                break;
+
+            case XDesignerMessageType.CreateSQLScriptExecute: {
+                const sqlPayload = payload as ICreateSQLScriptExecutePayload;
+                vscode.commands.executeCommand(
+                    "Dase.CreateSQLScriptExecute",
+                    sqlPayload.ModelIndex ?? 0,
+                    sqlPayload.Database   ?? "sqlserver",
+                    sqlPayload.CustomDB   ?? ""
+                );
+                break;
+            }
+
+            // ----------------------------------------------------
+            // AI ORM Code Generation
+            // ----------------------------------------------------
+            case XDesignerMessageType.GenerateORMCode:
+                /* istanbul ignore next */
+                vscode.commands.executeCommand("Dase.GenerateORMCode");
+                break;
+
+            case XDesignerMessageType.GenerateORMCodeExecute: {
+                /* istanbul ignore next */
+                const ormPayload = payload as IGenerateORMCodeExecutePayload;
+                /* istanbul ignore next */
+                vscode.commands.executeCommand(
+                    "Dase.GenerateORMCodeExecute",
+                    ormPayload.ModelIndex     ?? 0,
+                    ormPayload.OrmId          ?? "efcore",
+                    ormPayload.ContextContent ?? ""
+                );
+                break;
+            }
+
+            case XDesignerMessageType.ORMGenBrowseContext: {
+                /* istanbul ignore next */
+                const browsePayload = payload as { OrmId: string };
+                /* istanbul ignore next */
+                vscode.commands.executeCommand(
+                    "Dase.ORMGenBrowseContext",
+                    browsePayload.OrmId ?? "efcore"
+                );
+                break;
+            }
 
             default:
                 console.warn("Unknown message type:", type);
@@ -971,7 +1033,9 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="export-dbml"><span class="icon">📤</span>Export to DBML</div>
         <div class="context-menu-separator"></div>
-        <div class="context-menu-item" data-action="organize-tables-ai"><span class="icon">✨</span>Organize Tables using AI</div>
+        <div class="context-menu-item" data-action="organize-tables-ai"><span class="icon">&#x2728;</span>Organize Tables using AI</div>
+        <div class="context-menu-item" data-action="create-sql-script"><span class="icon">&#x1f5c4;&#xfe0f;</span>Create SQL Script&#x2026;</div>
+        <div class="context-menu-item" data-action="generate-orm-code"><span class="icon">&#x1f3d7;&#xfe0f;</span>Generate ORM Code&#x2026;</div>
     </div>
     <div id="table-context-menu" class="context-menu">
         <div class="context-menu-item" data-action="add-field"><span class="icon">➕</span>Add Field</div>
@@ -1046,6 +1110,138 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         <div class="context-menu-item" data-action="rename-field"><span class="icon">✏️</span>Rename Field</div>
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="delete-field"><span class="icon">🗑️</span>Delete Field</div>
+    </div>
+
+    <!-- AI SQL Script Generation overlay -->
+    <!-- ORM Code Generation overlay -->
+    <div id="orm-gen-overlay" class="ai-overlay" style="display:none" aria-hidden="true">
+        <div id="orm-gen-modal" class="ai-modal" role="dialog" aria-labelledby="orm-gen-modal-title" aria-live="polite">
+            <div class="ai-modal-header">
+                <div class="ai-modal-title-block">
+                    <span class="ai-modal-icon" id="orm-gen-modal-icon">&#x1f3d7;&#xfe0f;</span>
+                    <div>
+                        <h2 id="orm-gen-modal-title" class="ai-modal-title">Generate ORM Code</h2>
+                        <div id="orm-gen-model-badge" class="ai-model-badge"></div>
+                    </div>
+                </div>
+                <div id="orm-gen-status-dot" class="ai-status-dot ai-status-dot--idle"></div>
+            </div>
+            <!-- Phase 1: picker -->
+            <div id="orm-gen-picker-section" class="ai-picker-section" style="display:none">
+                <div class="ai-prompt-preview-wrap">
+                    <div class="ai-prompt-preview-label">Prompt preview</div>
+                    <textarea class="ai-prompt-preview" id="orm-gen-prompt-preview" readonly spellcheck="false"></textarea>
+                </div>
+                <div class="ai-model-selector-row">
+                    <span class="ai-model-selector-label">Model</span>
+                    <div class="ai-model-selector-wrap">
+                        <button class="ai-model-selector-btn" id="orm-gen-model-selector-btn" type="button">
+                            <span class="ai-model-selector-name" id="orm-gen-model-selector-name">Select model&#x2026;</span>
+                            <span class="ai-model-selector-cost" id="orm-gen-model-selector-cost"></span>
+                            <span class="ai-model-selector-chevron">&#x25be;</span>
+                        </button>
+                        <div id="orm-gen-model-dropdown" class="ai-model-dropdown" style="display:none"></div>
+                    </div>
+                </div>
+                <div class="ai-model-selector-row">
+                    <span class="ai-model-selector-label">ORM Target</span>
+                    <div class="ai-model-selector-wrap">
+                        <button class="ai-model-selector-btn" id="orm-gen-target-btn" type="button">
+                            <span class="ai-model-selector-name" id="orm-gen-target-name">C# / EF Core</span>
+                            <span class="ai-model-selector-chevron">&#x25be;</span>
+                        </button>
+                        <div id="orm-gen-target-dropdown" class="ai-model-dropdown" style="display:none"></div>
+                    </div>
+                </div>
+                <div class="orm-gen-context-row">
+                    <span class="ai-model-selector-label" id="orm-gen-context-label">Context file</span>
+                    <div class="orm-gen-context-right">
+                        <span class="orm-gen-context-file" id="orm-gen-context-file">None selected</span>
+                        <button class="seed-btn seed-btn-secondary orm-gen-browse-btn" id="orm-gen-browse-btn" type="button">Browse&#x2026;</button>
+                    </div>
+                </div>
+            </div>
+            <!-- Phase 2: progress -->
+            <div id="orm-gen-progress-section" class="ai-progress-section" style="display:none">
+                <div class="ai-progress-bar-track">
+                    <div class="ai-progress-bar-fill" id="orm-gen-progress-fill" style="width:0%"></div>
+                </div>
+                <div id="orm-gen-progress-label" class="ai-progress-label">Initializing&#x2026;</div>
+            </div>
+            <div id="orm-gen-steps-list" class="ai-steps-list" style="display:none"></div>
+            <div id="orm-gen-result-section" class="ai-result-section" style="display:none">
+                <div id="orm-gen-result-info" class="sql-result-info"></div>
+            </div>
+            <!-- Footer -->
+            <div class="ai-modal-footer" id="orm-gen-modal-footer">
+                <button id="orm-gen-cancel-btn" class="seed-btn seed-btn-secondary">Cancel</button>
+                <button id="orm-gen-execute-btn" class="seed-btn seed-btn-primary">Generate</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="sql-overlay" class="ai-overlay" style="display:none" aria-hidden="true">
+        <div id="sql-modal" class="ai-modal" role="dialog" aria-labelledby="sql-modal-title" aria-live="polite">
+            <div class="ai-modal-header">
+                <div class="ai-modal-title-block">
+                    <span class="ai-modal-icon" id="sql-modal-icon">&#x1f5c4;&#xfe0f;</span>
+                    <div>
+                        <h2 id="sql-modal-title" class="ai-modal-title">Create SQL Script</h2>
+                        <div id="sql-model-badge" class="ai-model-badge"></div>
+                    </div>
+                </div>
+                <div id="sql-status-dot" class="ai-status-dot ai-status-dot--idle"></div>
+            </div>
+            <!-- Phase 1: picker -->
+            <div id="sql-picker-section" class="ai-picker-section" style="display:none">
+                <div class="ai-prompt-preview-wrap">
+                    <div class="ai-prompt-preview-label">Prompt preview</div>
+                    <textarea class="ai-prompt-preview" id="sql-prompt-preview" readonly spellcheck="false"></textarea>
+                </div>
+                <div class="ai-model-selector-row">
+                    <span class="ai-model-selector-label">Model</span>
+                    <div class="ai-model-selector-wrap">
+                        <button class="ai-model-selector-btn" id="sql-model-selector-btn" type="button">
+                            <span class="ai-model-selector-name" id="sql-model-selector-name">Select model&#x2026;</span>
+                            <span class="ai-model-selector-cost" id="sql-model-selector-cost"></span>
+                            <span class="ai-model-selector-chevron">&#x25be;</span>
+                        </button>
+                        <div id="sql-model-dropdown" class="ai-model-dropdown" style="display:none"></div>
+                    </div>
+                </div>
+                <div class="ai-model-selector-row">
+                    <span class="ai-model-selector-label">Database</span>
+                    <div class="ai-model-selector-wrap">
+                        <button class="ai-model-selector-btn" id="sql-db-selector-btn" type="button">
+                            <span class="ai-model-selector-name" id="sql-db-selector-name">SQL Server</span>
+                            <span class="ai-model-selector-chevron">&#x25be;</span>
+                        </button>
+                        <div id="sql-db-dropdown" class="ai-model-dropdown" style="display:none"></div>
+                    </div>
+                </div>
+                <div id="sql-custom-db-row" class="sql-custom-db-row" style="display:none">
+                    <span class="ai-model-selector-label">Name</span>
+                    <input type="text" id="sql-custom-db-input" class="sql-custom-db-input"
+                           placeholder="Enter database name&#x2026;" autocomplete="off" spellcheck="false" />
+                </div>
+            </div>
+            <!-- Phase 2: progress -->
+            <div id="sql-progress-section" class="ai-progress-section" style="display:none">
+                <div class="ai-progress-bar-track">
+                    <div class="ai-progress-bar-fill" id="sql-progress-fill" style="width:0%"></div>
+                </div>
+                <div id="sql-progress-label" class="ai-progress-label">Initializing&#x2026;</div>
+            </div>
+            <div id="sql-steps-list" class="ai-steps-list" style="display:none"></div>
+            <div id="sql-result-section" class="ai-result-section" style="display:none">
+                <div id="sql-result-info" class="sql-result-info"></div>
+            </div>
+            <!-- Footer -->
+            <div class="ai-modal-footer" id="sql-modal-footer">
+                <button id="sql-cancel-btn" class="seed-btn seed-btn-secondary">Cancel</button>
+                <button id="sql-execute-btn" class="seed-btn seed-btn-primary">Generate</button>
+            </div>
+        </div>
     </div>
 
     <!-- AI Organization progress overlay -->
