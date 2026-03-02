@@ -2,7 +2,6 @@
 .vscode-test/**
 .github/**
 src/**
-node_modules/**
 obj/**
 *.ts
 !media/**/*.js
@@ -10,7 +9,39 @@ obj/**
 .gitignore
 .eslintrc.json
 tsconfig.json
+tsconfig.test.json
 DASE.esproj
 **/*.md
 !README.md
 samples/**
+jest.config.js
+test-results.json
+test_parser_dbml.txt
+coverage/**
+__tests__/**
+
+# Exclude all node_modules by default
+node_modules/**
+
+# Include production dependencies
+!node_modules/@tootega/**
+!node_modules/@dbml/**
+!node_modules/antlr4/**
+!node_modules/lodash/**
+!node_modules/luxon/**
+!node_modules/parsimmon/**
+!node_modules/pluralize/**
+
+# ESM files not needed (we use CommonJS)
+node_modules/**/*.mjs
+node_modules/**/esm/**
+node_modules/lodash-es/**
+
+# Dev files in node_modules
+node_modules/**/*.ts
+node_modules/**/*.map
+node_modules/**/test/**
+node_modules/**/tests/**
+node_modules/**/__tests__/**
+node_modules/**/docs/**
+node_modules/**/examples/**

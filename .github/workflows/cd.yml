@@ -1,0 +1,396 @@
+name: CD
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.0.0)'
+        required: true
+        type: string
+      publish_marketplace:
+        description: 'Publish to VS Code Marketplace'
+        required: false
+        type: boolean
+        default: false
+      publish_npm:
+        description: 'Publish TFX to npm'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ============================================
+  # Job 1: Build and Test
+  # ============================================
+  build_test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      full_version: ${{ steps.version.outputs.full_version }}
+      build_number: ${{ steps.version.outputs.build_number }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          BUILD_NUMBER=${{ github.run_number }}
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          fi
+          
+          # Parse version parts
+          MAJOR=$(echo $VERSION | cut -d. -f1)
+          MINOR=$(echo $VERSION | cut -d. -f2)
+          PATCH=$(echo $VERSION | cut -d. -f3 | cut -d- -f1)
+          PRERELEASE=$(echo $VERSION | grep -oP '(?<=-).*' || echo '')
+          
+          # Build full version: MAJOR.MINOR.BUILD or MAJOR.MINOR.BUILD-prerelease
+          if [ -n "$PRERELEASE" ]; then
+            FULL_VERSION="${MAJOR}.${MINOR}.${BUILD_NUMBER}-${PRERELEASE}"
+          else
+            FULL_VERSION="${MAJOR}.${MINOR}.${BUILD_NUMBER}"
+          fi
+          
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "full_version=$FULL_VERSION" >> $GITHUB_OUTPUT
+          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+          echo "📦 Base Version: $VERSION"
+          echo "📦 Full Version: $FULL_VERSION (build #$BUILD_NUMBER)"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: |
+            TFX/package-lock.json
+            DASE/package-lock.json
+
+      # --------------------
+      # TFX Build & Test
+      # --------------------
+      - name: Install TFX dependencies
+        run: npm ci
+        working-directory: TFX
+
+      - name: Build TFX
+        run: npm run build
+        working-directory: TFX
+
+      - name: Test TFX
+        run: npm run test:coverage
+        working-directory: TFX
+
+      - name: Upload TFX coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfx-coverage
+          path: TFX/coverage/
+
+      # --------------------
+      # DASE Build & Test
+      # --------------------
+      - name: Install DASE dependencies
+        run: npm ci
+        working-directory: DASE
+
+      - name: Build DASE
+        run: npm run compile
+        working-directory: DASE
+
+      - name: Test DASE
+        run: npm run test:coverage
+        working-directory: DASE
+
+      - name: Upload DASE coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: dase-coverage
+          path: DASE/coverage/
+
+  # ============================================
+  # Job 2: Package VSIX
+  # ============================================
+  package:
+    name: Package Extension
+    runs-on: ubuntu-latest
+    needs: build_test
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: |
+            TFX/package-lock.json
+            DASE/package-lock.json
+
+      # --------------------
+      # Build TFX (dependency)
+      # --------------------
+      - name: Install TFX dependencies
+        run: npm ci
+        working-directory: TFX
+
+      - name: Build TFX
+        run: npm run build
+        working-directory: TFX
+
+      # --------------------
+      # Build & Package DASE
+      # --------------------
+      - name: Install DASE dependencies
+        run: npm ci
+        working-directory: DASE
+
+      - name: Copy TFX to node_modules
+        run: |
+          mkdir -p DASE/node_modules/@tootega/tfx/dist
+          cp -r TFX/dist/* DASE/node_modules/@tootega/tfx/dist/
+          cp TFX/package.json DASE/node_modules/@tootega/tfx/
+          echo "📦 Copied TFX to DASE/node_modules/@tootega/tfx"
+
+      - name: Update package.json version
+        working-directory: DASE
+        run: |
+          VERSION="${{ needs.build_test.outputs.full_version }}"
+          BUILD="${{ needs.build_test.outputs.build_number }}"
+          npm version $VERSION --no-git-tag-version --allow-same-version
+          echo "📦 Updated package.json to version $VERSION (build #$BUILD)"
+
+      - name: Build DASE
+        run: npm run compile
+        working-directory: DASE
+
+      - name: Install vsce
+        run: npm install -g @vscode/vsce
+
+      - name: Package VSIX
+        working-directory: DASE
+        run: |
+          VERSION="${{ needs.build_test.outputs.full_version }}"
+          BUILD="${{ needs.build_test.outputs.build_number }}"
+          vsce package --out dase-${VERSION}.vsix
+          echo "📦 Created dase-${VERSION}.vsix (build #$BUILD)"
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dase-vsix-build-${{ needs.build_test.outputs.build_number }}
+          path: DASE/dase-*.vsix
+
+  # ============================================
+  # Job 3: Create GitHub Release
+  # ============================================
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [build_test, package]
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download VSIX artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dase-vsix-build-${{ needs.build_test.outputs.build_number }}
+          path: ./artifacts
+
+      - name: Generate Release Notes
+        id: release_notes
+        run: |
+          VERSION="${{ needs.build_test.outputs.version }}"
+          FULL_VERSION="${{ needs.build_test.outputs.full_version }}"
+          BUILD="${{ needs.build_test.outputs.build_number }}"
+          cat << EOF > release_notes.md
+          ## DASE v${FULL_VERSION}
+
+          **Base Version:** ${VERSION}  
+          **Build Number:** #${BUILD}
+
+          ### 🚀 Installation
+
+          1. Download the \`.vsix\` file below
+          2. Open VS Code
+          3. Press \`Ctrl+Shift+P\` (or \`Cmd+Shift+P\` on macOS)
+          4. Type "Extensions: Install from VSIX..."
+          5. Select the downloaded file
+
+          ### 📦 What's Included
+
+          - **DASE Extension** - Visual ORM Designer for VS Code
+          - **TFX Framework** - Core framework library (bundled)
+
+          ### 🔧 Requirements
+
+          - VS Code 1.99.0 or higher
+          - Node.js 20+
+
+          ### 📋 Changes
+
+          See [CHANGELOG.md](CHANGELOG.md) for details.
+
+          ---
+          *Built with ❤️ by Tootega*
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: DASE v${{ needs.build_test.outputs.full_version }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: ${{ contains(needs.build_test.outputs.version, '-') }}
+          files: |
+            ./artifacts/dase-*.vsix
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ============================================
+  # Job 4: Publish to VS Code Marketplace (Optional)
+  # ============================================
+  publish_marketplace:
+    name: Publish to Marketplace
+    runs-on: ubuntu-latest
+    needs: [build_test, package]
+    if: |
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_marketplace == 'true') ||
+      (github.event_name == 'push' && !contains(github.ref, '-'))
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: DASE/package-lock.json
+
+      - name: Download VSIX artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dase-vsix-build-${{ needs.build_test.outputs.build_number }}
+          path: ./artifacts
+
+      - name: Install vsce
+        run: npm install -g @vscode/vsce
+
+      - name: Publish to Marketplace
+        if: ${{ secrets.VSCE_PAT != '' }}
+        run: |
+          VERSION="${{ needs.build_test.outputs.full_version }}"
+          BUILD="${{ needs.build_test.outputs.build_number }}"
+          vsce publish --packagePath ./artifacts/dase-${VERSION}.vsix -p ${{ secrets.VSCE_PAT }}
+          echo "✅ Published v${VERSION} (build #${BUILD}) to VS Code Marketplace"
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+
+      - name: Skip publish (no PAT)
+        if: ${{ secrets.VSCE_PAT == '' }}
+        run: |
+          echo "⚠️ VSCE_PAT secret not configured - skipping Marketplace publish"
+          echo "To enable publishing, add VSCE_PAT secret to your repository"
+
+  # ============================================
+  # Job 5: Publish TFX to npm (Optional)
+  # ============================================
+  publish_npm:
+    name: Publish TFX to npm
+    runs-on: ubuntu-latest
+    needs: [build_test]
+    if: |
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_npm == 'true')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+          cache-dependency-path: TFX/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: TFX
+
+      - name: Update version
+        working-directory: TFX
+        run: |
+          VERSION="${{ needs.build_test.outputs.full_version }}"
+          BUILD="${{ needs.build_test.outputs.build_number }}"
+          npm version $VERSION --no-git-tag-version --allow-same-version
+          echo "📦 Updated TFX package.json to version $VERSION (build #$BUILD)"
+
+      - name: Build
+        run: npm run build
+        working-directory: TFX
+
+      - name: Publish to npm
+        if: ${{ secrets.NPM_TOKEN != '' }}
+        run: npm publish --access public
+        working-directory: TFX
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Skip publish (no token)
+        if: ${{ secrets.NPM_TOKEN == '' }}
+        run: |
+          echo "⚠️ NPM_TOKEN secret not configured - skipping npm publish"
+          echo "To enable publishing, add NPM_TOKEN secret to your repository"
+
+  # ============================================
+  # Job Summary
+  # ============================================
+  summary:
+    name: Deployment Summary
+    runs-on: ubuntu-latest
+    needs: [build_test, package, release]
+    if: always()
+
+    steps:
+      - name: Write Summary
+        run: |
+          VERSION="${{ needs.build_test.outputs.version }}"
+          FULL_VERSION="${{ needs.build_test.outputs.full_version }}"
+          BUILD="${{ needs.build_test.outputs.build_number }}"
+          {
+            echo "## 🚀 Deployment Summary"
+            echo ""
+            echo "| Component | Status |"
+            echo "|-----------|--------|"
+            echo "| Base Version | \`v${VERSION}\` |"
+            echo "| Full Version | \`v${FULL_VERSION}\` |"
+            echo "| Build Number | \`#${BUILD}\` |"
+            echo "| Build & Test | ${{ needs.build_test.result == 'success' && '✅ Passed' || '❌ Failed' }} |"
+            echo "| Package VSIX | ${{ needs.package.result == 'success' && '✅ Created' || '❌ Failed' }} |"
+            echo "| GitHub Release | ${{ needs.release.result == 'success' && '✅ Published' || needs.release.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |"
+            echo ""
+            echo "### 📥 Download"
+            echo ""
+            echo "The VSIX package is available in the [Releases](../../releases/tag/v${FULL_VERSION}) section."
+          } >> $GITHUB_STEP_SUMMARY

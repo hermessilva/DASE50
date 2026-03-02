@@ -431,3 +431,4 @@ coverage/
 /.vs
 /.vscode
 /DASE/test-results.json
+/DASE/vsix-temp
