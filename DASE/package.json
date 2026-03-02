@@ -1,567 +1,587 @@
-{
-    "name": "dase",
-    "displayName": "DASE - Design-Aided Software Engineering",
-    "description": "Visual design environment for multi-tier, multi-platform web applications",
-    "version": "1.0.0",
-    "publisher": "tootega",
-    "engines": {
-        "vscode": "^1.99.0"
-    },
-    "categories": [
-        "Other",
-        "Visualization",
-        "AI",
-        "Chat"
-    ],
-    "activationEvents": [
-        "*"
-    ],
-    "main": "./out/ExtensionMain.js",
-    "contributes": {
-        "commands": [
-            {
-                "command": "Dase.NewORMDesigner",
-                "title": "New ORM Designer",
-                "category": "DASE",
-                "icon": "$(file-add)"
-            },
-            {
-                "command": "Dase.OpenORMDesigner",
-                "title": "Open ORM Designer",
-                "category": "DASE",
-                "icon": "$(folder-opened)"
-            },
-            {
-                "command": "Dase.ValidateORMModel",
-                "title": "Validate ORM Model",
-                "category": "DASE",
-                "icon": "$(check)"
-            },
-            {
-                "command": "Dase.DeleteSelected",
-                "title": "Delete Selected",
-                "category": "DASE",
-                "icon": "$(trash)"
-            },
-            {
-                "command": "Dase.RenameSelected",
-                "title": "Rename Selected",
-                "category": "DASE",
-                "icon": "$(edit)"
-            },
-            {
-                "command": "Dase.AddTable",
-                "title": "Add Table",
-                "category": "DASE",
-                "icon": "$(table)"
-            },
-            {
-                "command": "Dase.AddField",
-                "title": "Add Field",
-                "category": "DASE",
-                "icon": "$(symbol-field)"
-            },
-            {
-                "command": "Dase.AlignLines",
-                "title": "Align Lines",
-                "category": "DASE",
-                "icon": "$(layout)"
-            },
-            {
-                "command": "Dase.ReloadDataTypes",
-                "title": "Reload Data Types",
-                "category": "DASE",
-                "icon": "$(refresh)"
-            },
-            {
-                "command": "Dase.ExportToDBML",
-                "title": "Export to DBML",
-                "category": "DASE",
-                "icon": "$(export)"
-            },
-            {
-                "command": "Dase.ImportFromDBML",
-                "title": "Import DBML to DSORM",
-                "category": "DASE",
-                "icon": "$(import)"
-            },
-            {
-                "command": "Dase.OrganizeTablesAI",
-                "title": "Organize Tables using AI",
-                "category": "DASE",
-                "icon": "$(sparkle)"
-            },
-            {
-                "command": "Dase.CreateSQLScript",
-                "title": "Create SQL Script using AI",
-                "category": "DASE",
-                "icon": "$(database)"
-            },
-            {
-                "command": "Dase.GenerateORMCode",
-                "title": "Generate ORM Code using AI",
-                "category": "DASE",
-                "icon": "$(code)"
-            }
-        ],
-        "customEditors": [
-            {
-                "viewType": "Dase.ORMDesigner",
-                "displayName": "ORM Designer",
-                "selector": [
-                    {
-                        "filenamePattern": "*.dsorm"
-                    }
-                ],
-                "priority": "default"
-            }
-        ],
-        "viewsContainers": {
-            "panel": [
-                {
-                    "id": "dasePanel",
-                    "title": "DASE",
-                    "icon": "$(database)"
-                }
-            ]
-        },
-        "views": {
-            "dasePanel": [
-                {
-                    "type": "webview",
-                    "id": "Dase.Properties",
-                    "name": "DASE Properties"
+﻿{
+    "name":  "dase",
+    "displayName":  "DASE - Design-Aided Software Engineering",
+    "description":  "Visual design environment for multi-tier, multi-platform web applications",
+    "version":  "1.0.57670",
+    "publisher":  "tootega",
+    "repository":  {
+                       "type":  "git",
+                       "url":  "https://github.com/Tootega/DASE50.git"
+                   },
+    "engines":  {
+                    "vscode":  "^1.109.0"
                 },
-                {
-                    "type": "webview",
-                    "id": "Dase.Issues",
-                    "name": "DASE Issues"
-                }
-            ]
-        },
-        "menus": {
-            "explorer/context": [
-                {
-                    "when": "resourceExtname == .dsorm",
-                    "command": "Dase.OpenORMDesigner",
-                    "group": "dase@1"
-                },
-                {
-                    "when": "resourceExtname == .dsorm",
-                    "command": "Dase.ValidateORMModel",
-                    "group": "dase@2",
-                    "icon": "$(check)"
-                },
-                {
-                    "when": "resourceExtname == .dbml",
-                    "command": "Dase.ImportFromDBML",
-                    "group": "DASE",
-                    "icon": "$(import)"
-                }
-            ],
-            "webview/context": [
-                {
-                    "when": "webviewId == 'Dase.ORMDesigner'",
-                    "command": "Dase.AddTable",
-                    "group": "dase@0"
-                },
-                {
-                    "when": "webviewId == 'Dase.ORMDesigner'",
-                    "command": "Dase.AddField",
-                    "group": "dase@1"
-                },
-                {
-                    "when": "webviewId == 'Dase.ORMDesigner'",
-                    "command": "Dase.DeleteSelected",
-                    "group": "dase@2"
-                },
-                {
-                    "when": "webviewId == 'Dase.ORMDesigner'",
-                    "command": "Dase.RenameSelected",
-                    "group": "dase@3"
-                },
-                {
-                    "when": "webviewId == 'Dase.ORMDesigner'",
-                    "command": "Dase.ValidateORMModel",
-                    "group": "dase@4"
-                },
-                {
-                    "when": "webviewId == 'Dase.ORMDesigner'",
-                    "command": "Dase.AlignLines",
-                    "group": "dase@5"
-                },
-                {
-                    "when": "webviewId == 'Dase.ORMDesigner'",
-                    "command": "Dase.ExportToDBML",
-                    "group": "dase@6"
-                },
-                {
-                    "when": "webviewId == 'Dase.ORMDesigner'",
-                    "command": "Dase.OrganizeTablesAI",
-                    "group": "dase@7"
-                },
-                {
-                    "when": "webviewId == 'Dase.ORMDesigner'",
-                    "command": "Dase.CreateSQLScript",
-                    "group": "dase@8"
-                },
-                {
-                    "when": "webviewId == 'Dase.ORMDesigner'",
-                    "command": "Dase.GenerateORMCode",
-                    "group": "dase@9"
-                }
-            ]
-        },
-        "chatParticipants": [
-            {
-                "id": "dase.ormAssistant",
-                "name": "dase",
-                "fullName": "DASE ORM Assistant",
-                "description": "ORM design assistant — query, validate, and modify your database model",
-                "isSticky": true,
-                "commands": [
-                    {
-                        "name": "model",
-                        "description": "Show current ORM model overview (tables, references, stats)"
+    "categories":  [
+                       "Other",
+                       "Visualization",
+                       "AI",
+                       "Chat"
+                   ],
+    "activationEvents":  [
+                             "onCustomEditor:Dase.ORMDesigner",
+                             "workspaceContains:**/*.dsorm",
+                             "onCommand:Dase.NewORMDesigner",
+                             "onCommand:Dase.OpenORMDesigner",
+                             "onCommand:Dase.ImportFromDBML"
+                         ],
+    "main":  "./out/ExtensionMain.js",
+    "contributes":  {
+                        "commands":  [
+                                         {
+                                             "command":  "Dase.NewORMDesigner",
+                                             "title":  "New ORM Designer",
+                                             "category":  "DASE",
+                                             "icon":  "$(file-add)"
+                                         },
+                                         {
+                                             "command":  "Dase.OpenORMDesigner",
+                                             "title":  "Open ORM Designer",
+                                             "category":  "DASE",
+                                             "icon":  "$(folder-opened)"
+                                         },
+                                         {
+                                             "command":  "Dase.ValidateORMModel",
+                                             "title":  "Validate ORM Model",
+                                             "category":  "DASE",
+                                             "icon":  "$(check)"
+                                         },
+                                         {
+                                             "command":  "Dase.DeleteSelected",
+                                             "title":  "Delete Selected",
+                                             "category":  "DASE",
+                                             "icon":  "$(trash)"
+                                         },
+                                         {
+                                             "command":  "Dase.RenameSelected",
+                                             "title":  "Rename Selected",
+                                             "category":  "DASE",
+                                             "icon":  "$(edit)"
+                                         },
+                                         {
+                                             "command":  "Dase.AddTable",
+                                             "title":  "Add Table",
+                                             "category":  "DASE",
+                                             "icon":  "$(table)"
+                                         },
+                                         {
+                                             "command":  "Dase.AddField",
+                                             "title":  "Add Field",
+                                             "category":  "DASE",
+                                             "icon":  "$(symbol-field)"
+                                         },
+                                         {
+                                             "command":  "Dase.AlignLines",
+                                             "title":  "Align Lines",
+                                             "category":  "DASE",
+                                             "icon":  "$(layout)"
+                                         },
+                                         {
+                                             "command":  "Dase.ReloadDataTypes",
+                                             "title":  "Reload Data Types",
+                                             "category":  "DASE",
+                                             "icon":  "$(refresh)"
+                                         },
+                                         {
+                                             "command":  "Dase.ExportToDBML",
+                                             "title":  "Export to DBML",
+                                             "category":  "DASE",
+                                             "icon":  "$(export)"
+                                         },
+                                         {
+                                             "command":  "Dase.ImportFromDBML",
+                                             "title":  "Import DBML to DSORM",
+                                             "category":  "DASE",
+                                             "icon":  "$(import)"
+                                         },
+                                         {
+                                             "command":  "Dase.OrganizeTablesAI",
+                                             "title":  "Organize Tables using AI",
+                                             "category":  "DASE",
+                                             "icon":  "$(sparkle)"
+                                         },
+                                         {
+                                             "command":  "Dase.CreateSQLScript",
+                                             "title":  "Create SQL Script using AI",
+                                             "category":  "DASE",
+                                             "icon":  "$(database)"
+                                         },
+                                         {
+                                             "command":  "Dase.GenerateORMCode",
+                                             "title":  "Generate ORM Code using AI",
+                                             "category":  "DASE",
+                                             "icon":  "$(code)"
+                                         }
+                                     ],
+                        "customEditors":  [
+                                              {
+                                                  "viewType":  "Dase.ORMDesigner",
+                                                  "displayName":  "ORM Designer",
+                                                  "selector":  [
+                                                                   {
+                                                                       "filenamePattern":  "*.dsorm"
+                                                                   }
+                                                               ],
+                                                  "priority":  "default"
+                                              }
+                                          ],
+                        "viewsContainers":  {
+                                                "panel":  [
+                                                              {
+                                                                  "id":  "dasePanel",
+                                                                  "title":  "DASE",
+                                                                  "icon":  "$(database)"
+                                                              }
+                                                          ]
+                                            },
+                        "views":  {
+                                      "dasePanel":  [
+                                                        {
+                                                            "type":  "webview",
+                                                            "id":  "Dase.Properties",
+                                                            "name":  "DASE Properties"
+                                                        },
+                                                        {
+                                                            "type":  "webview",
+                                                            "id":  "Dase.Issues",
+                                                            "name":  "DASE Issues"
+                                                        }
+                                                    ]
+                                  },
+                        "menus":  {
+                                      "explorer/context":  [
+                                                               {
+                                                                   "when":  "resourceExtname == .dsorm",
+                                                                   "command":  "Dase.OpenORMDesigner",
+                                                                   "group":  "dase@1"
+                                                               },
+                                                               {
+                                                                   "when":  "resourceExtname == .dsorm",
+                                                                   "command":  "Dase.ValidateORMModel",
+                                                                   "group":  "dase@2",
+                                                                   "icon":  "$(check)"
+                                                               },
+                                                               {
+                                                                   "when":  "resourceExtname == .dbml",
+                                                                   "command":  "Dase.ImportFromDBML",
+                                                                   "group":  "DASE",
+                                                                   "icon":  "$(import)"
+                                                               }
+                                                           ],
+                                      "webview/context":  [
+                                                              {
+                                                                  "when":  "webviewId == \u0027Dase.ORMDesigner\u0027",
+                                                                  "command":  "Dase.AddTable",
+                                                                  "group":  "dase@0"
+                                                              },
+                                                              {
+                                                                  "when":  "webviewId == \u0027Dase.ORMDesigner\u0027",
+                                                                  "command":  "Dase.AddField",
+                                                                  "group":  "dase@1"
+                                                              },
+                                                              {
+                                                                  "when":  "webviewId == \u0027Dase.ORMDesigner\u0027",
+                                                                  "command":  "Dase.DeleteSelected",
+                                                                  "group":  "dase@2"
+                                                              },
+                                                              {
+                                                                  "when":  "webviewId == \u0027Dase.ORMDesigner\u0027",
+                                                                  "command":  "Dase.RenameSelected",
+                                                                  "group":  "dase@3"
+                                                              },
+                                                              {
+                                                                  "when":  "webviewId == \u0027Dase.ORMDesigner\u0027",
+                                                                  "command":  "Dase.ValidateORMModel",
+                                                                  "group":  "dase@4"
+                                                              },
+                                                              {
+                                                                  "when":  "webviewId == \u0027Dase.ORMDesigner\u0027",
+                                                                  "command":  "Dase.AlignLines",
+                                                                  "group":  "dase@5"
+                                                              },
+                                                              {
+                                                                  "when":  "webviewId == \u0027Dase.ORMDesigner\u0027",
+                                                                  "command":  "Dase.ExportToDBML",
+                                                                  "group":  "dase@6"
+                                                              },
+                                                              {
+                                                                  "when":  "webviewId == \u0027Dase.ORMDesigner\u0027",
+                                                                  "command":  "Dase.OrganizeTablesAI",
+                                                                  "group":  "dase@7"
+                                                              },
+                                                              {
+                                                                  "when":  "webviewId == \u0027Dase.ORMDesigner\u0027",
+                                                                  "command":  "Dase.CreateSQLScript",
+                                                                  "group":  "dase@8"
+                                                              },
+                                                              {
+                                                                  "when":  "webviewId == \u0027Dase.ORMDesigner\u0027",
+                                                                  "command":  "Dase.GenerateORMCode",
+                                                                  "group":  "dase@9"
+                                                              }
+                                                          ]
+                                  },
+                        "chatParticipants":  [
+                                                 {
+                                                     "id":  "dase.ormAssistant",
+                                                     "name":  "dase",
+                                                     "fullName":  "DASE ORM Assistant",
+                                                     "description":  "ORM design assistant ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â query, validate, and modify your database model",
+                                                     "isSticky":  true,
+                                                     "commands":  [
+                                                                      {
+                                                                          "name":  "model",
+                                                                          "description":  "Show current ORM model overview (tables, references, stats)"
+                                                                      },
+                                                                      {
+                                                                          "name":  "table",
+                                                                          "description":  "Show details of a specific table by name, or list all tables"
+                                                                      },
+                                                                      {
+                                                                          "name":  "validate",
+                                                                          "description":  "Run ORM model validation and report errors and warnings"
+                                                                      },
+                                                                      {
+                                                                          "name":  "export",
+                                                                          "description":  "Export the current ORM model to DBML format"
+                                                                      },
+                                                                      {
+                                                                          "name":  "types",
+                                                                          "description":  "Show available data types from configuration"
+                                                                      },
+                                                                      {
+                                                                          "name":  "help",
+                                                                          "description":  "Show usage instructions and available commands"
+                                                                      }
+                                                                  ]
+                                                 }
+                                             ],
+                        "languageModelTools":  [
+                                                   {
+                                                       "name":  "dase_get_model",
+                                                       "displayName":  "Get ORM Model Info",
+                                                       "canBeReferencedInPrompt":  true,
+                                                       "toolReferenceName":  "daseModel",
+                                                       "icon":  "$(database)",
+                                                       "userDescription":  "Get overview of the current DASE ORM model",
+                                                       "modelDescription":  "Get information about the current DASE ORM model including table count, reference count, schema name, and a list of all tables with their field counts. Use this tool when the user asks about the ORM model overview, database structure, or wants to understand the current model. Returns a markdown-formatted summary. Requires a .dsorm file to be open in the ORM Designer.",
+                                                       "inputSchema":  {
+                                                                           "type":  "object",
+                                                                           "properties":  {
+
+                                                                                          }
+                                                                       }
+                                                   },
+                                                   {
+                                                       "name":  "dase_list_tables",
+                                                       "displayName":  "List ORM Tables",
+                                                       "canBeReferencedInPrompt":  true,
+                                                       "toolReferenceName":  "daseTables",
+                                                       "icon":  "$(table)",
+                                                       "userDescription":  "List all tables in the DASE ORM model",
+                                                       "modelDescription":  "List all tables in the current DASE ORM model with their field counts and primary key information. Optionally filter by table name. Use this tool when the user wants to see all tables or search for specific tables. Returns a markdown-formatted list.",
+                                                       "inputSchema":  {
+                                                                           "type":  "object",
+                                                                           "properties":  {
+                                                                                              "filter":  {
+                                                                                                             "type":  "string",
+                                                                                                             "description":  "Optional filter to match table names (case-insensitive substring match)"
+                                                                                                         }
+                                                                                          }
+                                                                       }
+                                                   },
+                                                   {
+                                                       "name":  "dase_get_table",
+                                                       "displayName":  "Get Table Details",
+                                                       "canBeReferencedInPrompt":  true,
+                                                       "toolReferenceName":  "daseTable",
+                                                       "icon":  "$(symbol-class)",
+                                                       "userDescription":  "Get detailed information about a specific ORM table",
+                                                       "modelDescription":  "Get full details of a specific table in the DASE ORM model including all fields (with data types, constraints, primary/foreign key flags), incoming FK references, and outgoing FK references. Use this when the user asks about a specific table structure or wants to understand a table\u0027s schema. The tableName parameter is case-insensitive.",
+                                                       "inputSchema":  {
+                                                                           "type":  "object",
+                                                                           "properties":  {
+                                                                                              "tableName":  {
+                                                                                                                "type":  "string",
+                                                                                                                "description":  "The name of the table to get details for (case-insensitive)"
+                                                                                                            }
+                                                                                          },
+                                                                           "required":  [
+                                                                                            "tableName"
+                                                                                        ]
+                                                                       }
+                                                   },
+                                                   {
+                                                       "name":  "dase_add_table",
+                                                       "displayName":  "Add Table",
+                                                       "canBeReferencedInPrompt":  true,
+                                                       "toolReferenceName":  "daseAddTable",
+                                                       "icon":  "$(add)",
+                                                       "userDescription":  "Add a new table to the ORM model",
+                                                       "modelDescription":  "Add a new table to the DASE ORM model. A primary key field will be automatically created. Use this when the user wants to create a new database table. The table name should follow naming conventions (PascalCase, singular). Optionally specify x,y position on the canvas.",
+                                                       "inputSchema":  {
+                                                                           "type":  "object",
+                                                                           "properties":  {
+                                                                                              "name":  {
+                                                                                                           "type":  "string",
+                                                                                                           "description":  "The name of the new table (PascalCase, singular, e.g. \u0027Customer\u0027, \u0027OrderItem\u0027)"
+                                                                                                       },
+                                                                                              "x":  {
+                                                                                                        "type":  "number",
+                                                                                                        "description":  "Optional X position on the canvas (default: 100)"
+                                                                                                    },
+                                                                                              "y":  {
+                                                                                                        "type":  "number",
+                                                                                                        "description":  "Optional Y position on the canvas (default: 100)"
+                                                                                                    }
+                                                                                          },
+                                                                           "required":  [
+                                                                                            "name"
+                                                                                        ]
+                                                                       }
+                                                   },
+                                                   {
+                                                       "name":  "dase_add_field",
+                                                       "displayName":  "Add Field",
+                                                       "canBeReferencedInPrompt":  true,
+                                                       "toolReferenceName":  "daseAddField",
+                                                       "icon":  "$(symbol-field)",
+                                                       "userDescription":  "Add a new field to a table",
+                                                       "modelDescription":  "Add a new field (column) to an existing table in the DASE ORM model. Specify the table name, field name, and data type. Common data types include: String, Int32, Int64, Boolean, DateTime, Decimal, Guid, Numeric, Text, Date, Binary. Use the dase_get_model or dase_list_tables tool first to verify the table exists.",
+                                                       "inputSchema":  {
+                                                                           "type":  "object",
+                                                                           "properties":  {
+                                                                                              "tableName":  {
+                                                                                                                "type":  "string",
+                                                                                                                "description":  "The name of the table to add the field to (case-insensitive)"
+                                                                                                            },
+                                                                                              "fieldName":  {
+                                                                                                                "type":  "string",
+                                                                                                                "description":  "The name of the new field (PascalCase, e.g. \u0027FirstName\u0027, \u0027EmailAddress\u0027)"
+                                                                                                            },
+                                                                                              "dataType":  {
+                                                                                                               "type":  "string",
+                                                                                                               "description":  "The data type for the field (e.g. \u0027String\u0027, \u0027Int32\u0027, \u0027Boolean\u0027, \u0027DateTime\u0027, \u0027Guid\u0027)"
+                                                                                                           }
+                                                                                          },
+                                                                           "required":  [
+                                                                                            "tableName",
+                                                                                            "fieldName",
+                                                                                            "dataType"
+                                                                                        ]
+                                                                       }
+                                                   },
+                                                   {
+                                                       "name":  "dase_add_reference",
+                                                       "displayName":  "Add FK Reference",
+                                                       "canBeReferencedInPrompt":  true,
+                                                       "toolReferenceName":  "daseAddRef",
+                                                       "icon":  "$(references)",
+                                                       "userDescription":  "Add a foreign key reference between tables",
+                                                       "modelDescription":  "Create a foreign key (FK) reference between two tables in the DASE ORM model. This creates a FK field in the source table pointing to the primary key of the target table. Use this when the user wants to establish a relationship between tables. Specify source and target table names (case-insensitive).",
+                                                       "inputSchema":  {
+                                                                           "type":  "object",
+                                                                           "properties":  {
+                                                                                              "sourceTable":  {
+                                                                                                                  "type":  "string",
+                                                                                                                  "description":  "The name of the source table (the one that will have the FK field)"
+                                                                                                              },
+                                                                                              "targetTable":  {
+                                                                                                                  "type":  "string",
+                                                                                                                  "description":  "The name of the target table (the one being referenced)"
+                                                                                                              },
+                                                                                              "name":  {
+                                                                                                           "type":  "string",
+                                                                                                           "description":  "Optional custom name for the reference (default: FK_SourceTable_TargetTable)"
+                                                                                                       }
+                                                                                          },
+                                                                           "required":  [
+                                                                                            "sourceTable",
+                                                                                            "targetTable"
+                                                                                        ]
+                                                                       }
+                                                   },
+                                                   {
+                                                       "name":  "dase_validate",
+                                                       "displayName":  "Validate ORM Model",
+                                                       "canBeReferencedInPrompt":  true,
+                                                       "toolReferenceName":  "daseValidate",
+                                                       "icon":  "$(check)",
+                                                       "userDescription":  "Validate the ORM model for errors and warnings",
+                                                       "modelDescription":  "Run validation on the current DASE ORM model and return all errors and warnings. Checks include: duplicate table names, empty names, missing primary keys, dangling FK references, tables with no fields, and more. Use this tool when the user asks to check or validate their model.",
+                                                       "inputSchema":  {
+                                                                           "type":  "object",
+                                                                           "properties":  {
+
+                                                                                          }
+                                                                       }
+                                                   },
+                                                   {
+                                                       "name":  "dase_export_dbml",
+                                                       "displayName":  "Export to DBML",
+                                                       "canBeReferencedInPrompt":  true,
+                                                       "toolReferenceName":  "daseDBML",
+                                                       "icon":  "$(export)",
+                                                       "userDescription":  "Export the ORM model to DBML format",
+                                                       "modelDescription":  "Export the current DASE ORM model to DBML (Database Markup Language) format. Returns the complete DBML script representing all tables, fields, and references. Use this when the user asks to export, share, or view the model as DBML text.",
+                                                       "inputSchema":  {
+                                                                           "type":  "object",
+                                                                           "properties":  {
+
+                                                                                          }
+                                                                       }
+                                                   },
+                                                   {
+                                                       "name":  "dase_get_properties",
+                                                       "displayName":  "Get Element Properties",
+                                                       "canBeReferencedInPrompt":  true,
+                                                       "toolReferenceName":  "daseProps",
+                                                       "icon":  "$(settings-gear)",
+                                                       "userDescription":  "Get properties of an ORM element by ID",
+                                                       "modelDescription":  "Get all properties of a specific element in the DASE ORM model by its element ID. Returns a table of property names, values, types, and read-only status. Use this to inspect or understand element configuration. You typically get element IDs from the dase_get_table tool output.",
+                                                       "inputSchema":  {
+                                                                           "type":  "object",
+                                                                           "properties":  {
+                                                                                              "elementId":  {
+                                                                                                                "type":  "string",
+                                                                                                                "description":  "The unique ID (GUID) of the element to get properties for"
+                                                                                                            }
+                                                                                          },
+                                                                           "required":  [
+                                                                                            "elementId"
+                                                                                        ]
+                                                                       }
+                                                   },
+                                                   {
+                                                       "name":  "dase_update_property",
+                                                       "displayName":  "Update Element Property",
+                                                       "canBeReferencedInPrompt":  true,
+                                                       "toolReferenceName":  "daseSetProp",
+                                                       "icon":  "$(edit)",
+                                                       "userDescription":  "Update a property of an ORM element",
+                                                       "modelDescription":  "Update a specific property on an element in the DASE ORM model. You need the element ID, the property key (from dase_get_properties output), and the new value. Use this for changing table or field properties like Description, DataType, IsRequired, Length, etc. Use dase_get_properties first to see available properties and their current values.",
+                                                       "inputSchema":  {
+                                                                           "type":  "object",
+                                                                           "properties":  {
+                                                                                              "elementId":  {
+                                                                                                                "type":  "string",
+                                                                                                                "description":  "The unique ID (GUID) of the element to update"
+                                                                                                            },
+                                                                                              "propertyKey":  {
+                                                                                                                  "type":  "string",
+                                                                                                                  "description":  "The property key to update (e.g. \u0027Description\u0027, \u0027DataType\u0027, \u0027IsRequired\u0027, \u0027Length\u0027)"
+                                                                                                              },
+                                                                                              "value":  {
+                                                                                                            "description":  "The new value for the property (type depends on the property)"
+                                                                                                        }
+                                                                                          },
+                                                                           "required":  [
+                                                                                            "elementId",
+                                                                                            "propertyKey",
+                                                                                            "value"
+                                                                                        ]
+                                                                       }
+                                                   },
+                                                   {
+                                                       "name":  "dase_move_table",
+                                                       "displayName":  "Move Table",
+                                                       "canBeReferencedInPrompt":  true,
+                                                       "toolReferenceName":  "daseMoveTable",
+                                                       "icon":  "$(move)",
+                                                       "userDescription":  "Move a table to a specific position on the canvas",
+                                                       "modelDescription":  "Move an ORM table to a specific (x, y) position on the designer canvas. Use this when the user wants to reposition a table. The tableName is case-insensitive. Coordinates are in pixels from the top-left of the canvas.",
+                                                       "inputSchema":  {
+                                                                           "type":  "object",
+                                                                           "properties":  {
+                                                                                              "tableName":  {
+                                                                                                                "type":  "string",
+                                                                                                                "description":  "The name of the table to move (case-insensitive)"
+                                                                                                            },
+                                                                                              "x":  {
+                                                                                                        "type":  "number",
+                                                                                                        "description":  "The new X position on the canvas (pixels from left)"
+                                                                                                    },
+                                                                                              "y":  {
+                                                                                                        "type":  "number",
+                                                                                                        "description":  "The new Y position on the canvas (pixels from top)"
+                                                                                                    }
+                                                                                          },
+                                                                           "required":  [
+                                                                                            "tableName",
+                                                                                            "x",
+                                                                                            "y"
+                                                                                        ]
+                                                                       }
+                                                   },
+                                                   {
+                                                       "name":  "dase_set_color",
+                                                       "displayName":  "Set Table Color",
+                                                       "canBeReferencedInPrompt":  true,
+                                                       "toolReferenceName":  "daseSetColor",
+                                                       "icon":  "$(symbol-color)",
+                                                       "userDescription":  "Set the fill color of an ORM table",
+                                                       "modelDescription":  "Set the fill (header) color of a table in the DASE ORM model. Accepts CSS hex colors (#RRGGBB, e.g. \u0027#4A90D9\u0027) or ARGB format (AARRGGBB). Use this when the user wants to color-code or visually distinguish tables. The tableName is case-insensitive.",
+                                                       "inputSchema":  {
+                                                                           "type":  "object",
+                                                                           "properties":  {
+                                                                                              "tableName":  {
+                                                                                                                "type":  "string",
+                                                                                                                "description":  "The name of the table to set the color for (case-insensitive)"
+                                                                                                            },
+                                                                                              "color":  {
+                                                                                                            "type":  "string",
+                                                                                                            "description":  "The color in CSS hex format (e.g. \u0027#4A90D9\u0027) or ARGB format (e.g. \u0027FF4A90D9\u0027)"
+                                                                                                        }
+                                                                                          },
+                                                                           "required":  [
+                                                                                            "tableName",
+                                                                                            "color"
+                                                                                        ]
+                                                                       }
+                                                   },
+                                                   {
+                                                       "name":  "dase_organize_layout",
+                                                       "displayName":  "Organize Table Layout (AI)",
+                                                       "canBeReferencedInPrompt":  true,
+                                                       "toolReferenceName":  "daseOrganize",
+                                                       "icon":  "$(sparkle)",
+                                                       "userDescription":  "Use AI to organize and color-code tables by functional group",
+                                                       "modelDescription":  "Trigger the AI-powered table organization feature. This will analyze all table names, fields, and FK relationships to infer functional groups (e.g., Security, Orders, Configuration), then reposition tables in visual clusters and color-code each group. This modifies the entire model layout. Use this when the user asks to organize, arrange, or group their tables automatically.",
+                                                       "inputSchema":  {
+                                                                           "type":  "object",
+                                                                           "properties":  {
+
+                                                                                          }
+                                                                       }
+                                                   }
+                                               ]
                     },
-                    {
-                        "name": "table",
-                        "description": "Show details of a specific table by name, or list all tables"
-                    },
-                    {
-                        "name": "validate",
-                        "description": "Run ORM model validation and report errors and warnings"
-                    },
-                    {
-                        "name": "export",
-                        "description": "Export the current ORM model to DBML format"
-                    },
-                    {
-                        "name": "types",
-                        "description": "Show available data types from configuration"
-                    },
-                    {
-                        "name": "help",
-                        "description": "Show usage instructions and available commands"
-                    }
-                ]
-            }
-        ],
-        "languageModelTools": [
-            {
-                "name": "dase_get_model",
-                "displayName": "Get ORM Model Info",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "daseModel",
-                "icon": "$(database)",
-                "userDescription": "Get overview of the current DASE ORM model",
-                "modelDescription": "Get information about the current DASE ORM model including table count, reference count, schema name, and a list of all tables with their field counts. Use this tool when the user asks about the ORM model overview, database structure, or wants to understand the current model. Returns a markdown-formatted summary. Requires a .dsorm file to be open in the ORM Designer.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {}
-                }
-            },
-            {
-                "name": "dase_list_tables",
-                "displayName": "List ORM Tables",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "daseTables",
-                "icon": "$(table)",
-                "userDescription": "List all tables in the DASE ORM model",
-                "modelDescription": "List all tables in the current DASE ORM model with their field counts and primary key information. Optionally filter by table name. Use this tool when the user wants to see all tables or search for specific tables. Returns a markdown-formatted list.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "filter": {
-                            "type": "string",
-                            "description": "Optional filter to match table names (case-insensitive substring match)"
+    "scripts":  {
+                    "vscode:prepublish":  "npm run compile",
+                    "compile":  "tsc -p ./",
+                    "watch":  "tsc -watch -p ./",
+                    "pretest":  "npm run compile",
+                    "build:webview":  "tsc -p ./media/tsconfig.json",
+                    "lint":  "eslint src --ext ts",
+                    "test":  "jest",
+                    "test:coverage":  "jest --coverage --json --outputFile=test-results.json",
+                    "test:watch":  "jest --watch",
+                    "package":  "vsce package",
+                    "publish":  "vsce publish"
+                },
+    "dependencies":  {
+                         "@dbml/core":  "^6.4.0",
+                         "@tootega/tfx":  "file:../TFX"
+                     },
+    "bundledDependencies":  [
+                                "@tootega/tfx",
+                                "@dbml/core"
+                            ],
+    "devDependencies":  {
+                            "@types/jest":  "^30.0.0",
+                            "@types/node":  "^20.10.0",
+                            "@types/vscode":  "^1.109.0",
+                            "jest":  "^30.2.0",
+                            "ts-jest":  "^29.4.6",
+                            "typescript":  "^5.3.0"
                         }
-                    }
-                }
-            },
-            {
-                "name": "dase_get_table",
-                "displayName": "Get Table Details",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "daseTable",
-                "icon": "$(symbol-class)",
-                "userDescription": "Get detailed information about a specific ORM table",
-                "modelDescription": "Get full details of a specific table in the DASE ORM model including all fields (with data types, constraints, primary/foreign key flags), incoming FK references, and outgoing FK references. Use this when the user asks about a specific table structure or wants to understand a table's schema. The tableName parameter is case-insensitive.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "tableName": {
-                            "type": "string",
-                            "description": "The name of the table to get details for (case-insensitive)"
-                        }
-                    },
-                    "required": [
-                        "tableName"
-                    ]
-                }
-            },
-            {
-                "name": "dase_add_table",
-                "displayName": "Add Table",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "daseAddTable",
-                "icon": "$(add)",
-                "userDescription": "Add a new table to the ORM model",
-                "modelDescription": "Add a new table to the DASE ORM model. A primary key field will be automatically created. Use this when the user wants to create a new database table. The table name should follow naming conventions (PascalCase, singular). Optionally specify x,y position on the canvas.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "name": {
-                            "type": "string",
-                            "description": "The name of the new table (PascalCase, singular, e.g. 'Customer', 'OrderItem')"
-                        },
-                        "x": {
-                            "type": "number",
-                            "description": "Optional X position on the canvas (default: 100)"
-                        },
-                        "y": {
-                            "type": "number",
-                            "description": "Optional Y position on the canvas (default: 100)"
-                        }
-                    },
-                    "required": [
-                        "name"
-                    ]
-                }
-            },
-            {
-                "name": "dase_add_field",
-                "displayName": "Add Field",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "daseAddField",
-                "icon": "$(symbol-field)",
-                "userDescription": "Add a new field to a table",
-                "modelDescription": "Add a new field (column) to an existing table in the DASE ORM model. Specify the table name, field name, and data type. Common data types include: String, Int32, Int64, Boolean, DateTime, Decimal, Guid, Numeric, Text, Date, Binary. Use the dase_get_model or dase_list_tables tool first to verify the table exists.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "tableName": {
-                            "type": "string",
-                            "description": "The name of the table to add the field to (case-insensitive)"
-                        },
-                        "fieldName": {
-                            "type": "string",
-                            "description": "The name of the new field (PascalCase, e.g. 'FirstName', 'EmailAddress')"
-                        },
-                        "dataType": {
-                            "type": "string",
-                            "description": "The data type for the field (e.g. 'String', 'Int32', 'Boolean', 'DateTime', 'Guid')"
-                        }
-                    },
-                    "required": [
-                        "tableName",
-                        "fieldName",
-                        "dataType"
-                    ]
-                }
-            },
-            {
-                "name": "dase_add_reference",
-                "displayName": "Add FK Reference",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "daseAddRef",
-                "icon": "$(references)",
-                "userDescription": "Add a foreign key reference between tables",
-                "modelDescription": "Create a foreign key (FK) reference between two tables in the DASE ORM model. This creates a FK field in the source table pointing to the primary key of the target table. Use this when the user wants to establish a relationship between tables. Specify source and target table names (case-insensitive).",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "sourceTable": {
-                            "type": "string",
-                            "description": "The name of the source table (the one that will have the FK field)"
-                        },
-                        "targetTable": {
-                            "type": "string",
-                            "description": "The name of the target table (the one being referenced)"
-                        },
-                        "name": {
-                            "type": "string",
-                            "description": "Optional custom name for the reference (default: FK_SourceTable_TargetTable)"
-                        }
-                    },
-                    "required": [
-                        "sourceTable",
-                        "targetTable"
-                    ]
-                }
-            },
-            {
-                "name": "dase_validate",
-                "displayName": "Validate ORM Model",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "daseValidate",
-                "icon": "$(check)",
-                "userDescription": "Validate the ORM model for errors and warnings",
-                "modelDescription": "Run validation on the current DASE ORM model and return all errors and warnings. Checks include: duplicate table names, empty names, missing primary keys, dangling FK references, tables with no fields, and more. Use this tool when the user asks to check or validate their model.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {}
-                }
-            },
-            {
-                "name": "dase_export_dbml",
-                "displayName": "Export to DBML",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "daseDBML",
-                "icon": "$(export)",
-                "userDescription": "Export the ORM model to DBML format",
-                "modelDescription": "Export the current DASE ORM model to DBML (Database Markup Language) format. Returns the complete DBML script representing all tables, fields, and references. Use this when the user asks to export, share, or view the model as DBML text.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {}
-                }
-            },
-            {
-                "name": "dase_get_properties",
-                "displayName": "Get Element Properties",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "daseProps",
-                "icon": "$(settings-gear)",
-                "userDescription": "Get properties of an ORM element by ID",
-                "modelDescription": "Get all properties of a specific element in the DASE ORM model by its element ID. Returns a table of property names, values, types, and read-only status. Use this to inspect or understand element configuration. You typically get element IDs from the dase_get_table tool output.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "elementId": {
-                            "type": "string",
-                            "description": "The unique ID (GUID) of the element to get properties for"
-                        }
-                    },
-                    "required": [
-                        "elementId"
-                    ]
-                }
-            },
-            {
-                "name": "dase_update_property",
-                "displayName": "Update Element Property",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "daseSetProp",
-                "icon": "$(edit)",
-                "userDescription": "Update a property of an ORM element",
-                "modelDescription": "Update a specific property on an element in the DASE ORM model. You need the element ID, the property key (from dase_get_properties output), and the new value. Use this for changing table or field properties like Description, DataType, IsRequired, Length, etc. Use dase_get_properties first to see available properties and their current values.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "elementId": {
-                            "type": "string",
-                            "description": "The unique ID (GUID) of the element to update"
-                        },
-                        "propertyKey": {
-                            "type": "string",
-                            "description": "The property key to update (e.g. 'Description', 'DataType', 'IsRequired', 'Length')"
-                        },
-                        "value": {
-                            "description": "The new value for the property (type depends on the property)"
-                        }
-                    },
-                    "required": [
-                        "elementId",
-                        "propertyKey",
-                        "value"
-                    ]
-                }
-            },
-            {
-                "name": "dase_move_table",
-                "displayName": "Move Table",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "daseMoveTable",
-                "icon": "$(move)",
-                "userDescription": "Move a table to a specific position on the canvas",
-                "modelDescription": "Move an ORM table to a specific (x, y) position on the designer canvas. Use this when the user wants to reposition a table. The tableName is case-insensitive. Coordinates are in pixels from the top-left of the canvas.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "tableName": {
-                            "type": "string",
-                            "description": "The name of the table to move (case-insensitive)"
-                        },
-                        "x": {
-                            "type": "number",
-                            "description": "The new X position on the canvas (pixels from left)"
-                        },
-                        "y": {
-                            "type": "number",
-                            "description": "The new Y position on the canvas (pixels from top)"
-                        }
-                    },
-                    "required": [
-                        "tableName",
-                        "x",
-                        "y"
-                    ]
-                }
-            },
-            {
-                "name": "dase_set_color",
-                "displayName": "Set Table Color",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "daseSetColor",
-                "icon": "$(symbol-color)",
-                "userDescription": "Set the fill color of an ORM table",
-                "modelDescription": "Set the fill (header) color of a table in the DASE ORM model. Accepts CSS hex colors (#RRGGBB, e.g. '#4A90D9') or ARGB format (AARRGGBB). Use this when the user wants to color-code or visually distinguish tables. The tableName is case-insensitive.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "tableName": {
-                            "type": "string",
-                            "description": "The name of the table to set the color for (case-insensitive)"
-                        },
-                        "color": {
-                            "type": "string",
-                            "description": "The color in CSS hex format (e.g. '#4A90D9') or ARGB format (e.g. 'FF4A90D9')"
-                        }
-                    },
-                    "required": [
-                        "tableName",
-                        "color"
-                    ]
-                }
-            },
-            {
-                "name": "dase_organize_layout",
-                "displayName": "Organize Table Layout (AI)",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "daseOrganize",
-                "icon": "$(sparkle)",
-                "userDescription": "Use AI to organize and color-code tables by functional group",
-                "modelDescription": "Trigger the AI-powered table organization feature. This will analyze all table names, fields, and FK relationships to infer functional groups (e.g., Security, Orders, Configuration), then reposition tables in visual clusters and color-code each group. This modifies the entire model layout. Use this when the user asks to organize, arrange, or group their tables automatically.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {}
-                }
-            }
-        ]
-    },
-    "scripts": {
-        "vscode:prepublish": "npm run compile",
-        "compile": "tsc -p ./",
-        "watch": "tsc -watch -p ./",
-        "pretest": "npm run compile",
-        "build:webview": "tsc -p ./media/tsconfig.json",
-        "lint": "eslint src --ext ts",
-        "test": "jest",
-        "test:coverage": "jest --coverage --json --outputFile=test-results.json",
-        "test:watch": "jest --watch",
-        "package": "vsce package",
-        "publish": "vsce publish"
-    },
-    "dependencies": {
-        "@dbml/core": "^6.4.0",
-        "@tootega/tfx": "file:../TFX"
-    },
-    "devDependencies": {
-        "@types/jest": "^30.0.0",
-        "@types/node": "^20.10.0",
-        "@types/vscode": "^1.109.0",
-        "jest": "^30.2.0",
-        "ts-jest": "^29.4.6",
-        "typescript": "^5.3.0"
-    }
 }

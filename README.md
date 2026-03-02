@@ -12,6 +12,7 @@
 ## TFX — Core Framework
 
 [![CI](https://github.com/Tootega/DASE50/actions/workflows/ci.yml/badge.svg)](https://github.com/HermesSilva/DASE50/actions/workflows/ci.yml)
+![Build](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/HermesSilva/4a8de64c5760e89b94863a7f0d9ecc46/raw/build-number.json)
 ![Tests](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/HermesSilva/4a8de64c5760e89b94863a7f0d9ecc46/raw/tfx-tests.json)
 ![Lines](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/HermesSilva/4a8de64c5760e89b94863a7f0d9ecc46/raw/tfx-lines.json)
 ![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/HermesSilva/4a8de64c5760e89b94863a7f0d9ecc46/raw/tfx-coverage.json)
@@ -24,6 +25,7 @@
 ## DASE — VS Code Extension
 
 [![CI](https://github.com/Tootega/DASE50/actions/workflows/ci.yml/badge.svg)](https://github.com/HermesSilva/DASE50/actions/workflows/ci.yml)
+![Build](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/HermesSilva/4a8de64c5760e89b94863a7f0d9ecc46/raw/build-number.json)
 ![Tests](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/HermesSilva/4a8de64c5760e89b94863a7f0d9ecc46/raw/dase-tests.json)
 ![Lines](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/HermesSilva/4a8de64c5760e89b94863a7f0d9ecc46/raw/dase-lines.json)
 ![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/HermesSilva/4a8de64c5760e89b94863a7f0d9ecc46/raw/dase-coverage.json)
@@ -122,7 +124,9 @@ DASE50/
 ├── .github/
 │   ├── copilot-instructions.md    # AI coding standards
 │   └── workflows/
-│       └── ci.yml                 # CI/CD pipeline
+│       ├── ci.yml                 # Continuous Integration
+│       └── cd.yml                 # Continuous Deployment
+├── CHANGELOG.md                   # Release history
 ├── TFX/                           # Core Framework
 │   ├── src/
 │   │   ├── Core/                  # Foundation classes
@@ -564,6 +568,47 @@ The repository uses a single unified CI/CD workflow that builds and tests both c
 **Artifacts:**
 - Coverage reports (both TFX and DASE)
 - VSIX extension package (master branch only)
+
+### Release & Deployment (CD)
+
+**Workflow:** [.github/workflows/cd.yml](.github/workflows/cd.yml)
+
+**Triggers:**
+- Git tags matching `v*.*.*` (e.g., `v1.0.0`, `v2.1.0-beta.1`)
+- Manual workflow dispatch with version input
+
+**Pipeline Stages:**
+1. **Build & Test** — Full test suite for both TFX and DASE
+2. **Package** — Create versioned VSIX extension
+3. **Release** — Create GitHub Release with assets
+4. **Publish Marketplace** (optional) — Publish to VS Code Marketplace
+5. **Publish npm** (optional) — Publish TFX to npm registry
+
+**Creating a Release:**
+
+```bash
+# Tag and push a release
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+Or use the GitHub UI to manually trigger:
+1. Go to Actions → CD
+2. Click "Run workflow"
+3. Enter version number (e.g., `1.0.0`)
+4. Select publishing options
+
+**Required Secrets (for publishing):**
+| Secret | Purpose |
+|--------|---------|
+| `VSCE_PAT` | VS Code Marketplace Personal Access Token |
+| `NPM_TOKEN` | npm registry authentication token |
+
+**Version Format:**
+- `v1.0.0` — Stable release
+- `v1.0.0-alpha.1` — Alpha pre-release
+- `v1.0.0-beta.1` — Beta pre-release
+- `v1.0.0-rc.1` — Release candidate
 
 ---
 

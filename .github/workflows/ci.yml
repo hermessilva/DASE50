@@ -14,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
 
     outputs:
+      buildNumber: ${{ github.run_number }}
+
       tfxTests: ${{ steps.tfx-metrics.outputs.tests }}
       tfxCoverage: ${{ steps.tfx-metrics.outputs.coverage }}
       tfxLinesCovered: ${{ steps.tfx-metrics.outputs.linesCovered }}
@@ -147,7 +149,7 @@ jobs:
       - name: Write job summary
         run: |
           {
-            echo "## Results"
+            echo "## Results (Build #${{ github.run_number }})"
             echo ""
             echo "| Package | Tests Passed | Coverage (Lines) | Lines Covered | Lines Total |"
             echo "|---|---:|---:|---:|---:|"
@@ -163,16 +165,38 @@ jobs:
         if: github.ref == 'refs/heads/master' && github.event_name == 'push'
         run: npm install -g @vscode/vsce
 
+      - name: Copy TFX to node_modules
+        if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+        run: |
+          mkdir -p DASE/node_modules/@tootega/tfx/dist
+          cp -r TFX/dist/* DASE/node_modules/@tootega/tfx/dist/
+          cp TFX/package.json DASE/node_modules/@tootega/tfx/
+          echo "📦 Copied TFX to DASE/node_modules/@tootega/tfx"
+
+      - name: Update version with build number
+        if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+        working-directory: DASE
+        run: |
+          BUILD_NUMBER=${{ github.run_number }}
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          NEW_VERSION="${CURRENT_VERSION%.*}.$BUILD_NUMBER"
+          npm version $NEW_VERSION --no-git-tag-version --allow-same-version
+          echo "📦 Version: $NEW_VERSION (build #$BUILD_NUMBER)"
+
       - name: Package extension
         if: github.ref == 'refs/heads/master' && github.event_name == 'push'
         working-directory: DASE
-        run: vsce package --no-dependencies --out dase-${{ github.sha }}.vsix
+        run: |
+          BUILD_NUMBER=${{ github.run_number }}
+          VERSION=$(node -p "require('./package.json').version")
+          vsce package --out dase-${VERSION}.vsix
+          echo "📦 Created dase-${VERSION}.vsix"
 
       - name: Upload VSIX artifact
         if: github.ref == 'refs/heads/master' && github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
-          name: dase-vsix
+          name: dase-vsix-build-${{ github.run_number }}
           path: DASE/dase-*.vsix
 
   publish:
@@ -300,6 +324,17 @@ jobs:
           label: All Lines
           message: ${{ needs.build_test.outputs.allLinesCovered }} / ${{ needs.build_test.outputs.allLinesTotal }}
           color: blue
+
+      - name: Build Number Badge
+        uses: schneegans/dynamic-badges-action@v1.7.0
+        continue-on-error: true
+        with:
+          auth: ${{ secrets.GIST_SECRET }}
+          gistID: ${{ vars.BADGE_GIST_ID }}
+          filename: build-number.json
+          label: Build
+          message: "#${{ needs.build_test.outputs.buildNumber }}"
+          color: blueviolet
 
       # --------------------
       # README (atualiza URLs reais se você usa o script)
