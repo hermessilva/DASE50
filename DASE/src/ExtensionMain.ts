@@ -16,6 +16,8 @@ import { XPropertiesViewProvider } from "./Views/PropertiesViewProvider";
 import { InitializeLogService, GetLogService } from "./Services/LogService";
 import { RegisterAgentIntegration } from "./AgentIntegration";
 import { XOrganizeTablesCommand } from "./Designers/ORM/Commands/OrganizeTablesCommand";
+import { XCreateSQLScriptCommand } from "./Designers/ORM/Commands/CreateSQLScriptCommand";
+import { XGenerateORMCodeCommand } from "./Designers/ORM/Commands/GenerateORMCodeCommand";
 
 export function activate(pContext: vscode.ExtensionContext): void {
     const log = InitializeLogService(pContext);
@@ -36,6 +38,8 @@ export function activate(pContext: vscode.ExtensionContext): void {
         XRenameSelectedCommand.Register(pContext, designerProvider);
         XReloadDataTypesCommand.Register(pContext, designerProvider);
         XOrganizeTablesCommand.Register(pContext, designerProvider);
+        XCreateSQLScriptCommand.Register(pContext, designerProvider);
+        XGenerateORMCodeCommand.Register(pContext, designerProvider);
 
         XIssuesViewProvider.Register(pContext);
         XPropertiesViewProvider.Register(pContext, designerProvider);

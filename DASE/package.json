@@ -90,6 +90,18 @@
                 "title": "Organize Tables using AI",
                 "category": "DASE",
                 "icon": "$(sparkle)"
+            },
+            {
+                "command": "Dase.CreateSQLScript",
+                "title": "Create SQL Script using AI",
+                "category": "DASE",
+                "icon": "$(database)"
+            },
+            {
+                "command": "Dase.GenerateORMCode",
+                "title": "Generate ORM Code using AI",
+                "category": "DASE",
+                "icon": "$(code)"
             }
         ],
         "customEditors": [
@@ -187,6 +199,16 @@
                     "when": "webviewId == 'Dase.ORMDesigner'",
                     "command": "Dase.OrganizeTablesAI",
                     "group": "dase@7"
+                },
+                {
+                    "when": "webviewId == 'Dase.ORMDesigner'",
+                    "command": "Dase.CreateSQLScript",
+                    "group": "dase@8"
+                },
+                {
+                    "when": "webviewId == 'Dase.ORMDesigner'",
+                    "command": "Dase.GenerateORMCode",
+                    "group": "dase@9"
                 }
             ]
         },

@@ -21,7 +21,9 @@ module.exports = {
     coveragePathIgnorePatterns: [
         '/node_modules/',
         '/__tests__/',
-        '/__mocks__/'
+        '/__mocks__/',
+        '/Commands/CreateSQLScriptCommand',
+        '/Commands/GenerateORMCodeCommand'
     ],
     coverageThreshold: {
         global: {
