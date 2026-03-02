@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <XORMDocument ID="c1e1fa60-6e97-4a6f-b188-34b7952aadf1" Name="ORM Model">
   <XValues>
     <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">c1e1fa60-6e97-4a6f-b188-34b7952aadf1</XData>
@@ -7,6 +7,8 @@
   <XORMDesign Name="ddd">
     <XValues>
       <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">ddd</XData>
+      <XData Name="ParentModel" ID="C2F5A832-7D4B-4E1F-AC3A-6B7E8D1A4F20" Type="String">COR.dsorm</XData>
+      <XData Name="StateControlTable" ID="3A8B7C2D-1E4F-4D6A-89C5-2D7E1F8A3B4C" Type="String">CORxStatus</XData>
     </XValues>
     <XORMTable ID="b2caa08c-8871-49bd-9d18-e11be1ad6e5e" Name="Tablea02">
       <XValues>
@@ -21,15 +23,14 @@
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">ID</XData>
           <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
           <XData Name="IsAutoIncrement" ID="00000001-0002-0003-0001-000000000006" Type="Boolean">true</XData>
-          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
         </XValues>
       </XORMPKField>
       <XORMField ID="06f1f323-3ec7-4dad-ad9a-6851a5047c20" Name="NewTableID">
         <XValues>
           <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">06f1f323-3ec7-4dad-ad9a-6851a5047c20</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">NewTableID</XData>
-          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
           <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">1</XData>
+          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
           <XData Name="IsRequired" ID="6DF729B6-538E-4622-AB5C-8FE1E62618A3" Type="Boolean">false</XData>
         </XValues>
       </XORMField>
@@ -47,15 +48,14 @@
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">ID</XData>
           <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
           <XData Name="IsAutoIncrement" ID="00000001-0002-0003-0001-000000000006" Type="Boolean">true</XData>
-          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
         </XValues>
       </XORMPKField>
       <XORMField ID="21f65dba-6ec8-4b03-a599-23a9b040256d" Name="NewTableID">
         <XValues>
           <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">21f65dba-6ec8-4b03-a599-23a9b040256d</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">NewTableID</XData>
-          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
           <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">1</XData>
+          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
           <XData Name="IsRequired" ID="6DF729B6-538E-4622-AB5C-8FE1E62618A3" Type="Boolean">false</XData>
         </XValues>
       </XORMField>
@@ -64,8 +64,9 @@
       <XValues>
         <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">7a4073ea-ae8d-49d4-8566-531323fdb943</XData>
         <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">NewTable</XData>
-        <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=812;Y=40;Width=200;Height=56}</XData>
+        <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=812;Y=40;Width=200;Height=72}</XData>
         <XData Name="Fill" ID="7152B5B8-EE22-4D84-9EA1-50AA254DA63D" Type="Color">{A=255;R=255;G=69;B=0}</XData>
+        <XData Name="UseStateControl" ID="04C4A96C-B8C1-4EB3-8F56-72766FCE1823" Type="Boolean">true</XData>
       </XValues>
       <XORMPKField ID="852e7023-e0c3-4973-8843-9c6ac5d63726" Name="ID">
         <XValues>
@@ -73,9 +74,16 @@
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">ID</XData>
           <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
           <XData Name="IsAutoIncrement" ID="00000001-0002-0003-0001-000000000006" Type="Boolean">true</XData>
-          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
         </XValues>
       </XORMPKField>
+      <XORMStateField ID="418b15ee-5100-4564-b0c6-f037f40a5691" Name="CORxStatusID">
+        <XValues>
+          <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">418b15ee-5100-4564-b0c6-f037f40a5691</XData>
+          <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">CORxStatusID</XData>
+          <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">1</XData>
+          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
+        </XValues>
+      </XORMStateField>
     </XORMTable>
     <XORMTable ID="5ca89602-0700-44e2-a5a8-e237084d3a5d" Name="Table01">
       <XValues>
@@ -90,15 +98,14 @@
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">ID</XData>
           <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
           <XData Name="IsAutoIncrement" ID="00000001-0002-0003-0001-000000000006" Type="Boolean">true</XData>
-          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
         </XValues>
       </XORMPKField>
       <XORMField ID="ee5024ea-828e-4ae4-82bf-cc59047517bc" Name="NewTableID">
         <XValues>
           <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">ee5024ea-828e-4ae4-82bf-cc59047517bc</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">NewTableID</XData>
-          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
           <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">1</XData>
+          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
           <XData Name="IsRequired" ID="6DF729B6-538E-4622-AB5C-8FE1E62618A3" Type="Boolean">false</XData>
         </XValues>
       </XORMField>
@@ -109,7 +116,7 @@
         <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">FK_NewTable</XData>
         <XLinkData Name="Source" ID="8A8851EB-B6CA-414F-B55A-C22A6A0F3753" Type="String" ElementID="ee5024ea-828e-4ae4-82bf-cc59047517bc" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">ee5024ea-828e-4ae4-82bf-cc59047517bc</XLinkData>
         <XLinkData Name="Target" ID="6461BED3-F1A0-4910-985D-9F0B0058D8BF" Type="String" ElementID="7a4073ea-ae8d-49d4-8566-531323fdb943" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">7a4073ea-ae8d-49d4-8566-531323fdb943</XLinkData>
-        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=1185;Y=204}|{X=1118.5;Y=204}|{X=1118.5;Y=50}|{X=1012;Y=50}</XData>
+        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=1185;Y=204}|{X=1098.5;Y=204}|{X=1098.5;Y=76}|{X=1012;Y=76}</XData>
       </XValues>
     </XORMReference>
     <XORMReference ID="aebb733a-2dd2-4bf8-87f5-fa6547740d68" Name="FK_NewTable">
@@ -118,7 +125,7 @@
         <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">FK_NewTable</XData>
         <XLinkData Name="Source" ID="8A8851EB-B6CA-414F-B55A-C22A6A0F3753" Type="String" ElementID="21f65dba-6ec8-4b03-a599-23a9b040256d" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">21f65dba-6ec8-4b03-a599-23a9b040256d</XLinkData>
         <XLinkData Name="Target" ID="6461BED3-F1A0-4910-985D-9F0B0058D8BF" Type="String" ElementID="7a4073ea-ae8d-49d4-8566-531323fdb943" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">7a4073ea-ae8d-49d4-8566-531323fdb943</XLinkData>
-        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=1382;Y=86}|{X=1197;Y=86}|{X=1197;Y=68}|{X=1012;Y=68}</XData>
+        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=1382;Y=86}|{X=1197;Y=86}|{X=1197;Y=76}|{X=1012;Y=76}</XData>
       </XValues>
     </XORMReference>
     <XORMReference ID="4e51fbb0-7077-4373-aa19-91bb6073cf2a" Name="FK_NewTable">
@@ -127,7 +134,7 @@
         <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">FK_NewTable</XData>
         <XLinkData Name="Source" ID="8A8851EB-B6CA-414F-B55A-C22A6A0F3753" Type="String" ElementID="06f1f323-3ec7-4dad-ad9a-6851a5047c20" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">06f1f323-3ec7-4dad-ad9a-6851a5047c20</XLinkData>
         <XLinkData Name="Target" ID="6461BED3-F1A0-4910-985D-9F0B0058D8BF" Type="String" ElementID="7a4073ea-ae8d-49d4-8566-531323fdb943" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">7a4073ea-ae8d-49d4-8566-531323fdb943</XLinkData>
-        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=492;Y=247}|{X=672;Y=247}|{X=672;Y=86}|{X=812;Y=86}</XData>
+        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=492;Y=247}|{X=652;Y=247}|{X=652;Y=76}|{X=812;Y=76}</XData>
       </XValues>
     </XORMReference>
     <XORMTable ID="2c29ab45-a1ea-4fbb-b49e-478c054a2ad5" Name="NewTable">
@@ -142,15 +149,14 @@
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">ID</XData>
           <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
           <XData Name="IsAutoIncrement" ID="00000001-0002-0003-0001-000000000006" Type="Boolean">true</XData>
-          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
         </XValues>
       </XORMPKField>
       <XORMField ID="6f8c7651-ddda-4291-8071-338914f2a41a" Name="Tabela01">
         <XValues>
           <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">6f8c7651-ddda-4291-8071-338914f2a41a</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">Tabela01</XData>
-          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
           <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">1</XData>
+          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
           <XData Name="IsRequired" ID="6DF729B6-538E-4622-AB5C-8FE1E62618A3" Type="Boolean">false</XData>
         </XValues>
       </XORMField>
@@ -158,7 +164,6 @@
         <XValues>
           <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">f763bca1-377b-470c-96b6-371a11bc815d</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">NewFieldxxc</XData>
-          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">String</XData>
           <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">2</XData>
           <XData Name="IsRequired" ID="6DF729B6-538E-4622-AB5C-8FE1E62618A3" Type="Boolean">false</XData>
         </XValues>
@@ -167,8 +172,8 @@
         <XValues>
           <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">7e59c406-0129-4a0b-9e98-02006588f4f8</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">Tabela02</XData>
-          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
           <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">3</XData>
+          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
           <XData Name="IsRequired" ID="6DF729B6-538E-4622-AB5C-8FE1E62618A3" Type="Boolean">false</XData>
         </XValues>
       </XORMField>
@@ -176,17 +181,15 @@
         <XValues>
           <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">ba6b6857-3ff0-44ed-beeb-1fce4c4aba6a</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">NewFieldffd</XData>
-          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Numeric</XData>
           <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">4</XData>
+          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Numeric</XData>
           <XData Name="IsRequired" ID="6DF729B6-538E-4622-AB5C-8FE1E62618A3" Type="Boolean">false</XData>
-          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
         </XValues>
       </XORMField>
       <XORMField ID="c1b6ea54-7d4a-4a3e-bbd2-b685aee5060b" Name="NewField">
         <XValues>
           <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">c1b6ea54-7d4a-4a3e-bbd2-b685aee5060b</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">NewField</XData>
-          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">String</XData>
           <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">5</XData>
           <XData Name="IsRequired" ID="6DF729B6-538E-4622-AB5C-8FE1E62618A3" Type="Boolean">false</XData>
         </XValues>
@@ -195,25 +198,22 @@
         <XValues>
           <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">d94b01fe-dd68-44e8-ab75-5e4065feccc2</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">Tabela03xddd</XData>
-          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
           <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">6</XData>
-          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
+          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
         </XValues>
       </XORMField>
       <XORMField ID="a59bf559-270b-4369-b0e2-c533d50fed43" Name="NewField">
         <XValues>
           <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">a59bf559-270b-4369-b0e2-c533d50fed43</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">NewField</XData>
-          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Text</XData>
           <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">7</XData>
-          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
+          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Text</XData>
         </XValues>
       </XORMField>
       <XORMField ID="c9e98be9-3deb-45df-8037-eacdcfc1932c" Name="NewField">
         <XValues>
           <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">c9e98be9-3deb-45df-8037-eacdcfc1932c</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">NewField</XData>
-          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">String</XData>
           <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">8</XData>
           <XData Name="IsRequired" ID="6DF729B6-538E-4622-AB5C-8FE1E62618A3" Type="Boolean">false</XData>
         </XValues>
@@ -222,7 +222,6 @@
         <XValues>
           <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">58912866-dff9-47e3-a207-d9a821325ca1</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">NewField</XData>
-          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">String</XData>
           <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">9</XData>
           <XData Name="IsRequired" ID="6DF729B6-538E-4622-AB5C-8FE1E62618A3" Type="Boolean">false</XData>
         </XValues>
@@ -231,17 +230,15 @@
         <XValues>
           <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">a7cf0608-bd1e-4335-bd82-18d237fc09de</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">Tabela04</XData>
-          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
           <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">10</XData>
+          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
           <XData Name="IsRequired" ID="6DF729B6-538E-4622-AB5C-8FE1E62618A3" Type="Boolean">false</XData>
-          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
         </XValues>
       </XORMField>
       <XORMField ID="1c8b7264-8485-4764-b0a2-836cea929ec8" Name="NewField">
         <XValues>
           <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">1c8b7264-8485-4764-b0a2-836cea929ec8</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">NewField</XData>
-          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">String</XData>
           <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">11</XData>
           <XData Name="IsRequired" ID="6DF729B6-538E-4622-AB5C-8FE1E62618A3" Type="Boolean">false</XData>
         </XValues>
@@ -250,7 +247,6 @@
         <XValues>
           <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">b8874c5f-d3a1-4c1f-9c3b-7919a4b4e78c</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">NewField</XData>
-          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">String</XData>
           <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">12</XData>
           <XData Name="IsRequired" ID="6DF729B6-538E-4622-AB5C-8FE1E62618A3" Type="Boolean">false</XData>
         </XValues>
@@ -259,8 +255,8 @@
         <XValues>
           <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">d8d04d01-5745-4c68-974b-aae19d840ac8</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">Tabela05</XData>
-          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
           <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">13</XData>
+          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
           <XData Name="IsRequired" ID="6DF729B6-538E-4622-AB5C-8FE1E62618A3" Type="Boolean">false</XData>
         </XValues>
       </XORMField>
@@ -271,7 +267,7 @@
         <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">FK_NewTable</XData>
         <XLinkData Name="Source" ID="8A8851EB-B6CA-414F-B55A-C22A6A0F3753" Type="String" ElementID="6f8c7651-ddda-4291-8071-338914f2a41a" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">6f8c7651-ddda-4291-8071-338914f2a41a</XLinkData>
         <XLinkData Name="Target" ID="6461BED3-F1A0-4910-985D-9F0B0058D8BF" Type="String" ElementID="5ca89602-0700-44e2-a5a8-e237084d3a5d" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">5ca89602-0700-44e2-a5a8-e237084d3a5d</XLinkData>
-        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=959;Y=305}|{X=1052;Y=305}|{X=1052;Y=159}|{X=1185;Y=159}</XData>
+        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=959;Y=305}|{X=1072;Y=305}|{X=1072;Y=184}|{X=1185;Y=184}</XData>
       </XValues>
     </XORMReference>
     <XORMReference ID="d17689d1-692f-4847-b4fd-ab8c6f823e6f" Name="FK_NewTable">
@@ -296,15 +292,14 @@
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">ID</XData>
           <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
           <XData Name="IsAutoIncrement" ID="00000001-0002-0003-0001-000000000006" Type="Boolean">true</XData>
-          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
         </XValues>
       </XORMPKField>
       <XORMField ID="78e5b8ab-582f-4da2-8302-6e5b65523cb3" Name="Table01ID">
         <XValues>
           <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">78e5b8ab-582f-4da2-8302-6e5b65523cb3</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">Table01ID</XData>
-          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
           <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">1</XData>
+          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
           <XData Name="IsRequired" ID="6DF729B6-538E-4622-AB5C-8FE1E62618A3" Type="Boolean">false</XData>
         </XValues>
       </XORMField>
@@ -312,8 +307,8 @@
         <XValues>
           <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">0b7c65cb-ceca-425d-ae44-73cf1f00d4aa</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">Table01ID</XData>
-          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
           <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">2</XData>
+          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
           <XData Name="IsRequired" ID="6DF729B6-538E-4622-AB5C-8FE1E62618A3" Type="Boolean">false</XData>
         </XValues>
       </XORMField>
@@ -324,7 +319,7 @@
         <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">FK_NewTable</XData>
         <XLinkData Name="Source" ID="8A8851EB-B6CA-414F-B55A-C22A6A0F3753" Type="String" ElementID="d94b01fe-dd68-44e8-ab75-5e4065feccc2" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">d94b01fe-dd68-44e8-ab75-5e4065feccc2</XLinkData>
         <XLinkData Name="Target" ID="6461BED3-F1A0-4910-985D-9F0B0058D8BF" Type="String" ElementID="5760497c-83b3-48b2-9e1c-7c28445735ef" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">5760497c-83b3-48b2-9e1c-7c28445735ef</XLinkData>
-        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=959;Y=385}|{X=1036;Y=385}|{X=1036;Y=358.5}|{X=1133;Y=358.5}</XData>
+        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=959;Y=385}|{X=1046;Y=385}|{X=1046;Y=371}|{X=1133;Y=371}</XData>
       </XValues>
     </XORMReference>
     <XORMTable ID="da00a65a-7e2e-4259-bcea-e7b2e3964398" Name="Tabela04">
@@ -340,7 +335,6 @@
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">ID</XData>
           <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
           <XData Name="IsAutoIncrement" ID="00000001-0002-0003-0001-000000000006" Type="Boolean">true</XData>
-          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
         </XValues>
       </XORMPKField>
     </XORMTable>
@@ -365,15 +359,14 @@
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">ID</XData>
           <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
           <XData Name="IsAutoIncrement" ID="00000001-0002-0003-0001-000000000006" Type="Boolean">true</XData>
-          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
         </XValues>
       </XORMPKField>
       <XORMField ID="fb82598a-e76c-46fc-969e-4323570d9a08" Name="Tabela03ID">
         <XValues>
           <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">fb82598a-e76c-46fc-969e-4323570d9a08</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">Tabela03ID</XData>
-          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
           <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">1</XData>
+          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
           <XData Name="IsRequired" ID="6DF729B6-538E-4622-AB5C-8FE1E62618A3" Type="Boolean">false</XData>
         </XValues>
       </XORMField>
@@ -400,14 +393,12 @@
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">ID</XData>
           <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Int32</XData>
           <XData Name="IsAutoIncrement" ID="00000001-0002-0003-0001-000000000006" Type="Boolean">true</XData>
-          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000007" Type="Boolean">false</XData>
         </XValues>
       </XORMPKField>
       <XORMField ID="b8ca7b7b-dc54-4066-85a8-5633e5f31dad" Name="NewField">
         <XValues>
           <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">b8ca7b7b-dc54-4066-85a8-5633e5f31dad</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">NewField</XData>
-          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">String</XData>
           <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">1</XData>
           <XData Name="IsRequired" ID="6DF729B6-538E-4622-AB5C-8FE1E62618A3" Type="Boolean">false</XData>
         </XValues>
@@ -419,7 +410,7 @@
         <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">FK_Table01</XData>
         <XLinkData Name="Source" ID="8A8851EB-B6CA-414F-B55A-C22A6A0F3753" Type="String" ElementID="78e5b8ab-582f-4da2-8302-6e5b65523cb3" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">78e5b8ab-582f-4da2-8302-6e5b65523cb3</XLinkData>
         <XLinkData Name="Target" ID="6461BED3-F1A0-4910-985D-9F0B0058D8BF" Type="String" ElementID="5ca89602-0700-44e2-a5a8-e237084d3a5d" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">5ca89602-0700-44e2-a5a8-e237084d3a5d</XLinkData>
-        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=1333;Y=383}|{X=1363;Y=383}|{X=1363;Y=250}|{X=1285;Y=250}|{X=1285;Y=220}</XData>
+        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=1333;Y=383}|{X=1405;Y=383}|{X=1405;Y=184}|{X=1385;Y=184}</XData>
       </XValues>
     </XORMReference>
     <XORMReference ID="59e16bec-f63c-41c8-970f-5c903073d8f2" Name="FK_Tabela03">
@@ -428,7 +419,7 @@
         <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">FK_Tabela03</XData>
         <XLinkData Name="Source" ID="8A8851EB-B6CA-414F-B55A-C22A6A0F3753" Type="String" ElementID="fb82598a-e76c-46fc-969e-4323570d9a08" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">fb82598a-e76c-46fc-969e-4323570d9a08</XLinkData>
         <XLinkData Name="Target" ID="6461BED3-F1A0-4910-985D-9F0B0058D8BF" Type="String" ElementID="5760497c-83b3-48b2-9e1c-7c28445735ef" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">5760497c-83b3-48b2-9e1c-7c28445735ef</XLinkData>
-        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=1322;Y=576}|{X=1362;Y=576}|{X=1362;Y=455}|{X=1245.5;Y=455}|{X=1245.5;Y=415}</XData>
+        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=1322;Y=576}|{X=1353;Y=576}|{X=1353;Y=371}|{X=1333;Y=371}</XData>
       </XValues>
     </XORMReference>
     <XORMReference ID="607a27ec-2f75-4344-8ec4-1d029a12b6cd" Name="FK_Table01">
@@ -437,8 +428,93 @@
         <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">FK_Table01</XData>
         <XLinkData Name="Source" ID="8A8851EB-B6CA-414F-B55A-C22A6A0F3753" Type="String" ElementID="0b7c65cb-ceca-425d-ae44-73cf1f00d4aa" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">0b7c65cb-ceca-425d-ae44-73cf1f00d4aa</XLinkData>
         <XLinkData Name="Target" ID="6461BED3-F1A0-4910-985D-9F0B0058D8BF" Type="String" ElementID="5ca89602-0700-44e2-a5a8-e237084d3a5d" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">5ca89602-0700-44e2-a5a8-e237084d3a5d</XLinkData>
-        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=1333;Y=399}|{X=1383;Y=399}|{X=1383;Y=270}|{X=1310;Y=270}|{X=1310;Y=220}</XData>
+        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=1333;Y=399}|{X=1405;Y=399}|{X=1405;Y=184}|{X=1385;Y=184}</XData>
       </XValues>
     </XORMReference>
+    <XORMTable ID="80571247-b59c-4588-a0c6-a7a612488e6a" Name="Tabela04">
+      <XValues>
+        <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">80571247-b59c-4588-a0c6-a7a612488e6a</XData>
+        <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">Tabela04</XData>
+        <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=402;Y=627;Width=200;Height=28}</XData>
+        <XData Name="Fill" ID="7152B5B8-EE22-4D84-9EA1-50AA254DA63D" Type="Color">{A=255;R=139;G=0;B=0}</XData>
+        <XData Name="IsShadow" ID="7E3F9A2C-D1B8-4E6F-A3C5-2D9F7B1E4A6C" Type="Boolean">true</XData>
+        <XData Name="ShadowDocumentID" ID="B4A7D3F1-8C2E-4A9B-D6F4-3E1C8B5D2A7F" Type="String">c1e1fa60-6e97-4a6f-b188-34b7952aadf1</XData>
+        <XData Name="ShadowDocumentName" ID="C9E2B6A4-F3D7-4C1E-B8A3-5D2F9C7E1B4A" Type="String">ORM Model</XData>
+        <XData Name="ShadowTableID" ID="D6F4C1B8-A2E9-4F3B-C7D1-8E5B4A9F6C2D" Type="String">da00a65a-7e2e-4259-bcea-e7b2e3964398</XData>
+        <XData Name="ShadowTableName" ID="E1A8F5C3-B7D4-4A2C-E9B6-4F1D8A3C7E5B" Type="String">Tabela04</XData>
+      </XValues>
+    </XORMTable>
+    <XORMTable ID="d1f3c4d5-75c2-4e84-b49e-6989d98a6fc4" Name="CORxStatus">
+      <XValues>
+        <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">d1f3c4d5-75c2-4e84-b49e-6989d98a6fc4</XData>
+        <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">CORxStatus</XData>
+        <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=1072;Y=40;Width=200;Height=28}</XData>
+        <XData Name="Fill" ID="7152B5B8-EE22-4D84-9EA1-50AA254DA63D" Type="Color">{A=255;R=165;G=42;B=42}</XData>
+        <XData Name="IsShadow" ID="7E3F9A2C-D1B8-4E6F-A3C5-2D9F7B1E4A6C" Type="Boolean">true</XData>
+        <XData Name="ShadowDocumentName" ID="C9E2B6A4-F3D7-4C1E-B8A3-5D2F9C7E1B4A" Type="String">COR</XData>
+        <XData Name="ShadowTableName" ID="E1A8F5C3-B7D4-4A2C-E9B6-4F1D8A3C7E5B" Type="String">CORxStatus</XData>
+      </XValues>
+    </XORMTable>
+    <XORMTable ID="d962a72d-929d-4bf5-88fb-eabc2d7cd109" Name="CORxRecursoDireito">
+      <XValues>
+        <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">d962a72d-929d-4bf5-88fb-eabc2d7cd109</XData>
+        <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">CORxRecursoDireito</XData>
+        <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=657;Y=596;Width=200;Height=28}</XData>
+        <XData Name="Fill" ID="7152B5B8-EE22-4D84-9EA1-50AA254DA63D" Type="Color">{A=255;R=255;G=140;B=0}</XData>
+        <XData Name="IsShadow" ID="7E3F9A2C-D1B8-4E6F-A3C5-2D9F7B1E4A6C" Type="Boolean">true</XData>
+        <XData Name="ShadowDocumentID" ID="B4A7D3F1-8C2E-4A9B-D6F4-3E1C8B5D2A7F" Type="String">7a8261d8-7e55-4201-bac5-5630cf6b7fbc</XData>
+        <XData Name="ShadowDocumentName" ID="C9E2B6A4-F3D7-4C1E-B8A3-5D2F9C7E1B4A" Type="String">COR</XData>
+        <XData Name="ShadowTableID" ID="D6F4C1B8-A2E9-4F3B-C7D1-8E5B4A9F6C2D" Type="String">d962a72d-929d-4bf5-88fb-eabc2d7cd109</XData>
+        <XData Name="ShadowTableName" ID="E1A8F5C3-B7D4-4A2C-E9B6-4F1D8A3C7E5B" Type="String">CORxRecursoDireito</XData>
+      </XValues>
+    </XORMTable>
+    <XORMTable ID="4eef61c2-1bca-46a7-a424-2ca378453c05" Name="CORxRecursoTemplate">
+      <XValues>
+        <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">4eef61c2-1bca-46a7-a424-2ca378453c05</XData>
+        <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">CORxRecursoTemplate</XData>
+        <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=629;Y=703;Width=200;Height=28}</XData>
+        <XData Name="Fill" ID="7152B5B8-EE22-4D84-9EA1-50AA254DA63D" Type="Color">{A=255;R=127;G=255;B=0}</XData>
+        <XData Name="IsShadow" ID="7E3F9A2C-D1B8-4E6F-A3C5-2D9F7B1E4A6C" Type="Boolean">true</XData>
+        <XData Name="ShadowDocumentID" ID="B4A7D3F1-8C2E-4A9B-D6F4-3E1C8B5D2A7F" Type="String">978d702d-4b68-41d5-8bd8-bc4305e8215f</XData>
+        <XData Name="ShadowDocumentName" ID="C9E2B6A4-F3D7-4C1E-B8A3-5D2F9C7E1B4A" Type="String">COR</XData>
+        <XData Name="ShadowTableID" ID="D6F4C1B8-A2E9-4F3B-C7D1-8E5B4A9F6C2D" Type="String">4eef61c2-1bca-46a7-a424-2ca378453c05</XData>
+        <XData Name="ShadowTableName" ID="E1A8F5C3-B7D4-4A2C-E9B6-4F1D8A3C7E5B" Type="String">CORxRecursoTemplate</XData>
+      </XValues>
+    </XORMTable>
+    <XORMTable ID="0c821019-44e3-4e47-8f37-9d87beed5378" Name="CORxUsuario">
+      <XValues>
+        <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">0c821019-44e3-4e47-8f37-9d87beed5378</XData>
+        <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">CORxUsuario</XData>
+        <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=150;Y=525;Width=200;Height=28}</XData>
+        <XData Name="Fill" ID="7152B5B8-EE22-4D84-9EA1-50AA254DA63D" Type="Color">{A=255;R=127;G=255;B=0}</XData>
+        <XData Name="IsShadow" ID="7E3F9A2C-D1B8-4E6F-A3C5-2D9F7B1E4A6C" Type="Boolean">true</XData>
+        <XData Name="ShadowDocumentID" ID="B4A7D3F1-8C2E-4A9B-D6F4-3E1C8B5D2A7F" Type="String">5e6b210a-41e2-4be6-bf56-aea6067fd9f5</XData>
+        <XData Name="ShadowDocumentName" ID="C9E2B6A4-F3D7-4C1E-B8A3-5D2F9C7E1B4A" Type="String">COR</XData>
+        <XData Name="ShadowTableID" ID="D6F4C1B8-A2E9-4F3B-C7D1-8E5B4A9F6C2D" Type="String">0c821019-44e3-4e47-8f37-9d87beed5378</XData>
+        <XData Name="ShadowTableName" ID="E1A8F5C3-B7D4-4A2C-E9B6-4F1D8A3C7E5B" Type="String">CORxUsuario</XData>
+      </XValues>
+    </XORMTable>
+    <XORMTable ID="9e049d6f-a69e-4649-8383-c8bd6ec2ae81" Name="CORxRecurso">
+      <XValues>
+        <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">9e049d6f-a69e-4649-8383-c8bd6ec2ae81</XData>
+        <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">CORxRecurso</XData>
+        <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=364;Y=34;Width=200;Height=28}</XData>
+        <XData Name="Fill" ID="7152B5B8-EE22-4D84-9EA1-50AA254DA63D" Type="Color">{A=255;R=255;G=140;B=0}</XData>
+        <XData Name="IsShadow" ID="7E3F9A2C-D1B8-4E6F-A3C5-2D9F7B1E4A6C" Type="Boolean">true</XData>
+        <XData Name="ShadowDocumentID" ID="B4A7D3F1-8C2E-4A9B-D6F4-3E1C8B5D2A7F" Type="String">8640a4b0-d8c9-49af-8603-334dd802b02d</XData>
+        <XData Name="ShadowDocumentName" ID="C9E2B6A4-F3D7-4C1E-B8A3-5D2F9C7E1B4A" Type="String">COR</XData>
+        <XData Name="ShadowTableID" ID="D6F4C1B8-A2E9-4F3B-C7D1-8E5B4A9F6C2D" Type="String">9e049d6f-a69e-4649-8383-c8bd6ec2ae81</XData>
+        <XData Name="ShadowTableName" ID="E1A8F5C3-B7D4-4A2C-E9B6-4F1D8A3C7E5B" Type="String">CORxRecurso</XData>
+      </XValues>
+    </XORMTable>
+    <XORMStateReference ID="193f1415-53d9-4a6f-a664-9ce06e132e85" Name="FK_NewTable_CORxStatus">
+      <XValues>
+        <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">193f1415-53d9-4a6f-a664-9ce06e132e85</XData>
+        <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">FK_NewTable_CORxStatus</XData>
+        <XLinkData Name="Source" ID="8A8851EB-B6CA-414F-B55A-C22A6A0F3753" Type="String" ElementID="418b15ee-5100-4564-b0c6-f037f40a5691" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">418b15ee-5100-4564-b0c6-f037f40a5691</XLinkData>
+        <XLinkData Name="Target" ID="6461BED3-F1A0-4910-985D-9F0B0058D8BF" Type="String" ElementID="d1f3c4d5-75c2-4e84-b49e-6989d98a6fc4" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">d1f3c4d5-75c2-4e84-b49e-6989d98a6fc4</XLinkData>
+        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=1012;Y=96}|{X=1042;Y=96}|{X=1042;Y=53.99999999999999}|{X=1072;Y=54}</XData>
+      </XValues>
+    </XORMStateReference>
   </XORMDesign>
 </XORMDocument>

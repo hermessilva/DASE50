@@ -4,6 +4,7 @@ import { XProperty } from "../../Core/XProperty.js";
 import { XGuid } from "../../Core/XGuid.js";
 import { XORMField } from "./XORMField.js";
 import { XORMPKField } from "./XORMPKField.js";
+import { XORMStateField } from "./XORMStateField.js";
 
 export interface XICreateFieldOptions
 {
@@ -13,6 +14,8 @@ export interface XICreateFieldOptions
     IsRequired?: boolean;
     IsAutoIncrement?: boolean;
     DefaultValue?: string;
+    /** Pipe-separated list of allowed values (enum constraint). */
+    AllowedValues?: string;
 }
 
 export interface XICreatePKFieldOptions
@@ -86,6 +89,15 @@ export class XORMTable extends XRectangle
         "ShadowModuleName",
         "Shadow Module Name",
         ""
+    );
+
+    /** Whether this table participates in the design's state-control pattern. Persisted; GUID matches C# UseState. */
+    public static readonly UseStateControlProp = XProperty.Register<XORMTable, boolean>(
+        (p: XORMTable) => p.UseStateControl,
+        "04C4A96C-B8C1-4EB3-8F56-72766FCE1823",
+        "UseStateControl",
+        "Use State Control",
+        false
     );
 
     public constructor()
@@ -173,6 +185,60 @@ export class XORMTable extends XRectangle
         this.SetValue(XORMTable.ShadowModuleNameProp, pValue);
     }
 
+    public get UseStateControl(): boolean
+    {
+        return this.GetValue(XORMTable.UseStateControlProp) as boolean;
+    }
+
+    public set UseStateControl(pValue: boolean)
+    {
+        this.SetValue(XORMTable.UseStateControlProp, pValue);
+    }
+
+    /** Returns the XORMStateField child of this table, or null if none exists. */
+    public GetStateField(): XORMStateField | null
+    {
+        for (const child of this.ChildNodes)
+        {
+            if (child instanceof XORMStateField)
+                return child;
+        }
+        return null;
+    }
+
+    /**
+     * Creates an XORMStateField child and appends it to this table.
+     * @param pDataType DataType to assign (should match the target state table's PKType).
+     * @param pFieldName Name of the field (convention: `${stateTableName}ID`).
+     */
+    public CreateStateField(pDataType: string, pFieldName: string): XORMStateField
+    {
+        const stateField = new XORMStateField();
+        stateField.ID = XGuid.NewValue();
+        stateField.Name = pFieldName;
+        stateField.DataType = pDataType;
+        stateField.IsRequired = true;
+        this.AppendChild(stateField);
+        this.UpdateFieldIndexes();
+        this.UpdateHeightForFields();
+        return stateField;
+    }
+
+    /**
+     * Removes the XORMStateField from this table.
+     * @returns true if a state field was found and removed; false if none existed.
+     */
+    public DeleteStateField(): boolean
+    {
+        const stateField = this.GetStateField();
+        if (stateField === null)
+            return false;
+        this.RemoveChild(stateField);
+        this.UpdateFieldIndexes();
+        this.UpdateHeightForFields();
+        return true;
+    }
+
     /**
      * Obtém o campo de chave primária da tabela
      * Retorna null se a tabela não tiver um campo PK
@@ -251,6 +317,8 @@ export class XORMTable extends XRectangle
 
         field.IsAutoIncrement = pOptions?.IsAutoIncrement ?? false;
         field.DefaultValue = pOptions?.DefaultValue ?? "";
+        if (pOptions?.AllowedValues)
+            field.AllowedValues = pOptions.AllowedValues;
 
         this.AppendChild(field);
         this.UpdateFieldIndexes();

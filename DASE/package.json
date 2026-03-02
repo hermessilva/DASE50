@@ -70,6 +70,12 @@
                 "title": "Reload Data Types",
                 "category": "DASE",
                 "icon": "$(refresh)"
+            },
+            {
+                "command": "Dase.ExportToDBML",
+                "title": "Export to DBML",
+                "category": "DASE",
+                "icon": "$(export)"
             }
         ],
         "customEditors": [
@@ -150,6 +156,11 @@
                     "when": "webviewId == 'Dase.ORMDesigner'",
                     "command": "Dase.AlignLines",
                     "group": "dase@5"
+                },
+                {
+                    "when": "webviewId == 'Dase.ORMDesigner'",
+                    "command": "Dase.ExportToDBML",
+                    "group": "dase@6"
                 }
             ]
         }

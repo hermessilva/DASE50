@@ -278,4 +278,148 @@ describe("XORMField", () => {
             expect(field.GetExpectedDataType()).toBeNull();
         });
     });
+
+    describe("AllowedValues", () => {
+        it("should default to empty string", () => {
+            const field = new XORMField();
+            expect(field.AllowedValues).toBe("");
+            expect(field.AllowedValuesList).toEqual([]);
+            expect(field.HasAllowedValues).toBe(false);
+        });
+
+        it("should store and retrieve a pipe-separated list", () => {
+            const field = new XORMField();
+            field.AllowedValues = "Active|Inactive|Pending";
+            expect(field.AllowedValues).toBe("Active|Inactive|Pending");
+        });
+
+        it("should trim whitespace when setting AllowedValues", () => {
+            const field = new XORMField();
+            field.AllowedValues = "  Active|Inactive  ";
+            expect(field.AllowedValues).toBe("Active|Inactive");
+        });
+
+        it("should parse AllowedValuesList correctly", () => {
+            const field = new XORMField();
+            field.AllowedValues = "Active|Inactive|Pending";
+            expect(field.AllowedValuesList).toEqual(["Active", "Inactive", "Pending"]);
+        });
+
+        it("should trim individual entries in AllowedValuesList", () => {
+            const field = new XORMField();
+            field.AllowedValues = " Active | Inactive | Pending ";
+            expect(field.AllowedValuesList).toEqual(["Active", "Inactive", "Pending"]);
+        });
+
+        it("should skip empty entries in AllowedValuesList", () => {
+            const field = new XORMField();
+            field.AllowedValues = "Active||Pending|";
+            expect(field.AllowedValuesList).toEqual(["Active", "Pending"]);
+        });
+
+        it("should return empty list when AllowedValues is empty", () => {
+            const field = new XORMField();
+            field.AllowedValues = "";
+            expect(field.AllowedValuesList).toEqual([]);
+        });
+
+        it("should report HasAllowedValues true when list is non-empty", () => {
+            const field = new XORMField();
+            field.AllowedValues = "A|B";
+            expect(field.HasAllowedValues).toBe(true);
+        });
+
+        it("should report HasAllowedValues false when list is empty", () => {
+            const field = new XORMField();
+            expect(field.HasAllowedValues).toBe(false);
+        });
+
+        it("should report HasAllowedValues false when only separators remain", () => {
+            const field = new XORMField();
+            field.AllowedValues = "||";
+            expect(field.HasAllowedValues).toBe(false);
+        });
+
+        describe("IsAllowedValue", () => {
+            it("should return true for any value when no constraint is defined", () => {
+                const field = new XORMField();
+                expect(field.IsAllowedValue("anything")).toBe(true);
+            });
+
+            it("should return true when value is in the list", () => {
+                const field = new XORMField();
+                field.AllowedValues = "Active|Inactive|Pending";
+                expect(field.IsAllowedValue("Active")).toBe(true);
+                expect(field.IsAllowedValue("Inactive")).toBe(true);
+                expect(field.IsAllowedValue("Pending")).toBe(true);
+            });
+
+            it("should return false when value is not in the list", () => {
+                const field = new XORMField();
+                field.AllowedValues = "Active|Inactive|Pending";
+                expect(field.IsAllowedValue("Unknown")).toBe(false);
+                expect(field.IsAllowedValue("active")).toBe(false); // case-sensitive
+            });
+
+            it("should be case-sensitive", () => {
+                const field = new XORMField();
+                field.AllowedValues = "Active";
+                expect(field.IsAllowedValue("active")).toBe(false);
+                expect(field.IsAllowedValue("ACTIVE")).toBe(false);
+                expect(field.IsAllowedValue("Active")).toBe(true);
+            });
+
+            it("should handle numeric allowed values", () => {
+                const field = new XORMField();
+                field.AllowedValues = "1|2|3|4|5";
+                expect(field.IsAllowedValue("3")).toBe(true);
+                expect(field.IsAllowedValue("6")).toBe(false);
+            });
+        });
+
+        describe("SetAllowedValuesList", () => {
+            it("should set values from an array", () => {
+                const field = new XORMField();
+                field.SetAllowedValuesList(["Active", "Inactive", "Pending"]);
+                expect(field.AllowedValues).toBe("Active|Inactive|Pending");
+                expect(field.AllowedValuesList).toEqual(["Active", "Inactive", "Pending"]);
+            });
+
+            it("should de-duplicate entries", () => {
+                const field = new XORMField();
+                field.SetAllowedValuesList(["A", "B", "A", "C", "B"]);
+                expect(field.AllowedValuesList).toEqual(["A", "B", "C"]);
+            });
+
+            it("should trim and skip empty entries", () => {
+                const field = new XORMField();
+                field.SetAllowedValuesList(["  Active  ", "", "  ", "Inactive"]);
+                expect(field.AllowedValuesList).toEqual(["Active", "Inactive"]);
+            });
+
+            it("should clear the list when given an empty array", () => {
+                const field = new XORMField();
+                field.AllowedValues = "Active|Inactive";
+                field.SetAllowedValuesList([]);
+                expect(field.AllowedValues).toBe("");
+                expect(field.HasAllowedValues).toBe(false);
+            });
+        });
+
+        it("should be passed through CreateField options on XORMTable", () => {
+            const doc = new XORMDocument();
+            const table = doc.Design.CreateTable({ Name: "Status" });
+            const field = table.CreateField({ Name: "State", AllowedValues: "Open|Closed|Pending" });
+            expect(field.AllowedValues).toBe("Open|Closed|Pending");
+            expect(field.HasAllowedValues).toBe(true);
+        });
+
+        it("should default to empty string when CreateField does not specify AllowedValues", () => {
+            const doc = new XORMDocument();
+            const table = doc.Design.CreateTable({ Name: "T" });
+            const field = table.CreateField({ Name: "F" });
+            expect(field.AllowedValues).toBe("");
+            expect(field.HasAllowedValues).toBe(false);
+        });
+    });
 });

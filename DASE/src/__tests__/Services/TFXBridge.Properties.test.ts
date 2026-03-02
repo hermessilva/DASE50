@@ -301,6 +301,31 @@ describe('XTFXBridge', () => {
             expect(result.Success).toBe(true);
         });
 
+        it('should update XORMField AllowedValues property', async () => {
+            const json = JSON.stringify({
+                Name: "TestModel",
+                Tables: [{ ID: "table-1", Name: "TestTable", X: 100, Y: 100, Fields: [{ ID: "field-1", Name: "Status", DataType: "String" }] }]
+            });
+            await bridge.LoadOrmModelFromText(json);
+
+            const result = bridge.UpdateProperty('field-1', 'AllowedValues', 'Open|Closed|Pending');
+
+            expect(result.Success).toBe(true);
+        });
+
+        it('should block AllowedValues update on an auto-increment field', async () => {
+            const json = JSON.stringify({
+                Name: "TestModel",
+                Tables: [{ ID: "table-1", Name: "TestTable", X: 100, Y: 100, Fields: [{ ID: "field-1", Name: "Counter", DataType: "Int32", IsAutoIncrement: true }] }]
+            });
+            await bridge.LoadOrmModelFromText(json);
+
+            const result = bridge.UpdateProperty('field-1', 'AllowedValues', '1|2|3');
+
+            expect(result.Success).toBe(false);
+            expect(result.Message).toContain('auto-increment');
+        });
+
         it('should update XORMField Description property', async () => {
             const json = JSON.stringify({
                 Name: "TestModel",
@@ -622,6 +647,64 @@ describe('XTFXBridge', () => {
             expect(dataTypeProp).toBeDefined();
             // Custom types should be used
             expect(dataTypeProp?.Options).toEqual(["String", "Int32", "Decimal", "Binary"]);
+        });
+
+        it('should expose AllowedValues as TagList type for a regular non-FK, non-AI field', () => {
+            const mockField = new tfx.XORMField();
+            mockField.ID = 'field-1';
+            mockField.Name = 'Status';
+            mockField.DataType = 'String' as any;
+            mockField.IsAutoIncrement = false;
+            bridge.Controller.GetElementByID = jest.fn().mockReturnValue(mockField);
+
+            const props = bridge.GetProperties('field-1');
+            const avProp = props.find(p => p.Key === 'AllowedValues');
+
+            expect(avProp).toBeDefined();
+            expect(avProp?.Type).toBe(XPropertyType.TagList);
+            expect(avProp?.Hint).toBeTruthy();
+        });
+
+        it('should set Hint and Placeholder on Name property for different element types', () => {
+            const mockField = new tfx.XORMField();
+            mockField.ID = 'field-1';
+            mockField.Name = 'Amount';
+            mockField.DataType = 'Int32' as any;
+            bridge.Controller.GetElementByID = jest.fn().mockReturnValue(mockField);
+
+            const props = bridge.GetProperties('field-1');
+            const nameProp = props.find(p => p.Key === 'Name');
+
+            expect(nameProp?.Hint).toBeTruthy();
+            expect(nameProp?.Placeholder).toBeTruthy();
+        });
+
+        it('should set Placeholder on Description property', () => {
+            const mockField = new tfx.XORMField();
+            mockField.ID = 'field-1';
+            mockField.Name = 'Amount';
+            mockField.DataType = 'Int32' as any;
+            bridge.Controller.GetElementByID = jest.fn().mockReturnValue(mockField);
+
+            const props = bridge.GetProperties('field-1');
+            const descProp = props.find(p => p.Key === 'Description');
+
+            expect(descProp?.Placeholder).toBeTruthy();
+        });
+
+        it('should set Placeholder on DefaultValue property for non-auto-increment regular field', () => {
+            const mockField = new tfx.XORMField();
+            mockField.ID = 'field-1';
+            mockField.Name = 'Amount';
+            mockField.DataType = 'Int32' as any;
+            mockField.IsAutoIncrement = false;
+            bridge.Controller.GetElementByID = jest.fn().mockReturnValue(mockField);
+
+            const props = bridge.GetProperties('field-1');
+            const dvProp = props.find(p => p.Key === 'DefaultValue');
+
+            expect(dvProp?.Placeholder).toBeTruthy();
+            expect(dvProp?.Hint).toBeTruthy();
         });
 
         it('should sort properties with unknown group using fallback order 99', async () => {

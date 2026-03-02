@@ -7,68 +7,58 @@ import { GetLogService } from "../../Services/LogService";
 import { XDesignerSelection } from "../../Models/DesignerSelection";
 import { XIssueItem } from "../../Models/IssueItem";
 
-interface ISelectPayload
-{
+interface ISelectPayload {
     Clear?: boolean;
     Toggle?: boolean;
     Add?: boolean;
     ElementID?: string;
 }
 
-interface IAddTablePayload
-{
+interface IAddTablePayload {
     X: number;
     Y: number;
     Name: string;
 }
 
-interface IAddRelationPayload
-{
+interface IAddRelationPayload {
     SourceID: string;
     TargetID: string;
     Name?: string;
     IsOneToOne?: boolean;
 }
 
-interface IAddFieldPayload
-{
+interface IAddFieldPayload {
     TableID: string;
     Name: string;
     DataType: string;
 }
 
-interface IMoveElementPayload
-{
+interface IMoveElementPayload {
     ElementID: string;
     X: number;
     Y: number;
 }
 
-interface IUpdatePropertyPayload
-{
+interface IUpdatePropertyPayload {
     ElementID: string;
     PropertyKey: string;
     Value: unknown;
 }
 
-interface IRenamePayload
-{
+interface IRenamePayload {
     NewName: string;
 }
 
-interface IReorderFieldPayload
-{
+interface IReorderFieldPayload {
     FieldID: string;
     NewIndex: number;
 }
 
-interface IRequestSeedDataPayload
-{
+interface IRequestSeedDataPayload {
     TableID: string;
 }
 
-interface ISaveSeedDataPayload
-{
+interface ISaveSeedDataPayload {
     TableID: string;
     Rows: Array<{
         TupleID: string;
@@ -76,14 +66,12 @@ interface ISaveSeedDataPayload
     }>;
 }
 
-interface IRequestShadowTablePickerPayload
-{
+interface IRequestShadowTablePickerPayload {
     X: number;
     Y: number;
 }
 
-interface IAddShadowTablePayload
-{
+interface IAddShadowTablePayload {
     X: number;
     Y: number;
     ModelName: string;
@@ -95,20 +83,17 @@ interface IAddShadowTablePayload
     TableName: string;
 }
 
-interface IDesignerMessage
-{
+interface IDesignerMessage {
     Type: string;
     Payload?: unknown;
 }
 
-interface ICustomDocument extends vscode.CustomDocument
-{
+interface ICustomDocument extends vscode.CustomDocument {
     uri: vscode.Uri;
     dispose: () => void;
 }
 
-export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<ICustomDocument>
-{
+export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<ICustomDocument> {
     private _Context: vscode.ExtensionContext;
     private _Webviews: Map<string, vscode.WebviewPanel>;
     private _States: Map<string, XORMDesignerState>;
@@ -118,8 +103,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
     private _OnDidChangeCustomDocument = new vscode.EventEmitter<vscode.CustomDocumentContentChangeEvent<ICustomDocument>>();
     public readonly onDidChangeCustomDocument = this._OnDidChangeCustomDocument.event;
 
-    constructor(pContext: vscode.ExtensionContext)
-    {
+    constructor(pContext: vscode.ExtensionContext) {
         this._Context = pContext;
         this._Webviews = new Map<string, vscode.WebviewPanel>();
         this._States = new Map<string, XORMDesignerState>();
@@ -127,13 +111,11 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         this._LastActiveKey = null;
     }
 
-    static get ViewType(): string
-    {
+    static get ViewType(): string {
         return "Dase.ORMDesigner";
     }
 
-    static Register(pContext: vscode.ExtensionContext): XORMDesignerEditorProvider
-    {
+    static Register(pContext: vscode.ExtensionContext): XORMDesignerEditorProvider {
         const provider = new XORMDesignerEditorProvider(pContext);
 
         const registration = vscode.window.registerCustomEditorProvider(
@@ -149,8 +131,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         return provider;
     }
 
-    async openCustomDocument(pUri: vscode.Uri, _pOpenContext: vscode.CustomDocumentOpenContext, _pToken: vscode.CancellationToken): Promise<ICustomDocument>
-    {
+    async openCustomDocument(pUri: vscode.Uri, _pOpenContext: vscode.CustomDocumentOpenContext, _pToken: vscode.CancellationToken): Promise<ICustomDocument> {
         const doc: ICustomDocument = {
             uri: pUri,
             dispose: () => { /* nothing */ }
@@ -158,8 +139,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         return doc;
     }
 
-    async resolveCustomEditor(pDocument: ICustomDocument, pWebviewPanel: vscode.WebviewPanel, _pToken: vscode.CancellationToken): Promise<void>
-    {
+    async resolveCustomEditor(pDocument: ICustomDocument, pWebviewPanel: vscode.WebviewPanel, _pToken: vscode.CancellationToken): Promise<void> {
         const key = pDocument.uri.toString();
         const state = new XORMDesignerState(pDocument as unknown as vscode.TextDocument);
         this._States.set(key, state);
@@ -171,8 +151,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
 
         // Track view state changes to update last active key
         pWebviewPanel.onDidChangeViewState((e) => {
-            if (e.webviewPanel.active)
-            {
+            if (e.webviewPanel.active) {
                 this._LastActiveKey = key;
                 // Update global IssueService with this document's issues
                 state.RefreshIssues();
@@ -181,8 +160,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
 
         // Listen to state changes to notify VS Code about dirty state
         state.OnStateChanged((e) => {
-            if (e.IsDirty)
-            {
+            if (e.IsDirty) {
                 // Only fire when becoming dirty - VS Code handles clean state automatically after save
                 this._OnDidChangeCustomDocument.fire({ document: pDocument });
             }
@@ -204,35 +182,30 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
             this._States.delete(key);
             this._Documents.delete(key);
             state.Dispose();
-            
+
             if (this._LastActiveKey === key)
                 this._LastActiveKey = null;
         });
 
-        try
-        {
+        try {
             await state.Load();
             // Initial validation to populate issue service even before webview is ready
             state.Validate();
         }
-        catch (err)
-        {
+        catch (err) {
             GetLogService().Error(`Failed to load document: ${pDocument.uri.fsPath}`, err);
         }
     }
 
-    async saveCustomDocument(pDocument: ICustomDocument, _pCancellation: vscode.CancellationToken): Promise<void>
-    {
+    async saveCustomDocument(pDocument: ICustomDocument, _pCancellation: vscode.CancellationToken): Promise<void> {
         const state = this._States.get(pDocument.uri.toString());
         if (state)
             await state.Save();
     }
 
-    async saveCustomDocumentAs(pDocument: ICustomDocument, pDestination: vscode.Uri, _pCancellation: vscode.CancellationToken): Promise<void>
-    {
+    async saveCustomDocumentAs(pDocument: ICustomDocument, pDestination: vscode.Uri, _pCancellation: vscode.CancellationToken): Promise<void> {
         const state = this._States.get(pDocument.uri.toString());
-        if (state)
-        {
+        if (state) {
             const text = state.Bridge.SaveOrmModelToText();
             const bytes = Buffer.from(text, "utf8");
             await vscode.workspace.fs.writeFile(pDestination, bytes);
@@ -241,18 +214,15 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         }
     }
 
-    async revertCustomDocument(pDocument: ICustomDocument, _pCancellation: vscode.CancellationToken): Promise<void>
-    {
+    async revertCustomDocument(pDocument: ICustomDocument, _pCancellation: vscode.CancellationToken): Promise<void> {
         const state = this._States.get(pDocument.uri.toString());
         if (state)
             await state.Load();
     }
 
-    async backupCustomDocument(pDocument: ICustomDocument, pContext: vscode.CustomDocumentBackupContext, _pCancellation: vscode.CancellationToken): Promise<vscode.CustomDocumentBackup>
-    {
+    async backupCustomDocument(pDocument: ICustomDocument, pContext: vscode.CustomDocumentBackupContext, _pCancellation: vscode.CancellationToken): Promise<vscode.CustomDocumentBackup> {
         const state = this._States.get(pDocument.uri.toString());
-        if (state)
-        {
+        if (state) {
             const text = state.Bridge.SaveOrmModelToText();
             const bytes = Buffer.from(text, "utf8");
             await vscode.workspace.fs.writeFile(pContext.destination, bytes);
@@ -260,8 +230,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         return { id: pContext.destination.toString(), delete: () => vscode.workspace.fs.delete(pContext.destination) };
     }
 
-    SetupMessageHandling(pPanel: vscode.WebviewPanel, pState: XORMDesignerState): void
-    {
+    SetupMessageHandling(pPanel: vscode.WebviewPanel, pState: XORMDesignerState): void {
         const selectionService = GetSelectionService();
 
         pPanel.webview.onDidReceiveMessage(async (pMsg: IDesignerMessage) => {
@@ -269,10 +238,10 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         });
 
         selectionService.OnSelectionChanged(async (pSelection: XDesignerSelection) => {
-            const props = pSelection.PrimaryID 
-                ? await pState.GetProperties(pSelection.PrimaryID) 
+            const props = pSelection.PrimaryID
+                ? await pState.GetProperties(pSelection.PrimaryID)
                 : [];
-            
+
             pPanel.webview.postMessage({
                 Type: XDesignerMessageType.SelectionChanged,
                 Payload: { SelectedIDs: pSelection.SelectedIDs, PrimaryID: pSelection.PrimaryID }
@@ -292,13 +261,11 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         });
     }
 
-    async HandleMessage(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pMsg: IDesignerMessage): Promise<void>
-    {
+    async HandleMessage(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pMsg: IDesignerMessage): Promise<void> {
         const type = pMsg.Type;
         const payload = pMsg.Payload || {};
 
-        switch (type)
-        {
+        switch (type) {
             case XDesignerMessageType.DesignerReady:
                 await this.OnDesignerReady(pPanel, pState);
                 break;
@@ -355,12 +322,21 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
                 await this.OnReloadDataTypes(pPanel, pState);
                 break;
 
+            // ----------------------------------------------------
+            // Seed Data Messages
+            // ----------------------------------------------------
             case XDesignerMessageType.RequestSeedData:
                 this.OnRequestSeedData(pPanel, pState, payload as IRequestSeedDataPayload);
                 break;
-
             case XDesignerMessageType.SaveSeedData:
                 await this.OnSaveSeedData(pPanel, pState, payload as ISaveSeedDataPayload);
+                break;
+
+            // ----------------------------------------------------
+            // DBML Messages
+            // ----------------------------------------------------
+            case "ExportToDBML":
+                vscode.commands.executeCommand("Dase.ExportToDBML");
                 break;
 
             case XDesignerMessageType.RequestShadowTablePicker:
@@ -376,14 +352,12 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         }
     }
 
-    OnRequestSeedData(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: IRequestSeedDataPayload): void
-    {
+    OnRequestSeedData(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: IRequestSeedDataPayload): void {
         if (!pPayload?.TableID)
             return;
 
         const seedData = pState.Bridge.GetSeedData(pPayload.TableID);
-        if (!seedData)
-        {
+        if (!seedData) {
             GetLogService().Warn(`GetSeedData: table not found: ${pPayload.TableID}`);
             return;
         }
@@ -394,8 +368,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         });
     }
 
-    async OnSaveSeedData(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: ISaveSeedDataPayload): Promise<void>
-    {
+    async OnSaveSeedData(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: ISaveSeedDataPayload): Promise<void> {
         if (!pPayload?.TableID || !Array.isArray(pPayload.Rows))
             return;
 
@@ -406,15 +379,13 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
             Payload: { TableID: pPayload.TableID, Success: result.Success, Message: result.Message }
         });
 
-        if (result.Success)
-        {
+        if (result.Success) {
             this.NotifyDocumentChanged(pState);
             await this.SendIssuesUpdate(pPanel, pState);
         }
     }
 
-    OnRequestShadowTablePicker(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: IRequestShadowTablePickerPayload): void
-    {
+    OnRequestShadowTablePicker(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: IRequestShadowTablePickerPayload): void {
         if (typeof pPayload?.X !== "number" || typeof pPayload?.Y !== "number")
             return;
 
@@ -422,14 +393,12 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         pPanel.webview.postMessage({ Type: XDesignerMessageType.ShadowTablePickerData, Payload: data });
     }
 
-    async OnAddShadowTable(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: IAddShadowTablePayload): Promise<void>
-    {
-        if (!pPayload?.TableID || !pPayload?.TableName)
+    async OnAddShadowTable(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: IAddShadowTablePayload): Promise<void> {
+        if (!pPayload?.TableName)
             return;
 
         const result = pState.AddShadowTable(pPayload);
-        if (result.Success)
-        {
+        if (result.Success) {
             const modelData = await pState.GetModelData();
             pPanel.webview.postMessage({ Type: XDesignerMessageType.LoadModel, Payload: modelData });
             await this.SendIssuesUpdate(pPanel, pState);
@@ -437,8 +406,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         }
     }
 
-    async OnDesignerReady(pPanel: vscode.WebviewPanel, pState: XORMDesignerState): Promise<void>
-    {
+    async OnDesignerReady(pPanel: vscode.WebviewPanel, pState: XORMDesignerState): Promise<void> {
         // Route all lines before sending model to ensure proper orthogonal routing
         pState.AlignLines();
 
@@ -455,24 +423,20 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         });
     }
 
-    async OnSaveModel(pState: XORMDesignerState): Promise<void>
-    {
-        try
-        {
+    async OnSaveModel(pState: XORMDesignerState): Promise<void> {
+        try {
             await pState.Save();
         }
-        catch (err)
-        {
+        catch (err) {
             GetLogService().Error("Failed to save model", err);
             const errMsg = err instanceof Error ? err.message : String(err);
             vscode.window.showErrorMessage("Failed to save model: " + errMsg);
         }
     }
 
-    OnSelectElement(pPayload: ISelectPayload): void
-    {
+    OnSelectElement(pPayload: ISelectPayload): void {
         const selectionService = GetSelectionService();
-        
+
         if (pPayload.Clear)
             selectionService.Clear();
         else if (pPayload.Toggle && pPayload.ElementID)
@@ -483,12 +447,10 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
             selectionService.Select(pPayload.ElementID);
     }
 
-    async OnAddTable(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: IAddTablePayload): Promise<void>
-    {
+    async OnAddTable(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: IAddTablePayload): Promise<void> {
         const name = pPayload.Name || "NewTable";
         const result = pState.AddTable(pPayload.X, pPayload.Y, name);
-        if (result.Success)
-        {
+        if (result.Success) {
             const modelData = await pState.GetModelData();
             pPanel.webview.postMessage({
                 Type: XDesignerMessageType.LoadModel,
@@ -500,48 +462,42 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         }
     }
 
-    async OnMoveElement(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: IMoveElementPayload): Promise<void>
-    {
+    async OnMoveElement(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: IMoveElementPayload): Promise<void> {
         const result = pState.MoveElement(pPayload.ElementID, pPayload.X, pPayload.Y);
-        if (result.Success)
-        {
+        if (result.Success) {
             // Route all lines to update connections after table movement
             pState.AlignLines();
-            
+
             // Reload model with updated line positions
             const modelData = await pState.GetModelData();
             pPanel.webview.postMessage({
                 Type: XDesignerMessageType.LoadModel,
                 Payload: modelData
             });
-            
+
             await this.SendIssuesUpdate(pPanel, pState);
             this.NotifyDocumentChanged(pState);
         }
     }
 
-    async OnReorderField(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: IReorderFieldPayload): Promise<void>
-    {
+    async OnReorderField(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: IReorderFieldPayload): Promise<void> {
         const result = pState.ReorderField(pPayload.FieldID, pPayload.NewIndex);
-        if (result.Success)
-        {
+        if (result.Success) {
             pState.AlignLines();
             const modelData = await pState.GetModelData();
             pPanel.webview.postMessage({
                 Type: XDesignerMessageType.LoadModel,
                 Payload: modelData
             });
-            
+
             await this.SendIssuesUpdate(pPanel, pState);
             this.NotifyDocumentChanged(pState);
         }
     }
 
-    async OnDeleteSelected(pPanel: vscode.WebviewPanel, pState: XORMDesignerState): Promise<void>
-    {
+    async OnDeleteSelected(pPanel: vscode.WebviewPanel, pState: XORMDesignerState): Promise<void> {
         const result = pState.DeleteSelected();
-        if (result.Success)
-        {
+        if (result.Success) {
             const modelData = await pState.GetModelData();
             pPanel.webview.postMessage({
                 Type: XDesignerMessageType.LoadModel,
@@ -552,8 +508,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         }
     }
 
-    async OnAddRelation(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: IAddRelationPayload): Promise<void>
-    {
+    async OnAddRelation(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: IAddRelationPayload): Promise<void> {
         const result = pState.AddReference(
             pPayload.SourceID,
             pPayload.TargetID,
@@ -561,11 +516,10 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
             pPayload.IsOneToOne
         );
 
-        if (result.Success)
-        {
+        if (result.Success) {
             // Route all lines to apply proper alignment and collision avoidance
             pState.AlignLines();
-            
+
             const modelData = await pState.GetModelData();
             pPanel.webview.postMessage({
                 Type: XDesignerMessageType.LoadModel,
@@ -577,25 +531,21 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         }
     }
 
-    async OnAddField(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: IAddFieldPayload): Promise<void>
-    {
+    async OnAddField(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: IAddFieldPayload): Promise<void> {
         let tableID = pPayload.TableID;
         let fieldName: string | undefined = pPayload.Name;
         let dataType: string | undefined = pPayload.DataType;
 
-        if (!tableID)
-        {
+        if (!tableID) {
             const selection = GetSelectionService();
-            if (!selection.HasSelection)
-            {
+            if (!selection.HasSelection) {
                 vscode.window.showWarningMessage("No table selected.");
                 return;
             }
             tableID = selection.PrimaryID!;
         }
 
-        if (!fieldName)
-        {
+        if (!fieldName) {
             fieldName = await vscode.window.showInputBox({
                 prompt: "Enter field name",
                 value: "NewField"
@@ -605,8 +555,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
                 return;
         }
 
-        if (!dataType)
-        {
+        if (!dataType) {
             dataType = await vscode.window.showQuickPick(
                 ["String", "Int32", "Int64", "Boolean", "DateTime", "Decimal", "Guid"],
                 { placeHolder: "Select data type" }
@@ -615,15 +564,14 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
             if (!dataType)
                 return;
         }
-        
+
         const result = pState.AddField(
             tableID,
             fieldName,
             dataType
         );
 
-        if (result.Success)
-        {
+        if (result.Success) {
             const modelData = await pState.GetModelData();
             pPanel.webview.postMessage({
                 Type: XDesignerMessageType.LoadModel,
@@ -635,12 +583,10 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         }
     }
 
-    async OnAlignLines(pPanel: vscode.WebviewPanel, pState: XORMDesignerState): Promise<void>
-    {
+    async OnAlignLines(pPanel: vscode.WebviewPanel, pState: XORMDesignerState): Promise<void> {
         const result = pState.AlignLines();
 
-        if (result.Success)
-        {
+        if (result.Success) {
             const modelData = await pState.GetModelData();
             pPanel.webview.postMessage({
                 Type: XDesignerMessageType.LoadModel,
@@ -652,16 +598,33 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         }
     }
 
-    async OnUpdateProperty(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: IUpdatePropertyPayload): Promise<void>
-    {
+    async OnUpdateProperty(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: IUpdatePropertyPayload): Promise<void> {
+        // Disabling state control removes a field and a reference — guard with confirmation
+        if (pPayload.PropertyKey === "UseStateControl" && pPayload.Value === false) {
+            const answer = await vscode.window.showWarningMessage(
+                "This will remove the state field and its FK reference from the table. Continue?",
+                { modal: true },
+                "Remove",
+                "Cancel"
+            );
+            if (answer !== "Remove") {
+                // Refresh properties to visually reset the checkbox
+                const props = await pState.GetProperties(pPayload.ElementID);
+                pPanel.webview.postMessage({
+                    Type: XDesignerMessageType.PropertiesChanged,
+                    Payload: { Properties: props }
+                });
+                return;
+            }
+        }
+
         const result = pState.UpdateProperty(
             pPayload.ElementID,
             pPayload.PropertyKey,
             pPayload.Value
         );
 
-        if (result.Success)
-        {
+        if (result.Success) {
             const modelData = await pState.GetModelData();
             pPanel.webview.postMessage({
                 Type: XDesignerMessageType.LoadModel,
@@ -679,14 +642,12 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         }
     }
 
-    async OnValidateModel(pPanel: vscode.WebviewPanel, pState: XORMDesignerState): Promise<void>
-    {
+    async OnValidateModel(pPanel: vscode.WebviewPanel, pState: XORMDesignerState): Promise<void> {
         const issues = await pState.Validate();
 
         // If shadow-table sync mutated any element (name or colour changed),
         // refresh the canvas and mark the document as dirty.
-        if (pState.Bridge.LastSyncMutated)
-        {
+        if (pState.Bridge.LastSyncMutated) {
             const modelData = await pState.GetModelData();
             pPanel.webview.postMessage({ Type: XDesignerMessageType.LoadModel, Payload: modelData });
             this.NotifyDocumentChanged(pState);
@@ -708,11 +669,9 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
             vscode.window.showInformationMessage("Validation: No issues found.");
     }
 
-    async OnRenameCompleted(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: IRenamePayload): Promise<void>
-    {
+    async OnRenameCompleted(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: IRenamePayload): Promise<void> {
         const result = pState.RenameSelected(pPayload.NewName);
-        if (result.Success)
-        {
+        if (result.Success) {
             const modelData = await pState.GetModelData();
             pPanel.webview.postMessage({
                 Type: XDesignerMessageType.LoadModel,
@@ -723,10 +682,9 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         }
     }
 
-    async OnReloadDataTypes(pPanel: vscode.WebviewPanel, pState: XORMDesignerState): Promise<void>
-    {
+    async OnReloadDataTypes(pPanel: vscode.WebviewPanel, pState: XORMDesignerState): Promise<void> {
         await pState.ReloadDataTypes();
-        
+
         // Notify webview that types have been reloaded
         pPanel.webview.postMessage({
             Type: XDesignerMessageType.DataTypesReloaded,
@@ -738,8 +696,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
 
         // Re-send properties for currently selected element if any
         const selection = GetSelectionService();
-        if (selection.HasSelection && selection.PrimaryID)
-        {
+        if (selection.HasSelection && selection.PrimaryID) {
             const props = pState.GetProperties(selection.PrimaryID);
             pPanel.webview.postMessage({
                 Type: XDesignerMessageType.PropertiesChanged,
@@ -748,14 +705,12 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         }
     }
 
-    private NotifyDocumentChanged(pState: XORMDesignerState): void
-    {
+    private NotifyDocumentChanged(pState: XORMDesignerState): void {
         // Simply mark as dirty - the OnStateChanged listener will notify VS Code
         pState.IsDirty = true;
     }
 
-    async SendIssuesUpdate(pPanel: vscode.WebviewPanel, pState: XORMDesignerState): Promise<void>
-    {
+    async SendIssuesUpdate(pPanel: vscode.WebviewPanel, pState: XORMDesignerState): Promise<void> {
         const issues = await pState.Validate();
         pPanel.webview.postMessage({
             Type: XDesignerMessageType.IssuesChanged,
@@ -763,8 +718,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         });
     }
 
-    async DeleteSelected(pUri: vscode.Uri): Promise<void>
-    {
+    async DeleteSelected(pUri: vscode.Uri): Promise<void> {
         const key = pUri.toString();
         const state = this._States.get(key);
         const panel = this._Webviews.get(key);
@@ -773,8 +727,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
             return;
 
         const result = state.DeleteSelected();
-        if (result.Success)
-        {
+        if (result.Success) {
             const modelData = await state.GetModelData();
             panel.webview.postMessage({
                 Type: XDesignerMessageType.LoadModel,
@@ -785,8 +738,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         }
     }
 
-    async RenameSelected(pUri: vscode.Uri): Promise<void>
-    {
+    async RenameSelected(pUri: vscode.Uri): Promise<void> {
         const key = pUri.toString();
         const state = this._States.get(key);
         const panel = this._Webviews.get(key);
@@ -795,8 +747,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
             return;
 
         const selection = GetSelectionService();
-        if (!selection.HasSelection)
-        {
+        if (!selection.HasSelection) {
             vscode.window.showWarningMessage("No element selected.");
             return;
         }
@@ -807,8 +758,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         });
     }
 
-    async ValidateModel(pUri: vscode.Uri): Promise<void>
-    {
+    async ValidateModel(pUri: vscode.Uri): Promise<void> {
         const key = pUri.toString();
         const state = this._States.get(key);
         const panel = this._Webviews.get(key);
@@ -819,8 +769,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         await this.OnValidateModel(panel, state);
     }
 
-    async ReloadDataTypes(pUri: vscode.Uri): Promise<void>
-    {
+    async ReloadDataTypes(pUri: vscode.Uri): Promise<void> {
         const key = pUri.toString();
         const state = this._States.get(key);
         const panel = this._Webviews.get(key);
@@ -831,67 +780,56 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         await this.OnReloadDataTypes(panel, state);
     }
 
-    GetActiveState(): XORMDesignerState | null
-    {
-        for (const [key, panel] of this._Webviews)
-        {
-            if (panel.active)
-            {
+    GetActiveState(): XORMDesignerState | null {
+        for (const [key, panel] of this._Webviews) {
+            if (panel.active) {
                 this._LastActiveKey = key;
                 return this._States.get(key) || null;
             }
         }
-        
+
         // Fallback to last active state
         if (this._LastActiveKey)
             return this._States.get(this._LastActiveKey) || null;
-            
+
         return null;
     }
 
-    GetActivePanel(): vscode.WebviewPanel | null
-    {
-        for (const [key, panel] of this._Webviews)
-        {
-            if (panel.active)
-            {
+    GetActivePanel(): vscode.WebviewPanel | null {
+        for (const [key, panel] of this._Webviews) {
+            if (panel.active) {
                 this._LastActiveKey = key;
                 return panel;
             }
         }
-        
+
         // Fallback to last active panel
         if (this._LastActiveKey)
             return this._Webviews.get(this._LastActiveKey) || null;
-            
+
         return null;
     }
 
-    GetActiveUri(): vscode.Uri | null
-    {
-        for (const [key, panel] of this._Webviews)
-        {
+    GetActiveUri(): vscode.Uri | null {
+        for (const [key, panel] of this._Webviews) {
             if (panel.active)
                 return vscode.Uri.parse(key);
         }
         return null;
     }
 
-    async AddTableToActiveDesigner(): Promise<void>
-    {
+    async AddTableToActiveDesigner(): Promise<void> {
         const state = this.GetActiveState();
         const panel = this.GetActivePanel();
 
-        if (!state || !panel)
-        {
+        if (!state || !panel) {
             vscode.window.showWarningMessage("No active ORM Designer.");
             return;
         }
 
         // Add table at a default position (center of visible area)
         const result = state.AddTable(100, 100, "NewTable");
-        if (result.Success)
-        {
+        if (result.Success) {
             const modelData = await state.GetModelData();
             panel.webview.postMessage({
                 Type: XDesignerMessageType.LoadModel,
@@ -902,20 +840,17 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         }
     }
 
-    async AddFieldToSelectedTable(): Promise<void>
-    {
+    async AddFieldToSelectedTable(): Promise<void> {
         const state = this.GetActiveState();
         const panel = this.GetActivePanel();
 
-        if (!state || !panel)
-        {
+        if (!state || !panel) {
             vscode.window.showWarningMessage("No active ORM Designer.");
             return;
         }
 
         const selection = GetSelectionService();
-        if (!selection.HasSelection)
-        {
+        if (!selection.HasSelection) {
             vscode.window.showWarningMessage("No table selected.");
             return;
         }
@@ -937,8 +872,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
             return;
 
         const result = state.AddField(selection.PrimaryID!, fieldName, dataType);
-        if (result.Success)
-        {
+        if (result.Success) {
             const modelData = await state.GetModelData();
             panel.webview.postMessage({
                 Type: XDesignerMessageType.LoadModel,
@@ -949,20 +883,17 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         }
     }
 
-    async AlignLinesInActiveDesigner(): Promise<void>
-    {
+    async AlignLinesInActiveDesigner(): Promise<void> {
         const state = this.GetActiveState();
         const panel = this.GetActivePanel();
 
-        if (!state || !panel)
-        {
+        if (!state || !panel) {
             vscode.window.showWarningMessage("No active ORM Designer.");
             return;
         }
 
         const result = state.AlignLines();
-        if (result.Success)
-        {
+        if (result.Success) {
             const modelData = await state.GetModelData();
             panel.webview.postMessage({
                 Type: XDesignerMessageType.LoadModel,
@@ -972,14 +903,12 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
             await state.Save();
             vscode.window.showInformationMessage("Lines aligned successfully.");
         }
-        else
-        {
+        else {
             vscode.window.showWarningMessage("Failed to align lines.");
         }
     }
 
-    GetWebviewContent(pWebview: vscode.Webview): string
-    {
+    GetWebviewContent(pWebview: vscode.Webview): string {
         const mediaPath = path.join(this._Context.extensionPath, "media");
         const cssUri = pWebview.asWebviewUri(vscode.Uri.file(path.join(mediaPath, "OrmDesigner.css")));
         const jsUri = pWebview.asWebviewUri(vscode.Uri.file(path.join(mediaPath, "OrmDesigner.js")));
@@ -1016,6 +945,8 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="validate-model"><span class="icon">✅</span>Validate Model</div>
         <div class="context-menu-item" data-action="align-lines"><span class="icon">📐</span>Align Lines</div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-action="export-dbml"><span class="icon">📤</span>Export to DBML</div>
     </div>
     <div id="table-context-menu" class="context-menu">
         <div class="context-menu-item" data-action="add-field"><span class="icon">➕</span>Add Field</div>
@@ -1042,6 +973,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
                 <span id="shadow-status" class="seed-status-msg"></span>
                 <div class="seed-modal-actions">
                     <button id="shadow-btn-cancel" class="seed-btn seed-btn-secondary">Cancel</button>
+                    <button id="shadow-btn-add" class="seed-btn seed-btn-primary"><span>➕</span> Add</button>
                 </div>
             </div>
         </div>

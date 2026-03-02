@@ -90,16 +90,14 @@ body {
     fill: var(--vscode-editorWidget-background, var(--vscode-editor-background));
     stroke: none;
     filter:
-        drop-shadow(0 4px 14px rgba(0, 0, 0, 0.45))
-        drop-shadow(0 1px 3px rgba(0, 0, 0, 0.3));
+        drop-shadow(0 4px 14px rgba(0, 0, 0, 0.45)) drop-shadow(0 1px 3px rgba(0, 0, 0, 0.3));
 }
 
 .orm-table.selected .orm-table-rect {
     stroke: var(--vscode-focusBorder);
     stroke-width: 1.5;
     filter:
-        drop-shadow(0 0 8px var(--vscode-focusBorder))
-        drop-shadow(0 4px 14px rgba(0, 0, 0, 0.55));
+        drop-shadow(0 0 8px var(--vscode-focusBorder)) drop-shadow(0 4px 14px rgba(0, 0, 0, 0.55));
 }
 
 .orm-table-header {
@@ -311,7 +309,7 @@ body {
     fill: none;
     stroke: var(--vscode-focusBorder);
     stroke-width: 2;
-    stroke-dasharray: 5,5;
+    stroke-dasharray: 5, 5;
     pointer-events: none;
 }
 
@@ -418,15 +416,20 @@ body {
 }
 
 @keyframes seedOverlayIn {
-    from { opacity: 0; }
-    to   { opacity: 1; }
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
 }
 
 .seed-modal {
     background: var(--vscode-editor-background);
-    border: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.3));
+    border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.3));
     border-radius: 8px;
-    box-shadow: 0 24px 64px rgba(0,0,0,0.55), 0 4px 16px rgba(0,0,0,0.3);
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55), 0 4px 16px rgba(0, 0, 0, 0.3);
     width: min(92vw, 960px);
     height: min(88vh, 680px);
     max-height: 88vh;
@@ -437,8 +440,15 @@ body {
 }
 
 @keyframes seedModalIn {
-    from { opacity: 0; transform: translateY(-18px) scale(0.97); }
-    to   { opacity: 1; transform: translateY(0)    scale(1); }
+    from {
+        opacity: 0;
+        transform: translateY(-18px) scale(0.97);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
 }
 
 /* ── Header ─────────────────────────────────────────────────────── */
@@ -447,7 +457,7 @@ body {
     align-items: center;
     justify-content: space-between;
     padding: 14px 18px 12px;
-    border-bottom: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.2));
+    border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
     flex-shrink: 0;
 }
 
@@ -473,7 +483,7 @@ body {
 }
 
 .seed-modal-badge {
-    background: var(--vscode-badge-background, rgba(128,128,128,0.25));
+    background: var(--vscode-badge-background, rgba(128, 128, 128, 0.25));
     color: var(--vscode-badge-foreground, var(--vscode-foreground));
     border-radius: 12px;
     padding: 1px 8px;
@@ -501,7 +511,7 @@ body {
 
 .seed-modal-close:hover {
     opacity: 1;
-    background: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2));
+    background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.2));
 }
 
 /* ── Toolbar ─────────────────────────────────────────────────────── */
@@ -510,7 +520,7 @@ body {
     align-items: center;
     gap: 8px;
     padding: 8px 16px;
-    border-bottom: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.15));
+    border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.15));
     flex-shrink: 0;
     flex-wrap: wrap;
 }
@@ -540,17 +550,19 @@ body {
     color: var(--vscode-button-foreground, #fff);
     border-color: transparent;
 }
+
 .seed-btn-primary:not(:disabled):hover {
     background: var(--vscode-button-hoverBackground, #1177bb);
 }
 
 .seed-btn-secondary {
-    background: var(--vscode-button-secondaryBackground, rgba(128,128,128,0.15));
+    background: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.15));
     color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
     border-color: var(--vscode-button-border, transparent);
 }
+
 .seed-btn-secondary:not(:disabled):hover {
-    background: var(--vscode-button-secondaryHoverBackground, rgba(128,128,128,0.25));
+    background: var(--vscode-button-secondaryHoverBackground, rgba(128, 128, 128, 0.25));
 }
 
 .seed-btn-danger {
@@ -558,6 +570,7 @@ body {
     color: var(--vscode-errorForeground, #f14c4c);
     border-color: var(--vscode-errorForeground, #f14c4c);
 }
+
 .seed-btn-danger:not(:disabled):hover {
     background: rgba(241, 76, 76, 0.12);
 }
@@ -568,6 +581,7 @@ body {
     border-color: transparent;
     font-weight: 600;
 }
+
 .seed-btn-success:not(:disabled):hover {
     filter: brightness(1.1);
 }
@@ -586,8 +600,13 @@ body {
 }
 
 @keyframes seedFadeIn {
-    from { opacity: 0; }
-    to   { opacity: 1; }
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
 }
 
 /* ── Grid ────────────────────────────────────────────────────────── */
@@ -618,7 +637,7 @@ body {
     top: 0;
     z-index: 2;
     background: var(--vscode-editorGroupHeader-tabsBackground,
-                    var(--vscode-editor-background));
+            var(--vscode-editor-background));
 }
 
 .seed-grid th {
@@ -626,8 +645,8 @@ body {
     text-align: left;
     font-weight: 600;
     font-size: 12px;
-    color: var(--vscode-descriptionForeground, rgba(204,204,204,0.85));
-    border-bottom: 2px solid var(--vscode-panel-border, rgba(128,128,128,0.2));
+    color: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.85));
+    border-bottom: 2px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
     white-space: nowrap;
     user-select: none;
 }
@@ -678,7 +697,7 @@ body {
 
 .seed-grid td {
     padding: 3px 4px;
-    border-bottom: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.12));
+    border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.12));
     vertical-align: middle;
     max-width: 260px;
 }
@@ -694,7 +713,7 @@ body {
 }
 
 .seed-grid tr:hover td {
-    background: var(--vscode-list-hoverBackground, rgba(128,128,128,0.06));
+    background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.06));
 }
 
 .seed-grid tr.seed-row-selected:hover td {
@@ -729,13 +748,13 @@ body {
 .seed-cell-input:focus,
 .seed-cell-select:focus {
     border-color: var(--vscode-focusBorder, #007fd4);
-    background: var(--vscode-input-background, rgba(255,255,255,0.05));
+    background: var(--vscode-input-background, rgba(255, 255, 255, 0.05));
 }
 
 .seed-cell-input:hover,
 .seed-cell-select:hover {
-    border-color: var(--vscode-input-border, rgba(128,128,128,0.4));
-    background: var(--vscode-input-background, rgba(255,255,255,0.04));
+    border-color: var(--vscode-input-border, rgba(128, 128, 128, 0.4));
+    background: var(--vscode-input-background, rgba(255, 255, 255, 0.04));
 }
 
 .seed-cell-input.cell-error,
@@ -794,7 +813,7 @@ body {
 .seed-empty-state {
     padding: 40px 20px;
     text-align: center;
-    color: var(--vscode-descriptionForeground, rgba(204,204,204,0.5));
+    color: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.5));
     font-size: 13px;
     pointer-events: none;
 }
@@ -812,14 +831,14 @@ body {
     align-items: center;
     justify-content: space-between;
     padding: 10px 18px;
-    border-top: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.2));
+    border-top: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
     flex-shrink: 0;
     gap: 12px;
 }
 
 .seed-status-msg {
     font-size: 11px;
-    color: var(--vscode-descriptionForeground, rgba(204,204,204,0.6));
+    color: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.6));
     flex: 1;
     white-space: nowrap;
     overflow: hidden;
@@ -841,10 +860,23 @@ body {
 }
 
 /* ── Scrollbar ──────────────────────────────────────────────────── */
-.seed-grid-container::-webkit-scrollbar { width: 6px; height: 6px; }
-.seed-grid-container::-webkit-scrollbar-track { background: transparent; }
-.seed-grid-container::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.3); border-radius: 3px; }
-.seed-grid-container::-webkit-scrollbar-thumb:hover { background: rgba(128,128,128,0.5); }
+.seed-grid-container::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.seed-grid-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.seed-grid-container::-webkit-scrollbar-thumb {
+    background: rgba(128, 128, 128, 0.3);
+    border-radius: 3px;
+}
+
+.seed-grid-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(128, 128, 128, 0.5);
+}
 
 /* ── PK cell style ──────────────────────────────────────────────── */
 .seed-cell-input.seed-cell-pk {
@@ -856,7 +888,9 @@ body {
 }
 
 /* ── FK orphan option warning ────────────────────────────────────── */
-.seed-cell-select option[selected] { font-style: italic; }
+.seed-cell-select option[selected] {
+    font-style: italic;
+}
 
 /* ── Seed validation badge (toolbar) ────────────────────────────── */
 #seed-validation-badge {
@@ -866,8 +900,8 @@ body {
     font-size: 11px;
     font-weight: 600;
     color: var(--vscode-editorWarning-foreground, #cca700);
-    background: rgba(204,167,0,0.12);
-    border: 1px solid rgba(204,167,0,0.25);
+    background: rgba(204, 167, 0, 0.12);
+    border: 1px solid rgba(204, 167, 0, 0.25);
     border-radius: 12px;
     padding: 2px 8px;
     white-space: nowrap;
@@ -881,7 +915,7 @@ body {
 
 .orm-shadow-badge {
     font-size: 9px;
-    fill: rgba(180,180,180,0.65);
+    fill: rgba(180, 180, 180, 0.65);
     font-style: italic;
     pointer-events: none;
 }
@@ -898,6 +932,7 @@ body {
     font-size: 12px;
     outline: none;
 }
+
 .shadow-search-input:focus {
     border-color: var(--vscode-focusBorder, #007acc);
 }
@@ -936,9 +971,20 @@ body {
     border-radius: 3px;
     margin: 0 4px;
 }
+
 .shadow-table-item:hover {
     background: var(--vscode-list-hoverBackground);
 }
+
+.shadow-table-item.selected {
+    background: var(--vscode-list-activeSelectionBackground);
+    color: var(--vscode-list-activeSelectionForeground);
+}
+
+.shadow-table-item.selected:hover {
+    background: var(--vscode-list-activeSelectionBackground);
+}
+
 .shadow-table-item:focus {
     outline: 1px solid var(--vscode-focusBorder, #007acc);
 }

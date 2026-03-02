@@ -9,6 +9,7 @@
       <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">7EC1C21E-EC23-49FA-B841-915FD59D6C77</XData>
       <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">COR</XData>
       <XData Name="ParentModel" ID="C2F5A832-7D4B-4E1F-AC3A-6B7E8D1A4F20" Type="String">Exemplo.dsorm|FolderX21/CEPx.dsorm|FolderX21/ERPx.dsorm</XData>
+      <XData Name="StateControlTable" ID="3A8B7C2D-1E4F-4D6A-89C5-2D7E1F8A3B4C" Type="String">CORxStatus</XData>
     </XValues>
     <XORMTable ID="C819571D-25DF-4B56-B72C-482081863EC8" Name="CORxStatus">
       <XValues>
@@ -302,6 +303,7 @@
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">Nome</XData>
           <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=3;Y=24;Width=189.1;Height=21}</XData>
           <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">4</XData>
+          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Enum</XData>
           <XData Name="Length" ID="D1AEAA0E-9FC0-478D-9464-DF991F5CE009" Type="Double">180</XData>
         </XValues>
       </XORMField>
@@ -544,7 +546,7 @@
       <XValues>
         <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">C4507496-5321-477F-BDCA-5ADDE2A370A0</XData>
         <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">CORxUsuario</XData>
-        <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=945;Y=190;Width=127.18;Height=48}</XData>
+        <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=945;Y=190;Width=127.18;Height=88}</XData>
         <XData Name="Fill" ID="7152B5B8-EE22-4D84-9EA1-50AA254DA63D" Type="Color">{A=255;R=127;G=255;B=0}</XData>
         <XData Name="PKType" ID="8F3E9777-A802-4A9F-B5B5-0D5D568E0365" Type="String">Guid</XData>
       </XValues>
@@ -552,7 +554,6 @@
         <XValues>
           <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">81D99CFB-5DFC-4A4C-800B-807AB68AD9FF</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">CORxUsuarioID</XData>
-          <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">3</XData>
           <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Guid</XData>
           <XData Name="IsAutoIncrement" ID="00000001-0002-0003-0001-000000000006" Type="Boolean">true</XData>
         </XValues>
@@ -562,7 +563,7 @@
           <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">A0A97CC6-3F07-4FDE-9645-5FDAEB7EBEEF</XData>
           <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">EMail</XData>
           <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=3;Y=24;Width=119.18;Height=21}</XData>
-          <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">4</XData>
+          <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">1</XData>
           <XData Name="Length" ID="D1AEAA0E-9FC0-478D-9464-DF991F5CE009" Type="Double">80</XData>
         </XValues>
       </XORMField>
@@ -596,6 +597,16 @@
           </XFieldValue>
         </XORMDataTuple>
       </XORMDataSet>
+      <XORMField ID="816e8851-4c4b-4c92-a027-bfc856293339" Name="Genero">
+        <XValues>
+          <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">816e8851-4c4b-4c92-a027-bfc856293339</XData>
+          <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">Genero</XData>
+          <XData Name="Index" ID="5469955E-340A-40D3-A1AE-9C6122EE0BF9" Type="Double">2</XData>
+          <XData Name="DataType" ID="244BD6B3-4873-4957-A34D-FD97F7DBD90D" Type="String">Enum</XData>
+          <XData Name="DefaultValue" ID="2152CB85-A8E7-4C05-85E0-02A6EAFB7C74" Type="String">NI</XData>
+          <XData Name="AllowedValues" ID="E7B3A1C5-D2F4-4E68-9A0B-1C2D3E4F5A6B" Type="String">Masculino|Feminino|NI</XData>
+        </XValues>
+      </XORMField>
     </XORMTable>
     <XORMReference ID="F3E4CFF5-1129-4AD5-884A-CAC97FDE96C4">
       <XValues>
@@ -992,7 +1003,7 @@
         <XData Name="Fill" ID="7152B5B8-EE22-4D84-9EA1-50AA254DA63D" Type="Color">{A=255;R=127;G=255;B=0}</XData>
         <XLinkData Name="Source" ID="8A8851EB-B6CA-414F-B55A-C22A6A0F3753" Type="String" ElementID="BAFD2290-B73E-4792-B244-1183E6EDE2E0" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">BAFD2290-B73E-4792-B244-1183E6EDE2E0</XLinkData>
         <XLinkData Name="Target" ID="6461BED3-F1A0-4910-985D-9F0B0058D8BF" Type="String" ElementID="C4507496-5321-477F-BDCA-5ADDE2A370A0" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">C4507496-5321-477F-BDCA-5ADDE2A370A0</XLinkData>
-        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=1062.053333333333;Y=420}|{X=1092.18;Y=420}|{X=1092.18;Y=226}|{X=1072.18;Y=226}</XData>
+        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=1062.053333333333;Y=420}|{X=1092.18;Y=420}|{X=1092.18;Y=234}|{X=1072.18;Y=234}</XData>
       </XValues>
     </XORMReference>
     <XORMReference ID="4B924243-B5C6-49B9-9E8B-ABAA4C17A5E2">
@@ -1435,7 +1446,7 @@
         <XData Name="Fill" ID="7152B5B8-EE22-4D84-9EA1-50AA254DA63D" Type="Color">{A=255;R=127;G=255;B=0}</XData>
         <XLinkData Name="Source" ID="8A8851EB-B6CA-414F-B55A-C22A6A0F3753" Type="String" ElementID="BCFA7AEC-A934-48E0-AEC6-BACACB391F8B" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">BCFA7AEC-A934-48E0-AEC6-BACACB391F8B</XLinkData>
         <XLinkData Name="Target" ID="6461BED3-F1A0-4910-985D-9F0B0058D8BF" Type="String" ElementID="C4507496-5321-477F-BDCA-5ADDE2A370A0" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">C4507496-5321-477F-BDCA-5ADDE2A370A0</XLinkData>
-        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=1193;Y=180}|{X=1132.5900000000001;Y=180}|{X=1132.5900000000001;Y=226}|{X=1072.18;Y=226}</XData>
+        <XData Name="Points" ID="E2378CBF-8185-465D-8215-142922E96006" Type="Point[]">{X=1193;Y=180}|{X=1132.5900000000001;Y=180}|{X=1132.5900000000001;Y=234}|{X=1072.18;Y=234}</XData>
       </XValues>
     </XORMReference>
     <XORMReference ID="2540E011-1265-4DC4-B4CE-3983FA0714B0">
@@ -1467,7 +1478,7 @@
       <XValues>
         <XData Name="ID" ID="608239C5-A43C-47FF-91A0-661470EC4918" Type="String">033fc58d-d413-41fa-8a50-80cecae3ea86</XData>
         <XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">CORxUsuario</XData>
-        <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=974;Y=34;Width=200;Height=28}</XData>
+        <XData Name="Bounds" ID="F731FAEC-F42C-499C-AADB-71823B4600F3" Type="Rect">{X=931;Y=28;Width=200;Height=28}</XData>
         <XData Name="Fill" ID="7152B5B8-EE22-4D84-9EA1-50AA254DA63D" Type="Color">{A=255;R=127;G=255;B=0}</XData>
         <XData Name="IsShadow" ID="7E3F9A2C-D1B8-4E6F-A3C5-2D9F7B1E4A6C" Type="Boolean">true</XData>
         <XData Name="ShadowDocumentID" ID="B4A7D3F1-8C2E-4A9B-D6F4-3E1C8B5D2A7F" Type="String">0bf1df34-c9ca-4691-9448-469ff149f48c</XData>

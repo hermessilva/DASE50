@@ -4,8 +4,7 @@ import { XPropertyItem } from "../Models/PropertyItem";
 import { XORMDesignerEditorProvider } from "../Designers/ORM/ORMDesignerEditorProvider";
 import { XDesignerSelection } from "../Models/DesignerSelection";
 
-export class XPropertiesViewProvider implements vscode.WebviewViewProvider
-{
+export class XPropertiesViewProvider implements vscode.WebviewViewProvider {
     // Context kept for future features (theming, storage)
     private readonly _Context: vscode.ExtensionContext;
     private _DesignerProvider: XORMDesignerEditorProvider;
@@ -13,21 +12,19 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
     private _Properties: XPropertyItem[];
     private _ElementID: string | null;
 
-    constructor(pContext: vscode.ExtensionContext, pDesignerProvider: XORMDesignerEditorProvider)
-    {
+    constructor(pContext: vscode.ExtensionContext, pDesignerProvider: XORMDesignerEditorProvider) {
         this._Context = pContext;
         this._DesignerProvider = pDesignerProvider;
         this._View = null;
         this._Properties = [];
         this._ElementID = null;
-        
+
         // Register selection listener immediately, not when webview resolves
         const selectionService = GetSelectionService();
         selectionService.OnSelectionChanged(async (pSelection: XDesignerSelection) => {
             this._ElementID = pSelection.PrimaryID;
-            
-            if (pSelection.PrimaryID)
-            {
+
+            if (pSelection.PrimaryID) {
                 const state = this._DesignerProvider.GetActiveState();
                 if (state)
                     this._Properties = state.GetProperties(pSelection.PrimaryID);
@@ -36,31 +33,26 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
             }
             else
                 this._Properties = [];
-            
+
             // If view is not resolved yet, try to reveal it
-            if (!this._View && this._Properties.length > 0)
-            {
-                try
-                {
+            if (!this._View && this._Properties.length > 0) {
+                try {
                     await vscode.commands.executeCommand(`${XPropertiesViewProvider.ViewType}.focus`);
                 }
-                catch
-                {
+                catch {
                     // Panel focus failed, will update on next visibility change
                 }
             }
-            
+
             this.UpdateView();
         });
     }
 
-    static get ViewType(): string
-    {
+    static get ViewType(): string {
         return "Dase.Properties";
     }
 
-    static Register(pContext: vscode.ExtensionContext, pDesignerProvider: XORMDesignerEditorProvider): XPropertiesViewProvider
-    {
+    static Register(pContext: vscode.ExtensionContext, pDesignerProvider: XORMDesignerEditorProvider): XPropertiesViewProvider {
         const provider = new XPropertiesViewProvider(pContext, pDesignerProvider);
         const registration = vscode.window.registerWebviewViewProvider(
             XPropertiesViewProvider.ViewType,
@@ -75,8 +67,7 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
         return provider;
     }
 
-    resolveWebviewView(pWebviewView: vscode.WebviewView, _pContext: vscode.WebviewViewResolveContext, _pToken: vscode.CancellationToken): void
-    {
+    resolveWebviewView(pWebviewView: vscode.WebviewView, _pContext: vscode.WebviewViewResolveContext, _pToken: vscode.CancellationToken): void {
         this._View = pWebviewView;
 
         pWebviewView.webview.options = {
@@ -86,18 +77,18 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
         // Always set fresh HTML content
         const htmlContent = this.GetHtmlContent();
         pWebviewView.webview.html = htmlContent;
-        
+
         // Handle view disposal
         pWebviewView.onDidDispose(() => {
             this._View = null;
         });
-        
+
         // Handle visibility changes - re-send properties when view becomes visible
         pWebviewView.onDidChangeVisibility(() => {
             if (pWebviewView.visible && this._Properties.length > 0)
                 this.UpdateView();
         });
-        
+
         // Update view with current properties (in case selection happened before resolve)
         this.UpdateView();
 
@@ -107,8 +98,7 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
         });
     }
 
-    async OnPropertyChanged(pPropertyKey: string, pValue: unknown): Promise<void>
-    {
+    async OnPropertyChanged(pPropertyKey: string, pValue: unknown): Promise<void> {
         if (!this._ElementID)
             return;
 
@@ -118,12 +108,28 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
         if (!panel || !state)
             return;
 
+        // Disabling state control removes a field and an FK reference — guard with confirmation
+        if (pPropertyKey === "UseStateControl" && pValue === false) {
+            const answer = await vscode.window.showWarningMessage(
+                "This will remove the state field and its FK reference from the table. Continue?",
+                { modal: true },
+                "Remove",
+                "Cancel"
+            );
+
+            if (answer !== "Remove") {
+                // User cancelled. Just refresh properties to revert the checkbox visually.
+                this._Properties = await state.GetProperties(this._ElementID);
+                this.UpdateView();
+                return;
+            }
+        }
+
         state.UpdateProperty(this._ElementID, pPropertyKey, pValue);
 
         // When parent model selection changes, wait for the async table load to complete
         // before refreshing properties — otherwise the dropdowns show the old groups
-        if (pPropertyKey === "ParentModel")
-        {
+        if (pPropertyKey === "ParentModel") {
             const models = ((pValue as string) || "").split("|").filter(f => f.length > 0);
             await state.LoadParentModelTables(models);
         }
@@ -135,8 +141,7 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
         const newKeys = this._Properties.map(p => p.Key).join(",");
 
         // Only send UpdateProperties when structure changes; avoids innerHTML re-render on every keystroke
-        if (oldKeys !== newKeys && this._View)
-        {
+        if (oldKeys !== newKeys && this._View) {
             const serializedProperties = this._Properties.map(p => ({
                 Key: p.Key,
                 Name: p.Name,
@@ -146,7 +151,33 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                 GroupedOptions: p.GroupedOptions || null,
                 IsReadOnly: p.IsReadOnly,
                 Category: p.Category,
-                Group: p.Group
+                Group: p.Group,
+                Placeholder: p.Placeholder || null,
+                Hint: p.Hint || null
+            }));
+            this._View.webview.postMessage({
+                Type: "UpdateProperties",
+                ElementID: this._ElementID,
+                Properties: serializedProperties
+            });
+        }
+        else if (pPropertyKey === "UseStateControl" && this._View) {
+            // Even if the keys didn't change, we need to send the updated properties
+            // so the webview knows the value has actually changed, allowing the UI 
+            // properties to synchronize visually. 
+            // Also, since UseStateControl might trigger shadow table adds
+            const serializedProperties = this._Properties.map(p => ({
+                Key: p.Key,
+                Name: p.Name,
+                Value: p.Value,
+                Type: p.Type,
+                Options: p.Options,
+                GroupedOptions: p.GroupedOptions || null,
+                IsReadOnly: p.IsReadOnly,
+                Category: p.Category,
+                Group: p.Group,
+                Placeholder: p.Placeholder || null,
+                Hint: p.Hint || null
             }));
             this._View.webview.postMessage({
                 Type: "UpdateProperties",
@@ -165,17 +196,15 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
         state.Save();
     }
 
-    async SetProperties(pElementID: string, pProperties: XPropertyItem[]): Promise<void>
-    {
+
+    async SetProperties(pElementID: string, pProperties: XPropertyItem[]): Promise<void> {
         this._ElementID = pElementID;
         this._Properties = pProperties || [];
         this.UpdateView();
     }
 
-    UpdateView(): void
-    {
-        if (this._View)
-        {
+    UpdateView(): void {
+        if (this._View) {
             // Serialize properties to plain objects for webview transfer
             const serializedProperties = this._Properties.map(p => ({
                 Key: p.Key,
@@ -186,15 +215,16 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                 GroupedOptions: p.GroupedOptions || null,
                 IsReadOnly: p.IsReadOnly,
                 Category: p.Category,
-                Group: p.Group
+                Group: p.Group,
+                Placeholder: p.Placeholder || null,
+                Hint: p.Hint || null
             }));
-            
+
             // Force HTML refresh if webview script might not be initialized
             // This is a workaround for VS Code caching issues
             if (serializedProperties.length > 0)
                 this._View.webview.html = this.GetHtmlContentWithProperties(serializedProperties);
-            else
-            {
+            else {
                 this._View.webview.postMessage({
                     Type: "UpdateProperties",
                     ElementID: this._ElementID,
@@ -203,12 +233,11 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
             }
         }
     }
-    
-    GetHtmlContentWithProperties(pProperties: Array<{Key: string; Name: string; Value: unknown; Type: string; Options: string[] | null; GroupedOptions?: Array<{Group: string; Items: string[]}> | null; IsReadOnly: boolean; Category: string; Group?: string}>): string
-    {
+
+    GetHtmlContentWithProperties(pProperties: Array<{ Key: string; Name: string; Value: unknown; Type: string; Options: string[] | null; GroupedOptions?: Array<{ Group: string; Items: string[] }> | null; IsReadOnly: boolean; Category: string; Group?: string; Placeholder?: string | null; Hint?: string | null }>): string {
         const propertiesJson = JSON.stringify(pProperties);
         const elementId = this._ElementID ? `"${this._ElementID}"` : "null";
-        
+
         return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -235,9 +264,37 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
         .property-name {
             flex: 0 0 40%;
             padding-right: 8px;
+            display: flex;
+            align-items: center;
+            min-width: 0;
+            gap: 3px;
+        }
+        .property-name-text {
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            flex: 1;
+            min-width: 0;
+        }
+        .prop-hint-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 12px;
+            height: 12px;
+            font-size: 8px;
+            font-weight: 700;
+            border-radius: 50%;
+            background: var(--vscode-activityBar-activeBorder, #007acc);
+            color: #ffffff;
+            cursor: help;
+            flex-shrink: 0;
+            opacity: 0.65;
+            user-select: none;
+            line-height: 1;
+        }
+        .prop-hint-icon:hover {
+            opacity: 1;
         }
         .property-value {
             flex: 1;
@@ -413,15 +470,17 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
             margin-bottom: 8px;
         }
         .property-group-header {
-            font-weight: 600;
-            padding: 6px 0 4px 0;
-            color: var(--vscode-foreground);
+            font-weight: 700;
+            padding: 5px 8px 4px 10px;
+            color: var(--vscode-activityBar-activeBorder, #007acc);
+            border-left: 3px solid var(--vscode-activityBar-activeBorder, #007acc);
             border-bottom: 1px solid var(--vscode-panel-border);
-            margin-bottom: 4px;
-            font-size: 11px;
+            margin-bottom: 6px;
+            margin-top: 6px;
+            font-size: 10.5px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            opacity: 0.8;
+            letter-spacing: 0.8px;
+            background: linear-gradient(to right, rgba(0,122,204,0.07), transparent);
         }
         .multifile-dropdown {
             position: relative;
@@ -494,6 +553,73 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
         }
         .property-value select.grouped-select option {
             padding-left: 8px;
+        }
+        .taglist-container {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 3px;
+            padding: 3px 5px;
+            min-height: 26px;
+            background-color: var(--vscode-input-background);
+            border: 1px solid var(--vscode-input-border);
+            box-sizing: border-box;
+            cursor: text;
+        }
+        .taglist-container:focus-within {
+            outline: 1px solid var(--vscode-focusBorder);
+            border-color: var(--vscode-focusBorder);
+        }
+        .taglist-disabled {
+            opacity: 0.6;
+            cursor: default;
+            pointer-events: none;
+        }
+        .tag-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            padding: 1px 6px 1px 7px;
+            background: linear-gradient(135deg, #0078D4 0%, #005a9e 100%);
+            color: #ffffff;
+            font-size: 10px;
+            border-radius: 10px;
+            white-space: nowrap;
+            max-width: 130px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .tag-remove {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            line-height: 1;
+            cursor: pointer;
+            opacity: 0.75;
+            flex-shrink: 0;
+            margin-left: 1px;
+            padding-bottom: 1px;
+        }
+        .tag-remove:hover {
+            opacity: 1;
+        }
+        .tag-input {
+            flex: 1;
+            min-width: 60px;
+            border: none;
+            outline: none;
+            background: transparent;
+            color: inherit;
+            font-family: inherit;
+            font-size: inherit;
+            padding: 1px 2px;
+        }
+        .taglist-validation-msg {
+            font-size: 10px;
+            color: var(--vscode-inputValidation-errorForeground, #f14c4c);
+            min-height: 13px;
+            padding: 1px 4px 0;
         }
     </style>
 </head>
@@ -717,7 +843,11 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                 for (const prop of grpProps)
                 {
                     html += '<div class="property-row">';
-                    html += '<div class="property-name" title="' + EscapeHtml(prop.Key) + '">' + EscapeHtml(prop.Name) + '</div>';
+                    html += '<div class="property-name">';
+                    html += '<span class="property-name-text" title="' + EscapeHtml(prop.Key) + '">' + EscapeHtml(prop.Name) + '</span>';
+                    if (prop.Hint)
+                        html += '<span class="prop-hint-icon" title="' + EscapeHtml(prop.Hint) + '">i</span>';
+                    html += '</div>';
                     html += '<div class="property-value">';
                     html += GetPropertyEditor(prop);
                     html += '</div></div>';
@@ -874,8 +1004,24 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                            '<div class="multifile-dropdown-list">' + checkboxItems + '</div>' +
                            '</div>';
 
+                case "TagList":
+                    const tagValues = value ? String(value).split("|").filter(function(tv) { return tv.trim().length > 0; }) : [];
+                    let tagChips = '';
+                    for (const tv of tagValues)
+                    {
+                        const safeTag = EscapeHtml(tv.trim());
+                        tagChips += '<div class="tag-chip" data-tag="' + safeTag + '">' + safeTag;
+                        if (!pProp.IsReadOnly) tagChips += '<span class="tag-remove">&#xD7;</span>';
+                        tagChips += '</div>';
+                    }
+                    const tagCls = 'taglist-container' + (pProp.IsReadOnly ? ' taglist-disabled' : '');
+                    const tagInput = pProp.IsReadOnly ? '' : '<input class="tag-input" type="text" placeholder="Add value, press Enter\u2026">';
+                    return '<div class="' + tagCls + '" data-key="' + key + '">' + tagChips + tagInput + '</div>' +
+                           '<div class="taglist-validation-msg"></div>';
+
                 default:
-                    return '<input type="text" data-key="' + key + '" value="' + EscapeHtml(String(value)) + '" ' + readonly + '>';
+                    const phAttr = pProp.Placeholder ? ' placeholder="' + EscapeHtml(pProp.Placeholder) + '"' : '';
+                    return '<input type="text" data-key="' + key + '" value="' + EscapeHtml(String(value)) + '" ' + readonly + phAttr + '>';
             }
         }
 
@@ -1040,6 +1186,58 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                 });
             });
 
+            // Handle taglist chip editors
+            const taglistContainers = document.querySelectorAll(".taglist-container:not(.taglist-disabled)");
+            taglistContainers.forEach(function(container) {
+                const tagInput = container.querySelector(".tag-input");
+                const tagKey = container.getAttribute("data-key");
+                if (!tagInput || !tagKey) return;
+
+                function GetTagValues() {
+                    const vals = [];
+                    container.querySelectorAll(".tag-chip").forEach(function(ch) { const v = ch.getAttribute("data-tag"); if (v) vals.push(v); });
+                    return vals;
+                }
+                function SendTagUpdate() {
+                    vscode.postMessage({ Type: "UpdateProperty", PropertyKey: tagKey, Value: GetTagValues().join("|") });
+                }
+                function ShowTagError(msg) {
+                    const el = container.nextElementSibling;
+                    if (el && el.classList.contains("taglist-validation-msg")) el.textContent = msg;
+                }
+                function ClearTagError() {
+                    const el = container.nextElementSibling;
+                    if (el && el.classList.contains("taglist-validation-msg")) el.textContent = '';
+                }
+                function AddTag(raw) {
+                    const v = raw.trim();
+                    if (!v) { tagInput.value = ''; return; }
+                    if (GetTagValues().indexOf(v) >= 0) { ShowTagError('Duplicate: "' + v + '"'); return; }
+                    ClearTagError();
+                    const chip = document.createElement('div');
+                    chip.className = 'tag-chip';
+                    chip.setAttribute('data-tag', v);
+                    chip.textContent = v;
+                    const rm = document.createElement('span');
+                    rm.className = 'tag-remove';
+                    rm.innerHTML = '&#xD7;';
+                    rm.addEventListener('click', function(e) { e.stopPropagation(); chip.remove(); ClearTagError(); SendTagUpdate(); });
+                    chip.appendChild(rm);
+                    container.insertBefore(chip, tagInput);
+                    tagInput.value = '';
+                    SendTagUpdate();
+                }
+                tagInput.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' || e.key === 'Tab' || e.key === '|') { e.preventDefault(); AddTag(tagInput.value); }
+                    else if (e.key === 'Backspace' && tagInput.value === '') {
+                        const chs = container.querySelectorAll('.tag-chip');
+                        if (chs.length > 0) { chs[chs.length - 1].remove(); ClearTagError(); SendTagUpdate(); }
+                    }
+                });
+                tagInput.addEventListener('blur', function() { if (tagInput.value.trim()) AddTag(tagInput.value); });
+                container.addEventListener('click', function(e) { if (!e.target.classList.contains('tag-remove')) tagInput.focus(); });
+            });
+
             // Close dropdowns when clicking outside
             document.addEventListener("click", function() {
                 document.querySelectorAll(".color-dropdown.open").forEach(function(d) {
@@ -1067,8 +1265,7 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
 </html>`;
     }
 
-    GetHtmlContent()
-    {
+    GetHtmlContent() {
         return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1095,9 +1292,37 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
         .property-name {
             flex: 0 0 40%;
             padding-right: 8px;
+            display: flex;
+            align-items: center;
+            min-width: 0;
+            gap: 3px;
+        }
+        .property-name-text {
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            flex: 1;
+            min-width: 0;
+        }
+        .prop-hint-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 12px;
+            height: 12px;
+            font-size: 8px;
+            font-weight: 700;
+            border-radius: 50%;
+            background: var(--vscode-activityBar-activeBorder, #007acc);
+            color: #ffffff;
+            cursor: help;
+            flex-shrink: 0;
+            opacity: 0.65;
+            user-select: none;
+            line-height: 1;
+        }
+        .prop-hint-icon:hover {
+            opacity: 1;
         }
         .property-value {
             flex: 1;
@@ -1133,15 +1358,17 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
             margin-bottom: 8px;
         }
         .property-group-header {
-            font-weight: 600;
-            padding: 6px 0 4px 0;
-            color: var(--vscode-foreground);
+            font-weight: 700;
+            padding: 5px 8px 4px 10px;
+            color: var(--vscode-activityBar-activeBorder, #007acc);
+            border-left: 3px solid var(--vscode-activityBar-activeBorder, #007acc);
             border-bottom: 1px solid var(--vscode-panel-border);
-            margin-bottom: 4px;
-            font-size: 11px;
+            margin-bottom: 6px;
+            margin-top: 6px;
+            font-size: 10.5px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            opacity: 0.8;
+            letter-spacing: 0.8px;
+            background: linear-gradient(to right, rgba(0,122,204,0.07), transparent);
         }
         .color-dropdown {
             position: relative;
@@ -1275,6 +1502,73 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
         }
         .property-value select.grouped-select option {
             padding-left: 8px;
+        }
+        .taglist-container {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 3px;
+            padding: 3px 5px;
+            min-height: 26px;
+            background-color: var(--vscode-input-background);
+            border: 1px solid var(--vscode-input-border);
+            box-sizing: border-box;
+            cursor: text;
+        }
+        .taglist-container:focus-within {
+            outline: 1px solid var(--vscode-focusBorder);
+            border-color: var(--vscode-focusBorder);
+        }
+        .taglist-disabled {
+            opacity: 0.6;
+            cursor: default;
+            pointer-events: none;
+        }
+        .tag-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            padding: 1px 6px 1px 7px;
+            background: linear-gradient(135deg, #0078D4 0%, #005a9e 100%);
+            color: #ffffff;
+            font-size: 10px;
+            border-radius: 10px;
+            white-space: nowrap;
+            max-width: 130px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .tag-remove {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            line-height: 1;
+            cursor: pointer;
+            opacity: 0.75;
+            flex-shrink: 0;
+            margin-left: 1px;
+            padding-bottom: 1px;
+        }
+        .tag-remove:hover {
+            opacity: 1;
+        }
+        .tag-input {
+            flex: 1;
+            min-width: 60px;
+            border: none;
+            outline: none;
+            background: transparent;
+            color: inherit;
+            font-family: inherit;
+            font-size: inherit;
+            padding: 1px 2px;
+        }
+        .taglist-validation-msg {
+            font-size: 10px;
+            color: var(--vscode-inputValidation-errorForeground, #f14c4c);
+            min-height: 13px;
+            padding: 1px 4px 0;
         }
     </style>
 </head>
@@ -1495,7 +1789,11 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                 for (const prop of grpProps)
                 {
                     html += '<div class="property-row">';
-                    html += '<div class="property-name" title="' + EscapeHtml(prop.Key) + '">' + EscapeHtml(prop.Name) + '</div>';
+                    html += '<div class="property-name">';
+                    html += '<span class="property-name-text" title="' + EscapeHtml(prop.Key) + '">' + EscapeHtml(prop.Name) + '</span>';
+                    if (prop.Hint)
+                        html += '<span class="prop-hint-icon" title="' + EscapeHtml(prop.Hint) + '">i</span>';
+                    html += '</div>';
                     html += '<div class="property-value">';
                     html += GetPropertyEditor(prop);
                     html += '</div></div>';
@@ -1641,8 +1939,24 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                            '<div class="multifile-dropdown-list">' + checkboxItems + '</div>' +
                            '</div>';
 
+                case "TagList":
+                    const tagValues = value ? String(value).split("|").filter(function(tv) { return tv.trim().length > 0; }) : [];
+                    let tagChips = '';
+                    for (const tv of tagValues)
+                    {
+                        const safeTag = EscapeHtml(tv.trim());
+                        tagChips += '<div class="tag-chip" data-tag="' + safeTag + '">' + safeTag;
+                        if (!pProp.IsReadOnly) tagChips += '<span class="tag-remove">&#xD7;</span>';
+                        tagChips += '</div>';
+                    }
+                    const tagCls = 'taglist-container' + (pProp.IsReadOnly ? ' taglist-disabled' : '');
+                    const tagInput = pProp.IsReadOnly ? '' : '<input class="tag-input" type="text" placeholder="Add value, press Enter\u2026">';
+                    return '<div class="' + tagCls + '" data-key="' + key + '">' + tagChips + tagInput + '</div>' +
+                           '<div class="taglist-validation-msg"></div>';
+
                 default:
-                    return '<input type="text" data-key="' + key + '" value="' + EscapeHtml(String(value)) + '" ' + readonly + '>';
+                    const phAttr = pProp.Placeholder ? ' placeholder="' + EscapeHtml(pProp.Placeholder) + '"' : '';
+                    return '<input type="text" data-key="' + key + '" value="' + EscapeHtml(String(value)) + '" ' + readonly + phAttr + '>';
             }
         }
 
@@ -1806,6 +2120,58 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                         vscode.postMessage({ Type: "UpdateProperty", PropertyKey: key, Value: val });
                     });
                 });
+            });
+
+            // Handle taglist chip editors
+            const taglistContainers = document.querySelectorAll(".taglist-container:not(.taglist-disabled)");
+            taglistContainers.forEach(function(container) {
+                const tagInput = container.querySelector(".tag-input");
+                const tagKey = container.getAttribute("data-key");
+                if (!tagInput || !tagKey) return;
+
+                function GetTagValues() {
+                    const vals = [];
+                    container.querySelectorAll(".tag-chip").forEach(function(ch) { const v = ch.getAttribute("data-tag"); if (v) vals.push(v); });
+                    return vals;
+                }
+                function SendTagUpdate() {
+                    vscode.postMessage({ Type: "UpdateProperty", PropertyKey: tagKey, Value: GetTagValues().join("|") });
+                }
+                function ShowTagError(msg) {
+                    const el = container.nextElementSibling;
+                    if (el && el.classList.contains("taglist-validation-msg")) el.textContent = msg;
+                }
+                function ClearTagError() {
+                    const el = container.nextElementSibling;
+                    if (el && el.classList.contains("taglist-validation-msg")) el.textContent = '';
+                }
+                function AddTag(raw) {
+                    const v = raw.trim();
+                    if (!v) { tagInput.value = ''; return; }
+                    if (GetTagValues().indexOf(v) >= 0) { ShowTagError('Duplicate: "' + v + '"'); return; }
+                    ClearTagError();
+                    const chip = document.createElement('div');
+                    chip.className = 'tag-chip';
+                    chip.setAttribute('data-tag', v);
+                    chip.textContent = v;
+                    const rm = document.createElement('span');
+                    rm.className = 'tag-remove';
+                    rm.innerHTML = '&#xD7;';
+                    rm.addEventListener('click', function(e) { e.stopPropagation(); chip.remove(); ClearTagError(); SendTagUpdate(); });
+                    chip.appendChild(rm);
+                    container.insertBefore(chip, tagInput);
+                    tagInput.value = '';
+                    SendTagUpdate();
+                }
+                tagInput.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' || e.key === 'Tab' || e.key === '|') { e.preventDefault(); AddTag(tagInput.value); }
+                    else if (e.key === 'Backspace' && tagInput.value === '') {
+                        const chs = container.querySelectorAll('.tag-chip');
+                        if (chs.length > 0) { chs[chs.length - 1].remove(); ClearTagError(); SendTagUpdate(); }
+                    }
+                });
+                tagInput.addEventListener('blur', function() { if (tagInput.value.trim()) AddTag(tagInput.value); });
+                container.addEventListener('click', function(e) { if (!e.target.classList.contains('tag-remove')) tagInput.focus(); });
             });
 
             // Close dropdowns when clicking outside

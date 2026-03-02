@@ -5,7 +5,9 @@ export const XPropertyType = {
     Enum: "Enum",
     Color: "Color",
     Rect: "Rect",
-    MultiFileSelect: "MultiFileSelect"
+    MultiFileSelect: "MultiFileSelect",
+    /** Tag-chip list editor. Value is pipe-separated string; each chip is one allowed value. */
+    TagList: "TagList"
 } as const;
 
 export type TPropertyType = typeof XPropertyType[keyof typeof XPropertyType];
@@ -27,6 +29,10 @@ export class XPropertyItem
     IsReadOnly: boolean;
     Category: string;
     Group?: string;
+    /** Short placeholder text shown inside the input control when empty. */
+    Placeholder?: string;
+    /** Longer contextual hint shown via the (i) icon beside the property label. */
+    Hint?: string;
 
     constructor(pKey: string, pName: string, pValue: unknown, pType?: TPropertyType, pOptions?: string[], pGroup?: string)
     {

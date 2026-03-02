@@ -6,6 +6,7 @@ import { XAddTableCommand } from "./Designers/ORM/Commands/AddTableCommand";
 import { XAddFieldCommand } from "./Designers/ORM/Commands/AddFieldCommand";
 import { XAlignLinesCommand } from "./Designers/ORM/Commands/AlignLinesCommand";
 import { XValidateORMModelCommand } from "./Designers/ORM/Commands/ValidateORMModelCommand";
+import { XExportToDBMLCommand } from "./Designers/ORM/Commands/ExportToDBMLCommand";
 import { XDeleteSelectedCommand } from "./Commands/DeleteSelectedCommand";
 import { XRenameSelectedCommand } from "./Commands/RenameSelectedCommand";
 import { XReloadDataTypesCommand } from "./Commands/ReloadDataTypesCommand";
@@ -13,13 +14,11 @@ import { XIssuesViewProvider } from "./Views/IssuesViewProvider";
 import { XPropertiesViewProvider } from "./Views/PropertiesViewProvider";
 import { InitializeLogService, GetLogService } from "./Services/LogService";
 
-export function activate(pContext: vscode.ExtensionContext): void
-{
+export function activate(pContext: vscode.ExtensionContext): void {
     const log = InitializeLogService(pContext);
     log.Info("DASE extension is activating...");
 
-    try
-    {
+    try {
         const designerProvider = XORMDesignerEditorProvider.Register(pContext);
 
         XNewORMDesignerCommand.Register(pContext, designerProvider);
@@ -27,6 +26,7 @@ export function activate(pContext: vscode.ExtensionContext): void
         XAddTableCommand.Register(pContext, designerProvider);
         XAddFieldCommand.Register(pContext, designerProvider);
         XAlignLinesCommand.Register(pContext, designerProvider);
+        XExportToDBMLCommand.Register(pContext, designerProvider);
         XValidateORMModelCommand.Register(pContext, designerProvider);
         XDeleteSelectedCommand.Register(pContext, designerProvider);
         XRenameSelectedCommand.Register(pContext, designerProvider);
@@ -37,14 +37,12 @@ export function activate(pContext: vscode.ExtensionContext): void
 
         log.Info("DASE extension activated successfully");
     }
-    catch (error)
-    {
+    catch (error) {
         log.Error("Failed to activate DASE extension", error);
         throw error;
     }
 }
 
-export function deactivate(): void
-{
+export function deactivate(): void {
     GetLogService().Info("DASE extension deactivated");
 }

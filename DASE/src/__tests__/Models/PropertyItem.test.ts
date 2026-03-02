@@ -74,5 +74,24 @@ describe('XPropertyType', () => {
         expect(XPropertyType.Enum).toBe('Enum');
         expect(XPropertyType.Color).toBe('Color');
         expect(XPropertyType.Rect).toBe('Rect');
+        expect(XPropertyType.MultiFileSelect).toBe('MultiFileSelect');
+        expect(XPropertyType.TagList).toBe('TagList');
+    });
+
+    it('should allow setting Placeholder and Hint on XPropertyItem', () => {
+        const prop = new XPropertyItem('av', 'Allowed Values', '', XPropertyType.TagList);
+        prop.Placeholder = 'Add a value...';
+        prop.Hint = 'Pipe-separated constraint list';
+
+        expect(prop.Placeholder).toBe('Add a value...');
+        expect(prop.Hint).toBe('Pipe-separated constraint list');
+        expect(prop.Type).toBe(XPropertyType.TagList);
+    });
+
+    it('should have undefined Placeholder and Hint by default', () => {
+        const prop = new XPropertyItem('name', 'Name', 'value');
+
+        expect(prop.Placeholder).toBeUndefined();
+        expect(prop.Hint).toBeUndefined();
     });
 });

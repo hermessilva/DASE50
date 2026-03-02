@@ -44,8 +44,7 @@ import {
 // Data interfaces for webview communication (JSON-serializable)
 // These mirror TFX types but are plain objects for webview transfer
 
-interface IFieldData
-{
+interface IFieldData {
     ID: string;
     Name: string;
     DataType: string;
@@ -56,21 +55,20 @@ interface IFieldData
     IsAutoIncrement?: boolean;
     DefaultValue?: string;
     Description?: string;
+    /** Pipe-separated list of allowed values — models enum/CHECK constraints. */
+    AllowedValues?: string;
 }
 
-interface ITableData
-{
+export interface ITableData {
     ID: string;
     Name: string;
     X: number;
     Y: number;
     Width: number;
     Height: number;
-    Description?: string;
     FillProp?: string;
+    Description?: string;
     PKType?: string;
-    Fields: IFieldData[];
-    // Shadow table metadata
     IsShadow?: boolean;
     ShadowDocumentID?: string;
     ShadowDocumentName?: string;
@@ -78,10 +76,14 @@ interface ITableData
     ShadowTableName?: string;
     ShadowModuleID?: string;
     ShadowModuleName?: string;
+    Fields: IFieldData[];
+    SeedData?: {
+        Headers: string[];
+        Tuples: string[][];
+    };
 }
 
-interface IReferenceData
-{
+interface IReferenceData {
     ID: string;
     Name: string;
     SourceFieldID: string;
@@ -92,8 +94,7 @@ interface IReferenceData
 }
 
 // Legacy interface for loading old JSON files (supports both old and new field names)
-interface ILegacyReferenceData
-{
+interface ILegacyReferenceData {
     ID?: string;
     Name?: string;
     SourceID?: string;
@@ -104,8 +105,7 @@ interface ILegacyReferenceData
     Points?: Array<{ X: number; Y: number }>;
 }
 
-interface IModelData
-{
+interface IModelData {
     DesignID?: string;
     Schema?: string;
     Tables: ITableData[];
@@ -114,14 +114,12 @@ interface IModelData
 
 // ─── Seed / fixture-data editor interfaces ─────────────────────────────────
 
-export interface IFKOption
-{
+export interface IFKOption {
     Value: string;
     Label: string;
 }
 
-export interface ISeedColumn
-{
+export interface ISeedColumn {
     FieldID: string;
     Name: string;
     DataType: string;
@@ -132,34 +130,29 @@ export interface ISeedColumn
     FKOptions?: IFKOption[];
 }
 
-export interface ISeedRow
-{
+export interface ISeedRow {
     TupleID: string;
     Values: Record<string, string>;
 }
 
-export interface ISeedEditorPayload
-{
+export interface ISeedEditorPayload {
     TableID: string;
     TableName: string;
     Columns: ISeedColumn[];
     Rows: ISeedRow[];
 }
 
-export interface ISeedRowSave
-{
+export interface ISeedRowSave {
     TupleID: string;
     Values: Record<string, string>;
 }
 
-export interface IShadowTableEntry
-{
+export interface IShadowTableEntry {
     ID: string;
     Name: string;
 }
 
-export interface IShadowModelEntry
-{
+export interface IShadowModelEntry {
     ModelName: string;
     DocumentID: string;
     DocumentName: string;
@@ -168,15 +161,13 @@ export interface IShadowModelEntry
     Tables: IShadowTableEntry[];
 }
 
-export interface IShadowTablePickerData
-{
+export interface IShadowTablePickerData {
     X: number;
     Y: number;
     Models: IShadowModelEntry[];
 }
 
-export interface IAddShadowTablePayload
-{
+export interface IAddShadowTablePayload {
     X: number;
     Y: number;
     ModelName: string;
@@ -188,16 +179,15 @@ export interface IAddShadowTablePayload
     TableName: string;
 }
 
-interface IJsonData
-{
+interface IJsonData {
     Name?: string;
     Schema?: string;
+    StateControlTable?: string;
     Tables?: ITableData[];
     References?: ILegacyReferenceData[];
 }
 
-export class XTFXBridge
-{
+export class XTFXBridge {
     private _Controller: XORMController;
     private _Validator: XORMValidator;
     private _Engine: XSerializationEngine;
@@ -208,28 +198,27 @@ export class XTFXBridge
     private _TypeInfos: XORMDataTypeInfo[];
     private _TypesLoaded: boolean;
     private _AvailableOrmFiles: string[];
-    private _ParentModelTableGroups: Array<{ModelName: string, Tables: Array<{Name: string, Fill: string}>}>;
+    private _ParentModelTableGroups: Array<{ ModelName: string, Tables: Array<{ Name: string, Fill: string }> }>;
     private _LastSyncMutated: boolean;
 
     /** Fallback property hints for well-known types when config is not yet loaded. */
     private static readonly _FallbackTypeHints: Record<string, { HasLength: boolean; HasScale: boolean; CanAutoIncrement: boolean }> =
-    {
-        "Boolean":  { HasLength: false, HasScale: false, CanAutoIncrement: false },
-        "Date":     { HasLength: false, HasScale: false, CanAutoIncrement: false },
-        "DateTime": { HasLength: false, HasScale: false, CanAutoIncrement: false },
-        "Binary":   { HasLength: true,  HasScale: false, CanAutoIncrement: false },
-        "Guid":     { HasLength: false, HasScale: false, CanAutoIncrement: false },
-        "Int8":     { HasLength: false, HasScale: false, CanAutoIncrement: true  },
-        "Int16":    { HasLength: false, HasScale: false, CanAutoIncrement: true  },
-        "Int32":    { HasLength: false, HasScale: false, CanAutoIncrement: true  },
-        "Int64":    { HasLength: false, HasScale: false, CanAutoIncrement: true  },
-        "Numeric":  { HasLength: true,  HasScale: true,  CanAutoIncrement: false },
-        "String":   { HasLength: true,  HasScale: false, CanAutoIncrement: false },
-        "Text":     { HasLength: false, HasScale: false, CanAutoIncrement: false }
-    };
+        {
+            "Boolean": { HasLength: false, HasScale: false, CanAutoIncrement: false },
+            "Date": { HasLength: false, HasScale: false, CanAutoIncrement: false },
+            "DateTime": { HasLength: false, HasScale: false, CanAutoIncrement: false },
+            "Binary": { HasLength: true, HasScale: false, CanAutoIncrement: false },
+            "Guid": { HasLength: false, HasScale: false, CanAutoIncrement: false },
+            "Int8": { HasLength: false, HasScale: false, CanAutoIncrement: true },
+            "Int16": { HasLength: false, HasScale: false, CanAutoIncrement: true },
+            "Int32": { HasLength: false, HasScale: false, CanAutoIncrement: true },
+            "Int64": { HasLength: false, HasScale: false, CanAutoIncrement: true },
+            "Numeric": { HasLength: true, HasScale: true, CanAutoIncrement: false },
+            "String": { HasLength: true, HasScale: false, CanAutoIncrement: false },
+            "Text": { HasLength: false, HasScale: false, CanAutoIncrement: false }
+        };
 
-    constructor()
-    {
+    constructor() {
         this._Controller = null!;
         this._Validator = null!;
         this._Engine = null!;
@@ -244,11 +233,10 @@ export class XTFXBridge
         this._LastSyncMutated = false;
     }
 
-    Initialize(): void
-    {
+    Initialize(): void {
         if (this._Initialized)
             return;
-        
+
         RegisterORMElements();
         this._Controller = new XORMController();
         this._Validator = new XORMValidator();
@@ -260,10 +248,8 @@ export class XTFXBridge
      * Set the context path for configuration file lookup
      * This should be the path to the current design file
      */
-    SetContextPath(pPath: string): void
-    {
-        if (this._ContextPath !== pPath)
-        {
+    SetContextPath(pPath: string): void {
+        if (this._ContextPath !== pPath) {
             this._ContextPath = pPath;
             this._TypesLoaded = false;
         }
@@ -272,8 +258,7 @@ export class XTFXBridge
     /**
      * Get the current context path
      */
-    get ContextPath(): string
-    {
+    get ContextPath(): string {
         return this._ContextPath;
     }
 
@@ -281,22 +266,20 @@ export class XTFXBridge
      * Load data types from configuration file
      * Must be called before GetProperties if types are needed
      */
-    async LoadDataTypes(): Promise<void>
-    {
+    async LoadDataTypes(): Promise<void> {
         if (this._TypesLoaded && this._AllDataTypes.length > 0)
             return;
 
         const manager = XConfigurationManager.GetInstance();
         manager.SetFileSystem(new XVsCodeFileSystemAdapter());
 
-        try
-        {
+        try {
             const contextPath = this._ContextPath || process.cwd();
-            
+
             const allTypes = await manager.GetORMDataTypes(contextPath);
             this._TypeInfos = allTypes;
             this._AllDataTypes = allTypes.map(t => t.TypeName).sort((a, b) => a.localeCompare(b));
-            
+
             const pkTypes = await manager.GetORMPrimaryKeyTypes(contextPath);
             this._PKDataTypes = pkTypes.map(t => t.TypeName).sort((a, b) => a.localeCompare(b));
 
@@ -304,8 +287,7 @@ export class XTFXBridge
 
             GetLogService().Info(`Loaded ${this._AllDataTypes.length} data types, ${this._PKDataTypes.length} PK types from configuration`);
         }
-        catch (error)
-        {
+        catch (error) {
             GetLogService().Error(`Failed to load data types: ${error}`);
             this._TypeInfos = [];
             this._AllDataTypes = ["Boolean", "DateTime", "Guid", "Int32", "String"];
@@ -318,13 +300,12 @@ export class XTFXBridge
      * Force reload of data types from configuration
      * Use when configuration file has changed
      */
-    async ReloadDataTypes(): Promise<void>
-    {
+    async ReloadDataTypes(): Promise<void> {
         this._TypesLoaded = false;
-        
+
         const manager = XConfigurationManager.GetInstance();
         manager.ClearCache();
-        
+
         await this.LoadDataTypes();
     }
 
@@ -332,8 +313,7 @@ export class XTFXBridge
      * Scans the directory of the current design file and caches all other .dsorm file names found there.
      * Must be called after SetContextPath() with a non-empty context path.
      */
-    async LoadAvailableOrmFiles(): Promise<void>
-    {
+    async LoadAvailableOrmFiles(): Promise<void> {
         this._AvailableOrmFiles = [];
 
         if (!this._ContextPath)
@@ -342,31 +322,25 @@ export class XTFXBridge
         const currentFileName = path.basename(this._ContextPath);
         const rootDir = path.dirname(this._ContextPath);
 
-        const scanDir = async (pAbsDir: string, pRelPrefix: string): Promise<void> =>
-        {
-            try
-            {
+        const scanDir = async (pAbsDir: string, pRelPrefix: string): Promise<void> => {
+            try {
                 const dirUri = vscode.Uri.file(pAbsDir);
                 const entries = await vscode.workspace.fs.readDirectory(dirUri);
-                for (const [name, type] of entries)
-                {
-                    if (type === vscode.FileType.Directory)
-                    {
+                for (const [name, type] of entries) {
+                    if (type === vscode.FileType.Directory) {
                         await scanDir(
                             path.join(pAbsDir, name),
                             pRelPrefix ? `${pRelPrefix}/${name}` : name
                         );
                     }
-                    else if (type === vscode.FileType.File && name.endsWith(".dsorm"))
-                    {
+                    else if (type === vscode.FileType.File && name.endsWith(".dsorm")) {
                         const relPath = pRelPrefix ? `${pRelPrefix}/${name}` : name;
                         if (relPath !== currentFileName)
                             this._AvailableOrmFiles.push(relPath);
                     }
                 }
             }
-            catch (error)
-            {
+            catch (error) {
                 GetLogService().Error(`Failed to scan directory ${pAbsDir}: ${error}`);
             }
         };
@@ -379,8 +353,7 @@ export class XTFXBridge
      * Loads table names from the given parent model files (relative to the current context directory).
      * Results are cached in _ParentModelTableGroups (one group per model file).
      */
-    async LoadParentModelTables(pParentModels: string[]): Promise<void>
-    {
+    async LoadParentModelTables(pParentModels: string[]): Promise<void> {
         this._ParentModelTableGroups = [];
 
         if (!this._ContextPath || pParentModels.length === 0)
@@ -389,12 +362,10 @@ export class XTFXBridge
         const dirPath = path.dirname(this._ContextPath);
         this.Initialize();
 
-        for (const modelName of pParentModels)
-        {
+        for (const modelName of pParentModels) {
             if (!modelName)
                 continue;
-            try
-            {
+            try {
                 const filePath = path.join(dirPath, modelName);
                 const fileUri = vscode.Uri.file(filePath);
                 const bytes = await vscode.workspace.fs.readFile(fileUri);
@@ -406,14 +377,12 @@ export class XTFXBridge
                 // NormalizeCSharpXml is a no-op for TS-format files (returns the input unchanged).
                 const xmlText = this.NormalizeCSharpXml(text);
                 const result = this._Engine?.Deserialize<XORMDocument>(xmlText);
-                if (result?.Success && result.Data)
-                {
+                if (result?.Success && result.Data) {
                     result.Data.Initialize();
                     /* istanbul ignore next — Design always has GetTables after successful deserialization */
                     const tables = result.Data.Design?.GetTables?.() ?? [];
-                    const tableEntries: Array<{Name: string, Fill: string}> = [];
-                    for (const table of tables)
-                    {
+                    const tableEntries: Array<{ Name: string, Fill: string }> = [];
+                    for (const table of tables) {
                         if (table.Name)
                             /* istanbul ignore next — Fill is always set (default XColor.Transparent) */
                             tableEntries.push({ Name: table.Name, Fill: table.Fill?.ToString() ?? "" });
@@ -422,8 +391,7 @@ export class XTFXBridge
                         this._ParentModelTableGroups.push({ ModelName: modelName, Tables: tableEntries });
                 }
             }
-            catch (error)
-            {
+            catch (error) {
                 GetLogService().Error(`Failed to load parent model tables from ${modelName}: ${error}`);
             }
         }
@@ -432,48 +400,40 @@ export class XTFXBridge
     /**
      * Get all available data types
      */
-    GetAllDataTypes(): string[]
-    {
+    GetAllDataTypes(): string[] {
         return [...this._AllDataTypes];
     }
 
     /**
      * Get data types that can be used in primary keys
      */
-    GetPKDataTypes(): string[]
-    {
+    GetPKDataTypes(): string[] {
         return [...this._PKDataTypes];
     }
 
-    get Controller(): any
-    {
+    get Controller(): any {
         return this._Controller;
     }
 
-    get Document(): any
-    {
+    get Document(): any {
         return this._Controller?.Document;
     }
 
-    LoadOrmModelFromText(pText: string): XORMDocument
-    {
+    LoadOrmModelFromText(pText: string): XORMDocument {
         this.Initialize();
 
-        try
-        {
+        try {
             const doc = new XORMDocument();
             doc.ID = XGuid.NewValue();
             doc.Name = "ORM Model";
 
-            const tryExtractReferencePointsFromXml = (xmlText: string): Map<string, XPoint[]> =>
-            {
+            const tryExtractReferencePointsFromXml = (xmlText: string): Map<string, XPoint[]> => {
                 const pointsByRefId = new Map<string, XPoint[]>();
                 // Minimal extraction of per-reference Points; this is used only as a fallback when
                 // the underlying XML deserializer produces invalid point values (e.g., NaN).
                 const refBlockRegex = /<XORMReference\b[^>]*\bID="([^"]+)"[^>]*>([\s\S]*?)<\/XORMReference>/g;
                 let refMatch: RegExpExecArray | null;
-                while ((refMatch = refBlockRegex.exec(xmlText)) !== null)
-                {
+                while ((refMatch = refBlockRegex.exec(xmlText)) !== null) {
                     const refId = refMatch[1];
                     const refBlock = refMatch[2];
 
@@ -488,8 +448,7 @@ export class XTFXBridge
                     const points: XPoint[] = [];
                     const pointRegex = /\{X=([^;]+);Y=([^}]+)\}/g;
                     let pointMatch: RegExpExecArray | null;
-                    while ((pointMatch = pointRegex.exec(rawPoints)) !== null)
-                    {
+                    while ((pointMatch = pointRegex.exec(rawPoints)) !== null) {
                         const x = Number.parseFloat(pointMatch[1]);
                         const y = Number.parseFloat(pointMatch[2]);
                         if (Number.isFinite(x) && Number.isFinite(y))
@@ -503,32 +462,27 @@ export class XTFXBridge
                 return pointsByRefId;
             };
 
-            if (pText && pText.trim().length > 0)
-            {
+            if (pText && pText.trim().length > 0) {
                 const trimmedText = pText.trim();
-                if (trimmedText.startsWith("<?xml") || trimmedText.startsWith("<"))
-                {
+                if (trimmedText.startsWith("<?xml") || trimmedText.startsWith("<")) {
                     const normalizedText = this.NormalizeCSharpXml(pText);
-                const result = this._Engine.Deserialize<XORMDocument>(normalizedText);
-                    if (result.Success && result.Data)
-                    {
+                    const result = this._Engine.Deserialize<XORMDocument>(normalizedText);
+                    if (result.Success && result.Data) {
                         // Initialize the document to consolidate multiple XORMDesign instances
                         result.Data.Initialize();
 
                         // Migrate C# DASE4VS legacy DataType/PKType GUIDs to plain type names
                         this.MigrateLegacyDataTypeGUIDs(result.Data);
                         this._Controller.Document = result.Data;
-                        
+
                         // Route all lines after document is fully loaded and relationships established
                         const references = result.Data.Design?.GetReferences?.();
 
                         // If points were defined in the XML but deserialized into invalid values (e.g., NaN),
                         // recover them from the original XML.
                         const pointsByRefId = tryExtractReferencePointsFromXml(pText);
-                        if (references && pointsByRefId.size > 0)
-                        {
-                            for (const ref of references)
-                            {
+                        if (references && pointsByRefId.size > 0) {
+                            for (const ref of references) {
                                 const refId = String(ref?.ID);
                                 const fallbackPoints = pointsByRefId.get(refId);
                                 if (!fallbackPoints || fallbackPoints.length === 0)
@@ -550,15 +504,14 @@ export class XTFXBridge
                                 return true;
                             return pts.some((p: any) => !Number.isFinite(p?.X) || !Number.isFinite(p?.Y));
                         });
-                        
+
                         if (shouldRoute)
                             result.Data.Design?.RouteAllLines?.();
-                        
+
                         return result.Data;
                     }
                 }
-                else
-                {
+                else {
                     const data = JSON.parse(pText) as IJsonData;
                     this.LoadFromJson(doc, data);
                 }
@@ -567,8 +520,7 @@ export class XTFXBridge
             this._Controller.Document = doc;
             return doc;
         }
-        catch (err)
-        {
+        catch (err) {
             console.error("LoadOrmModelFromText error:", err);
             const doc = new XORMDocument();
             doc.ID = XGuid.NewValue();
@@ -609,16 +561,13 @@ export class XTFXBridge
      * The TS version uses plain strings (e.g. "Int32", "String").
      * This method is called once after XML deserialization of a potentially legacy file.
      */
-    private MigrateLegacyDataTypeGUIDs(pDocument: XORMDocument): void
-    {
+    private MigrateLegacyDataTypeGUIDs(pDocument: XORMDocument): void {
         const design = pDocument.Design;
         if (!design || typeof (design as any).GetTables !== "function")
             return;
 
-        for (const table of design.GetTables())
-        {
-            if (XTFXBridge.IsDataTypeGUID(table.PKType))
-            {
+        for (const table of design.GetTables()) {
+            if (XTFXBridge.IsDataTypeGUID(table.PKType)) {
                 const resolved = XTFXBridge.CSHARP_TYPE_GUID_MAP.get(table.PKType.toUpperCase());
                 if (resolved)
                     table.PKType = resolved;
@@ -626,10 +575,8 @@ export class XTFXBridge
                     GetLogService().Warn(`Unknown C# PKType GUID: ${table.PKType} on table "${table.Name}" — left as-is`);
             }
 
-            for (const field of table.GetFields())
-            {
-                if (XTFXBridge.IsDataTypeGUID(field.DataType))
-                {
+            for (const field of table.GetFields()) {
+                if (XTFXBridge.IsDataTypeGUID(field.DataType)) {
                     const resolved = XTFXBridge.CSHARP_TYPE_GUID_MAP.get(field.DataType.toUpperCase());
                     if (resolved)
                         field.DataType = resolved;
@@ -644,20 +591,17 @@ export class XTFXBridge
      * Returns true when the given string looks like a GUID (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx).
      * Used to distinguish legacy C# type GUIDs from plain TS type names like "Int32" or "String".
      */
-    private static IsDataTypeGUID(pValue: string): boolean
-    {
+    private static IsDataTypeGUID(pValue: string): boolean {
         return /^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$/.test(pValue);
     }
 
-    private NormalizeCSharpXml(pXml: string): string
-    {
+    private NormalizeCSharpXml(pXml: string): string {
         const trimmed = pXml.trim();
 
         // Detect optional XML declaration
         let declaration = "";
         let body = trimmed;
-        if (body.startsWith("<?xml"))
-        {
+        if (body.startsWith("<?xml")) {
             const declEnd = body.indexOf("?>") + 2;
             declaration = body.substring(0, declEnd);
             body = body.substring(declEnd).trimStart();
@@ -681,23 +625,21 @@ export class XTFXBridge
         return `${declaration}<XORMDocument ID="${docID}" Name="ORM Model">${body}</XORMDocument>`;
     }
 
-    private NormalizeFieldValues(pXml: string): string
-    {
+    private NormalizeFieldValues(pXml: string): string {
         // GUIDs matching the registered XFieldValue properties in TS (both are plain Register)
         const fieldIDDataGuid = "3DA1B8E4-FA2C-4B7A-9E63-0D57C84A1F92";
-        const valueDataGuid   = "7A6E3F81-2B9C-4D5E-8F07-1C4D8E9A2B03";
+        const valueDataGuid = "7A6E3F81-2B9C-4D5E-8F07-1C4D8E9A2B03";
 
-        const convert = (pAttrs: string, pContent: string): string =>
-        {
-            const idMatch    = /\bID="([^"]+)"/.exec(pAttrs);
+        const convert = (pAttrs: string, pContent: string): string => {
+            const idMatch = /\bID="([^"]+)"/.exec(pAttrs);
             const fieldMatch = /\bFieldID="([^"]+)"/.exec(pAttrs);
 
             if (!idMatch)
                 return `<XFieldValue${pAttrs}>${pContent}</XFieldValue>`; // leave as-is
 
-            const elemID  = idMatch[1];
+            const elemID = idMatch[1];
             const fieldID = fieldMatch ? fieldMatch[1] : XGuid.EmptyValue;
-            const value   = pContent.trim();
+            const value = pContent.trim();
 
             return `<XFieldValue ID="${elemID}"><XValues>` +
                 `<XData Name="FieldID" ID="${fieldIDDataGuid}" Type="String">${this.XmlEscape(fieldID)}</XData>` +
@@ -716,8 +658,7 @@ export class XTFXBridge
         return result;
     }
 
-    private XmlEscape(pText: string): string
-    {
+    private XmlEscape(pText: string): string {
         return pText
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
@@ -725,10 +666,8 @@ export class XTFXBridge
             .replace(/"/g, "&quot;");
     }
 
-    SaveOrmModelToText(): string
-    {
-        try
-        {
+    SaveOrmModelToText(): string {
+        try {
             const doc = this._Controller?.Document;
             if (!doc)
                 return '<?xml version="1.0" encoding="utf-8"?>\n<XORMDocument />';
@@ -739,8 +678,7 @@ export class XTFXBridge
 
             return '<?xml version="1.0" encoding="utf-8"?>\n<XORMDocument />';
         }
-        catch (err)
-        {
+        catch (err) {
             console.error("SaveOrmModelToText error:", err);
             return '<?xml version="1.0" encoding="utf-8"?>\n<XORMDocument />';
         }
@@ -750,8 +688,7 @@ export class XTFXBridge
      * Whether the last call to ValidateOrmModel caused any mutation on shadow tables
      * (name or colour update). Callers can check this to decide whether to refresh the canvas.
      */
-    get LastSyncMutated(): boolean
-    {
+    get LastSyncMutated(): boolean {
         return this._LastSyncMutated;
     }
 
@@ -770,8 +707,7 @@ export class XTFXBridge
      * Returns extra XIssueItem[] for missing originals; structural updates are applied
      * directly to the shadow table objects. Sets _LastSyncMutated when any update is made.
      */
-    private SyncShadowTables(): XIssueItem[]
-    {
+    private SyncShadowTables(): XIssueItem[] {
         this._LastSyncMutated = false;
         const issues: XIssueItem[] = [];
         const design = this._Controller?.Design as XORMDesign | null;
@@ -783,41 +719,35 @@ export class XTFXBridge
         const realTables = allTables.filter((t: XORMTable) => !t.IsShadow);
         const shadowTables = allTables.filter((t: XORMTable) => t.IsShadow);
 
-        for (const shadow of shadowTables)
-        {
+        for (const shadow of shadowTables) {
             // Try to find the original in the current design by ShadowTableID
             /* istanbul ignore next — ?? null is a type-narrowing guard; find returns undefined */
             const sameModelOriginal = shadow.ShadowTableID
                 ? realTables.find((t: XORMTable) => t.ID === shadow.ShadowTableID) ?? null
                 : null;
 
-            if (sameModelOriginal)
-            {
+            if (sameModelOriginal) {
                 // Same-model shadow: sync name and fill
-                if (sameModelOriginal.Name !== shadow.ShadowTableName)
-                {
+                if (sameModelOriginal.Name !== shadow.ShadowTableName) {
                     shadow.Name = sameModelOriginal.Name;
                     shadow.ShadowTableName = sameModelOriginal.Name;
                     this._LastSyncMutated = true;
                 }
                 const srcFill = sameModelOriginal.Fill?.ToString();
                 const dstFill = shadow.Fill?.ToString();
-                if (srcFill && srcFill !== dstFill)
-                {
+                if (srcFill && srcFill !== dstFill) {
                     shadow.Fill = XColor.Parse(srcFill);
                     this._LastSyncMutated = true;
                 }
             }
-            else if (shadow.ShadowDocumentName)
-            {
+            else if (shadow.ShadowDocumentName) {
                 // Cross-model shadow: ShadowDocumentName stores the model path without extension.
                 // _ParentModelTableGroups keys include the extension — add it when looking up.
                 const shadowDocName = shadow.ShadowDocumentName;
                 const groupKey = shadowDocName.endsWith(".dsorm") ? shadowDocName : shadowDocName + ".dsorm";
                 const grp = this._ParentModelTableGroups.find(g => g.ModelName === groupKey);
 
-                if (!grp)
-                {
+                if (!grp) {
                     issues.push(new XIssueItem(
                         shadow.ID,
                         shadow.Name,
@@ -825,11 +755,9 @@ export class XTFXBridge
                         `Shadow table "${shadow.Name}" references model "${shadowDocName}" which is not available in the parent model list.`
                     ));
                 }
-                else
-                {
+                else {
                     const tableEntry = grp.Tables.find(e => e.Name === shadow.ShadowTableName);
-                    if (!tableEntry)
-                    {
+                    if (!tableEntry) {
                         issues.push(new XIssueItem(
                             shadow.ID,
                             shadow.Name,
@@ -837,19 +765,16 @@ export class XTFXBridge
                             `Shadow table "${shadow.Name}" references table "${shadow.ShadowTableName}" which no longer exists in model "${shadowDocName}".`
                         ));
                     }
-                    else
-                    {
+                    else {
                         const dstFill = shadow.Fill?.ToString();
-                        if (tableEntry.Fill && tableEntry.Fill !== dstFill)
-                        {
+                        if (tableEntry.Fill && tableEntry.Fill !== dstFill) {
                             shadow.Fill = XColor.Parse(tableEntry.Fill);
                             this._LastSyncMutated = true;
                         }
                     }
                 }
             }
-            else
-            {
+            else {
                 // Shadow with no resolvable source reference
                 issues.push(new XIssueItem(
                     shadow.ID,
@@ -863,8 +788,7 @@ export class XTFXBridge
         return issues;
     }
 
-    ValidateOrmModel(): XIssueItem[]
-    {
+    ValidateOrmModel(): XIssueItem[] {
         this.Initialize();
 
         const doc = this._Controller?.Document;
@@ -876,14 +800,13 @@ export class XTFXBridge
 
         // Update validator with types from configuration (or defaults if not loaded)
         this._Validator.ValidPKTypes = this._PKDataTypes.length > 0 ? this._PKDataTypes : ["Guid", "Int32", "Int64"];
-        
+
         const tfxIssues = this._Validator.Validate(doc);
         const issues: XIssueItem[] = [...shadowIssues];
 
-        for (const issue of tfxIssues)
-        {
-            const severity: TIssueSeverity = issue.Severity === tfx.XDesignerErrorSeverity?.Error 
-                ? XIssueSeverity.Error 
+        for (const issue of tfxIssues) {
+            const severity: TIssueSeverity = issue.Severity === tfx.XDesignerErrorSeverity?.Error
+                ? XIssueSeverity.Error
                 : XIssueSeverity.Warning;
             issues.push(new XIssueItem(
                 issue.ElementID,
@@ -897,25 +820,21 @@ export class XTFXBridge
         return issues;
     }
 
-    ApplyOperation(pOperation: any): any
-    {
+    ApplyOperation(pOperation: any): any {
         return this._Controller?.ApplyOperation(pOperation);
     }
 
-    AddTable(pX: number, pY: number, pName: string): XIOperationResult
-    {
+    AddTable(pX: number, pY: number, pName: string): XIOperationResult {
         this.Initialize();
-        
+
         const addTableData: XIAddTableData = { X: pX, Y: pY, Name: pName };
         const result = this._Controller?.AddTable(addTableData);
-        
+
         return result || { Success: false, Message: "Failed to add table." };
     }
 
-    AddReference(pSourceTableID: string, pTargetTableID: string, pName: string, pIsOneToOne?: boolean): XIOperationResult
-    {
-        if (pIsOneToOne)
-        {
+    AddReference(pSourceTableID: string, pTargetTableID: string, pName: string, pIsOneToOne?: boolean): XIOperationResult {
+        if (pIsOneToOne) {
             // 1:1 FK: link the source table's PK field directly to the target table — no new FK field created
             const sourceTable = this._Controller?.GetElementByID(pSourceTableID) as XORMTable | null;
             const pkField = sourceTable?.GetPKField?.() ?? null;
@@ -936,19 +855,19 @@ export class XTFXBridge
         // Get the target table to build the FK field name
         const targetTable = this._Controller?.GetElementByID(pTargetTableID) as XORMTable | null;
         const targetName = targetTable?.Name || "Target";
-        
+
         // First create the FK field in the source table
         const fkFieldName = `${targetName}ID`;
-        
+
         const addFieldData: XIAddFieldData = {
             TableID: pSourceTableID,
             Name: fkFieldName
         };
         const fieldResult = this._Controller?.AddField(addFieldData);
-        
+
         if (!fieldResult?.Success || !fieldResult?.ElementID)
             return { Success: false, Message: "Failed to create FK field." };
-        
+
         // Now create the reference using the field ID as source
         const addRefData: XIAddReferenceData = {
             SourceFieldID: fieldResult.ElementID,
@@ -958,8 +877,7 @@ export class XTFXBridge
         return this._Controller?.AddReference(addRefData) || { Success: false };
     }
 
-    AddField(pTableID: string, pName: string, _pDataType: string): XIOperationResult
-    {
+    AddField(pTableID: string, pName: string, _pDataType: string): XIOperationResult {
         const addFieldData: XIAddFieldData = {
             TableID: pTableID,
             Name: pName
@@ -967,8 +885,7 @@ export class XTFXBridge
         return this._Controller?.AddField(addFieldData) || { Success: false };
     }
 
-    AlignLines(): boolean
-    {
+    AlignLines(): boolean {
         return this._Controller?.RouteAllLines?.() ?? false;
     }
 
@@ -977,8 +894,7 @@ export class XTFXBridge
      * Includes the current model's own tables (as the first group), 
      * then one group per parent model previously loaded into _ParentModelTableGroups.
      */
-    GetShadowTablePickerData(pX: number, pY: number): IShadowTablePickerData
-    {
+    GetShadowTablePickerData(pX: number, pY: number): IShadowTablePickerData {
         this.Initialize();
 
         const models: IShadowModelEntry[] = [];
@@ -991,8 +907,7 @@ export class XTFXBridge
         const currentDocumentName = this._Controller?.Document?.Name ?? "";
         /* istanbul ignore next */
         const currentTables = this._Controller?.Design?.GetTables?.()?.filter((t: XORMTable) => !t.IsShadow) ?? [];
-        if (currentTables.length > 0)
-        {
+        if (currentTables.length > 0) {
             const docId = this._Controller?.Document?.ID ?? /* istanbul ignore next */ XGuid.NewValue();
             models.push({
                 ModelName: currentModelName,
@@ -1006,8 +921,7 @@ export class XTFXBridge
         }
 
         // Parent models — skip any group whose name matches the current model (avoid duplicates)
-        for (const grp of this._ParentModelTableGroups)
-        {
+        for (const grp of this._ParentModelTableGroups) {
             if (grp.ModelName === currentModelName)
                 continue;
             models.push({
@@ -1029,21 +943,14 @@ export class XTFXBridge
      * A shadow table is a read-only placeholder that references a table from another (or the same) model.
      * It is used as a FK target for code-generation purposes.
      */
-    AddShadowTable(pPayload: IAddShadowTablePayload): XIOperationResult
-    {
+    AddShadowTable(pPayload: IAddShadowTablePayload): XIOperationResult {
         this.Initialize();
 
         const design = this._Controller?.Design;
         if (!design)
             return { Success: false, Message: "No active design." };
 
-        // Prevent duplicate shadow tables that reference the same source
-        const existing = design.GetTables().find(
-            (t: XORMTable) => t.IsShadow && t.ShadowTableName === pPayload.TableName &&
-                t.ShadowDocumentName === pPayload.DocumentName
-        );
-        if (existing)
-            return { Success: true, ElementID: existing.ID };
+        // Allow duplicate shadow tables that reference the same source.
 
         // Create the table at the target position
         const table = design.CreateTable({
@@ -1066,16 +973,14 @@ export class XTFXBridge
         const originalInDesign = pPayload.TableID
             ? design.GetTables().find((t: XORMTable) => t.ID === pPayload.TableID && !t.IsShadow)
             : null;
-        if (originalInDesign)
-        {
+        if (originalInDesign) {
             /* istanbul ignore next — Fill is always set (default XColor.Transparent) */
             const fillStr = originalInDesign.Fill?.ToString();
             /* istanbul ignore next — fillStr is always truthy since Fill defaults to XColor.Transparent */
             if (fillStr)
                 table.Fill = XColor.Parse(fillStr);
         }
-        else
-        {
+        else {
             // Look in the cached parent-model groups by the relative model file path.
             // _ParentModelTableGroups keys use the relative file path (e.g. "FolderX21/CEPx.dsorm"),
             // which matches pPayload.ModelName exactly. pPayload.DocumentName has the extension
@@ -1096,13 +1001,11 @@ export class XTFXBridge
         return { Success: true, ElementID: table.ID };
     }
 
-    DeleteElement(pElementID: string): XIOperationResult
-    {
+    DeleteElement(pElementID: string): XIOperationResult {
         return this._Controller?.RemoveElement(pElementID) || { Success: false };
     }
 
-    RenameElement(pElementID: string, pNewName: string): XIOperationResult
-    {
+    RenameElement(pElementID: string, pNewName: string): XIOperationResult {
         const renameData: XIRenameElementData = {
             ElementID: pElementID,
             NewName: pNewName
@@ -1110,8 +1013,7 @@ export class XTFXBridge
         return this._Controller?.RenameElement(renameData) || { Success: false };
     }
 
-    MoveElement(pElementID: string, pX: number, pY: number): XIOperationResult
-    {
+    MoveElement(pElementID: string, pX: number, pY: number): XIOperationResult {
         const moveData: XIMoveElementData = {
             ElementID: pElementID,
             X: pX,
@@ -1120,8 +1022,7 @@ export class XTFXBridge
         return this._Controller?.MoveElement(moveData) || { Success: false };
     }
 
-    ReorderField(pFieldID: string, pNewIndex: number): XIOperationResult
-    {
+    ReorderField(pFieldID: string, pNewIndex: number): XIOperationResult {
         const reorderData: XIReorderFieldData = {
             FieldID: pFieldID,
             NewIndex: pNewIndex
@@ -1129,8 +1030,7 @@ export class XTFXBridge
         return this._Controller?.ReorderField(reorderData) || { Success: false };
     }
 
-    UpdateProperty(pElementID: string, pPropertyKey: string, pValue: unknown): XIOperationResult
-    {
+    UpdateProperty(pElementID: string, pPropertyKey: string, pValue: unknown): XIOperationResult {
         this.Initialize();
 
         const element = this._Controller?.GetElementByID(pElementID);
@@ -1139,21 +1039,18 @@ export class XTFXBridge
 
         // Directly set known properties instead of using SetValueByKey
         // This avoids key mismatch issues with the property registry
-        if (pPropertyKey === "Name")
-        {
+        if (pPropertyKey === "Name") {
             // Shadow tables cannot be renamed
             if (element instanceof XORMTable && element.IsShadow)
                 return { Success: false, Message: "Shadow tables are read-only." };
             element.Name = pValue as string;
         }
-        else if (element instanceof XORMTable)
-        {
+        else if (element instanceof XORMTable) {
             // All property edits are blocked on shadow tables
             if (element.IsShadow)
                 return { Success: false, Message: "Shadow tables are read-only." };
 
-            switch (pPropertyKey)
-            {
+            switch (pPropertyKey) {
                 case "PKType":
                     element.PKType = pValue as string;
                     break;
@@ -1179,14 +1076,43 @@ export class XTFXBridge
                     );
                     element.Bounds = newBounds;
                     break;
+                case "UseStateControl":
+                    {
+                        const design = this._Controller?.Design;
+                        /* istanbul ignore next -- design cannot be null if element was found */
+                        if (!design)
+                            return { Success: false, Message: "No active design." };
+                        if (pValue === true) {
+                            const enableResult = design.EnableStateControl(element);
+                            if (!enableResult.Success)
+                                return { Success: false, Message: enableResult.Message };
+
+                            if (enableResult.ShadowTableCreated && enableResult.ShadowTableID) {
+                                const shadowTable = design.FindTableByID(enableResult.ShadowTableID);
+                                if (shadowTable) {
+                                    const stateTableName = design.StateControlTable;
+                                    const grp = this._ParentModelTableGroups.find(g => g.Tables.some(e => e.Name === stateTableName));
+                                    if (grp) {
+                                        shadowTable.ShadowDocumentName = grp.ModelName.replace(/\.dsorm$/i, "");
+                                        const entry = grp.Tables.find(e => e.Name === stateTableName);
+                                        if (entry && entry.Fill) {
+                                            shadowTable.Fill = XColor.Parse(entry.Fill);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        else
+                            design.DisableStateControl(element);
+                        design.RouteAllLines?.();
+                        break;
+                    }
                 default:
                     return { Success: false, Message: `Unknown property: ${pPropertyKey}` };
             }
         }
-        else if (element instanceof XORMReference)
-        {
-            switch (pPropertyKey)
-            {
+        else if (element instanceof XORMReference) {
+            switch (pPropertyKey) {
                 case "Description":
                     element.Description = pValue as string;
                     break;
@@ -1194,10 +1120,8 @@ export class XTFXBridge
                     return { Success: false, Message: `Unknown property: ${pPropertyKey}` };
             }
         }
-        else if (element instanceof XORMField)
-        {
-            switch (pPropertyKey)
-            {
+        else if (element instanceof XORMField) {
+            switch (pPropertyKey) {
                 case "DataType":
                     // Block DataType changes on FK fields
                     if (element.IsForeignKey)
@@ -1221,6 +1145,11 @@ export class XTFXBridge
                 case "DefaultValue":
                     element.DefaultValue = pValue as string;
                     break;
+                case "AllowedValues":
+                    if (element.IsAutoIncrement)
+                        return { Success: false, Message: "AllowedValues cannot be set on an auto-increment field." };
+                    element.AllowedValues = pValue as string;
+                    break;
                 case "Description":
                     element.Description = pValue as string;
                     break;
@@ -1228,10 +1157,8 @@ export class XTFXBridge
                     return { Success: false, Message: `Unknown property: ${pPropertyKey}` };
             }
         }
-        else if (element instanceof XORMDesign)
-        {
-            switch (pPropertyKey)
-            {
+        else if (element instanceof XORMDesign) {
+            switch (pPropertyKey) {
                 case "Schema":
                     element.Schema = pValue as string;
                     break;
@@ -1260,19 +1187,18 @@ export class XTFXBridge
     }
 
     private static readonly _GroupOrder: Record<string, number> =
-    {
-        "Identity": 1,
-        "Data": 2,
-        "Behaviour": 3,
-        "Appearance": 4,
-        "Design": 5,
-        "Control": 6,
-        "Test": 7,
-        "General": 99
-    };
+        {
+            "Identity": 1,
+            "Data": 2,
+            "Behaviour": 3,
+            "Appearance": 4,
+            "Design": 5,
+            "Control": 6,
+            "Test": 7,
+            "General": 99
+        };
 
-    private GetGroupOrder(pGroup: string | undefined): number
-    {
+    private GetGroupOrder(pGroup: string | undefined): number {
         const groupName = pGroup ?? "General";
         const order = XTFXBridge._GroupOrder[groupName];
         if (order === undefined)
@@ -1280,10 +1206,8 @@ export class XTFXBridge
         return order;
     }
 
-    private SortProperties(pProps: XPropertyItem[]): XPropertyItem[]
-    {
-        return pProps.sort((a, b) =>
-        {
+    private SortProperties(pProps: XPropertyItem[]): XPropertyItem[] {
+        return pProps.sort((a, b) => {
             const grpA = this.GetGroupOrder(a.Group);
             const grpB = this.GetGroupOrder(b.Group);
             if (grpA !== grpB)
@@ -1293,8 +1217,7 @@ export class XTFXBridge
     }
 
     /** Returns the XORMDataTypeInfo for the given type name, using loaded config if available or static fallback otherwise. */
-    private GetEffectiveTypeInfo(pTypeName: string): { HasLength: boolean; HasScale: boolean; CanAutoIncrement: boolean }
-    {
+    private GetEffectiveTypeInfo(pTypeName: string): { HasLength: boolean; HasScale: boolean; CanAutoIncrement: boolean } {
         for (const info of this._TypeInfos)
             if (info.TypeName === pTypeName)
                 return info;
@@ -1302,8 +1225,7 @@ export class XTFXBridge
     }
 
     /** Resolves a field ID to a friendly "TableName.FieldName" display string. */
-    private ResolveFieldFriendlyName(pFieldID: string): string
-    {
+    private ResolveFieldFriendlyName(pFieldID: string): string {
         if (!pFieldID || !this._Controller)
             return pFieldID;
         const field = this._Controller.GetElementByID(pFieldID);
@@ -1316,16 +1238,14 @@ export class XTFXBridge
     }
 
     /** Resolves a table ID to its display name. */
-    private ResolveTableFriendlyName(pTableID: string): string
-    {
+    private ResolveTableFriendlyName(pTableID: string): string {
         if (!pTableID || !this._Controller)
             return pTableID;
         const table = this._Controller.GetElementByID(pTableID);
         return table?.Name ?? pTableID;
     }
 
-    GetProperties(pElementID: string): XPropertyItem[]
-    {
+    GetProperties(pElementID: string): XPropertyItem[] {
         this.Initialize();
 
         const element = this._Controller?.GetElementByID(pElementID);
@@ -1335,19 +1255,28 @@ export class XTFXBridge
         const props: XPropertyItem[] = [];
 
         // Name is always shown and editable for all elements
-        props.push(new XPropertyItem("Name", "Name", element.Name, XPropertyType.String, undefined, "Identity"));
-
+        const nameProp = new XPropertyItem("Name", "Name", element.Name, XPropertyType.String, undefined, "Identity");
         if (element instanceof XORMDesign)
-        {
-            props.push(new XPropertyItem("Schema", "Schema", element.Schema, XPropertyType.String, undefined, "Data"));
+            nameProp.Placeholder = "e.g. SalesModel";
+        else if (element instanceof XORMTable)
+            nameProp.Placeholder = "e.g. Customer";
+        else
+            nameProp.Placeholder = "e.g. CustomerName";
+        nameProp.Hint = "Used to generate the class and database table/column name.";
+        props.push(nameProp);
+
+        if (element instanceof XORMDesign) {
+            const schemaProp = new XPropertyItem("Schema", "Schema", element.Schema, XPropertyType.String, undefined, "Data");
+            schemaProp.Placeholder = "e.g. dbo";
+            schemaProp.Hint = "Database schema that owns this model's tables (e.g. dbo, public, sales).";
+            props.push(schemaProp);
 
             // Parent model: multi-select from .dsorm files in the same directory
             const parentModelProp = new XPropertyItem("ParentModel", "Parent Model", element.ParentModel, XPropertyType.MultiFileSelect, this._AvailableOrmFiles.length > 0 ? this._AvailableOrmFiles : undefined, "Relations");
             props.push(parentModelProp);
 
             // Trigger async parent table load on first access if design has parent models but tables not yet loaded
-            if (element.ParentModel && this._ParentModelTableGroups.length === 0)
-            {
+            if (element.ParentModel && this._ParentModelTableGroups.length === 0) {
                 const selected = element.ParentModel.split("|").filter(f => f.length > 0);
                 if (selected.length > 0)
                     /* istanbul ignore next */
@@ -1379,10 +1308,8 @@ export class XTFXBridge
             tctProp.GroupedOptions = groupedOptions.length > 0 ? groupedOptions : null;
             props.push(tctProp);
         }
-        else if (element instanceof XORMTable)
-        {
-            if (element.IsShadow)
-            {
+        else if (element instanceof XORMTable) {
+            if (element.IsShadow) {
                 // Shadow table: show origin info, everything read-only
                 const nameProp = props.find(p => p.Key === "Name");
                 /* istanbul ignore next */
@@ -1397,18 +1324,28 @@ export class XTFXBridge
                 tblProp.IsReadOnly = true;
                 props.push(tblProp);
 
-                if (element.ShadowModuleName)
-                {
+                if (element.ShadowModuleName) {
                     const modProp = new XPropertyItem("ShadowModuleName", "Module", element.ShadowModuleName, XPropertyType.String, undefined, "Shadow");
                     modProp.IsReadOnly = true;
                     props.push(modProp);
                 }
             }
-            else
-            {
+            else {
                 const pkTypes = this._PKDataTypes.length > 0 ? this._PKDataTypes : ["Guid", "Int32", "Int64"];
                 props.push(new XPropertyItem("PKType", "PK Type", element.PKType, XPropertyType.Enum, pkTypes, "Data"));
-                props.push(new XPropertyItem("Description", "Description", element.Description, XPropertyType.String, undefined, "Data"));
+
+                // Use State Control — editable only when the design has a StateControlTable configured
+                const stateTableName = this._Controller?.Design?.StateControlTable || "";
+                const useStateControlProp = new XPropertyItem("UseStateControl", "Use State Control", element.UseStateControl, XPropertyType.Boolean, undefined, "Control");
+                useStateControlProp.IsReadOnly = !stateTableName;
+                useStateControlProp.Hint = stateTableName
+                    ? `Creates a FK to "${stateTableName}". Disabling removes the state field and its reference.`
+                    : "Set the State Control Table on the design first.";
+                props.push(useStateControlProp);
+
+                const descTblProp = new XPropertyItem("Description", "Description", element.Description, XPropertyType.String, undefined, "Data");
+                descTblProp.Placeholder = "Optional description...";
+                props.push(descTblProp);
 
                 const fillColor = element.Fill;
                 const colorStr = typeof fillColor.ToString === 'function'
@@ -1417,8 +1354,7 @@ export class XTFXBridge
                 props.push(new XPropertyItem("Fill", "Fill", colorStr, XPropertyType.Color, undefined, "Appearance"));
             }
         }
-        else if (element instanceof XORMReference)
-        {
+        else if (element instanceof XORMReference) {
             // Source and Target are shown as friendly names and are read-only
             const sourceName = this.ResolveFieldFriendlyName(element.Source);
             const targetName = this.ResolveTableFriendlyName(element.Target);
@@ -1431,10 +1367,11 @@ export class XTFXBridge
             targetProp.IsReadOnly = true;
             props.push(targetProp);
 
-            props.push(new XPropertyItem("Description", "Description", element.Description, XPropertyType.String, undefined, "Data"));
+            const descRefProp = new XPropertyItem("Description", "Description", element.Description, XPropertyType.String, undefined, "Data");
+            descRefProp.Placeholder = "Optional description...";
+            props.push(descRefProp);
         }
-        else if (element instanceof XORMPKField)
-        {
+        else if (element instanceof XORMPKField) {
             const allTypes = this._AllDataTypes.length > 0 ? this._AllDataTypes : ["Boolean", "DateTime", "Guid", "Int32", "String"];
             const typeInfo = this.GetEffectiveTypeInfo(element.DataType);
 
@@ -1457,13 +1394,18 @@ export class XTFXBridge
                 props.push(new XPropertyItem("IsAutoIncrement", "Auto Increment", element.IsAutoIncrement, XPropertyType.Boolean, undefined, "Behaviour"));
 
             // Default Value — only when not using auto-increment
-            if (!element.IsAutoIncrement)
-                props.push(new XPropertyItem("DefaultValue", "Default Value", element.DefaultValue, XPropertyType.String, undefined, "Data"));
+            if (!element.IsAutoIncrement) {
+                const dvpkProp = new XPropertyItem("DefaultValue", "Default Value", element.DefaultValue, XPropertyType.String, undefined, "Data");
+                dvpkProp.Placeholder = "e.g. 0, true, 'Active'";
+                dvpkProp.Hint = "Default value written into the database column definition (DDL DEFAULT clause).";
+                props.push(dvpkProp);
+            }
 
-            props.push(new XPropertyItem("Description", "Description", element.Description, XPropertyType.String, undefined, "Data"));
+            const descPkProp = new XPropertyItem("Description", "Description", element.Description, XPropertyType.String, undefined, "Data");
+            descPkProp.Placeholder = "Optional description...";
+            props.push(descPkProp);
         }
-        else if (element instanceof XORMField)
-        {
+        else if (element instanceof XORMField) {
             const allTypes = this._AllDataTypes.length > 0 ? this._AllDataTypes : ["Boolean", "DateTime", "Guid", "Int32", "String"];
             const isForeignKey = element.IsForeignKey;
             const effectiveDataType = isForeignKey
@@ -1487,18 +1429,30 @@ export class XTFXBridge
 
             // IsPrimaryKey is always false for XORMField — never shown
 
-            if (!isForeignKey)
-            {
+            if (!isForeignKey) {
                 // Auto Increment — only for regular fields and when the type supports it
                 if (typeInfo.CanAutoIncrement)
                     props.push(new XPropertyItem("IsAutoIncrement", "Auto Increment", element.IsAutoIncrement, XPropertyType.Boolean, undefined, "Behaviour"));
 
                 // Default Value — only when not using auto-increment
-                if (!element.IsAutoIncrement)
-                    props.push(new XPropertyItem("DefaultValue", "Default Value", element.DefaultValue, XPropertyType.String, undefined, "Data"));
+                if (!element.IsAutoIncrement) {
+                    const dvProp = new XPropertyItem("DefaultValue", "Default Value", element.DefaultValue, XPropertyType.String, undefined, "Data");
+                    dvProp.Placeholder = "e.g. 0, true, 'Active'";
+                    dvProp.Hint = "Default value written into the database column definition (DDL DEFAULT clause).";
+                    props.push(dvProp);
+                }
+
+                // Allowed Values — tag-chip list for enum/CHECK constraint (pipe-separated internally)
+                // Read-only when AutoIncrement is active (numeric sequences cannot have fixed values).
+                const avProp = new XPropertyItem("AllowedValues", "Allowed Values", element.AllowedValues, XPropertyType.TagList, undefined, "Data");
+                avProp.IsReadOnly = element.IsAutoIncrement;
+                avProp.Hint = "Each tag is one permitted value. Generates a CHECK constraint or ENUM in the database. Separator: | (pipe).";
+                props.push(avProp);
             }
 
-            props.push(new XPropertyItem("Description", "Description", element.Description, XPropertyType.String, undefined, "Data"));
+            const descProp = new XPropertyItem("Description", "Description", element.Description, XPropertyType.String, undefined, "Data");
+            descProp.Placeholder = "Optional description...";
+            props.push(descProp);
         }
 
         return this.SortProperties(props);
@@ -1508,8 +1462,7 @@ export class XTFXBridge
      * Builds the seed editor payload for the given table.
      * Resolves FK options from referenced tables' DataSets.
      */
-    GetSeedData(pTableID: string): ISeedEditorPayload | null
-    {
+    GetSeedData(pTableID: string): ISeedEditorPayload | null {
         this.Initialize();
 
         const table = this._Controller?.GetElementByID(pTableID) as XORMTable | null;
@@ -1523,21 +1476,17 @@ export class XTFXBridge
 
         const rawFields = table.GetFields();
 
-        const columns: ISeedColumn[] = rawFields.map(field =>
-        {
+        const columns: ISeedColumn[] = rawFields.map(field => {
             const isFk = field.IsForeignKey;
             let fkOptions: IFKOption[] | undefined;
             let fkTableName: string | undefined;
 
-            if (isFk && design)
-            {
+            if (isFk && design) {
                 // Find the XORMReference whose Source points to this FK field
                 const ref = allRefs.find(r => r.Source === field.ID);
-                if (ref)
-                {
+                if (ref) {
                     const targetTable = (design as any).GetTables?.().find((t: any) => t.ID === ref.Target) as XORMTable | undefined;
-                    if (targetTable)
-                    {
+                    if (targetTable) {
                         fkTableName = targetTable.Name;
                         const pkField = targetTable.GetPKField();
                         const targetFields = targetTable.GetFields();
@@ -1547,11 +1496,9 @@ export class XTFXBridge
                         const targetDataSets = (targetTable as any).GetChildrenOfType?.(XORMDataSet) as XORMDataSet[];
                         const targetDataSet: XORMDataSet | undefined = targetDataSets?.[0];
 
-                        if (targetDataSet && pkField)
-                        {
+                        if (targetDataSet && pkField) {
                             fkOptions = [];
-                            for (const tuple of targetDataSet.GetTuples())
-                            {
+                            for (const tuple of targetDataSet.GetTuples()) {
                                 const fvList = tuple.GetFieldValues();
                                 const pkVal = fvList.find(v => v.FieldID === pkField!.ID)?.Value ?? "";
                                 const dispVal = displayField
@@ -1563,8 +1510,7 @@ export class XTFXBridge
                                 fkOptions.push({ Value: pkVal, Label: label });
                             }
                         }
-                        else
-                        {
+                        else {
                             fkOptions = [];
                         }
                     }
@@ -1588,10 +1534,8 @@ export class XTFXBridge
         const dataSet: XORMDataSet | undefined = dataSets?.[0];
         const rows: ISeedRow[] = [];
 
-        if (dataSet)
-        {
-            for (const tuple of dataSet.GetTuples())
-            {
+        if (dataSet) {
+            for (const tuple of dataSet.GetTuples()) {
                 const values: Record<string, string> = {};
                 for (const fv of tuple.GetFieldValues())
                     values[fv.FieldID] = fv.Value;
@@ -1608,11 +1552,123 @@ export class XTFXBridge
     }
 
     /**
+     * Inspects the current loaded ORM model and returns a DBML script representation.
+     */
+    ExportToDBML(): string {
+        const modelData = this.GetModelData();
+        if (!modelData || !modelData.Tables || modelData.Tables.length === 0)
+            return "";
+
+        const tables = modelData.Tables;
+        const refs = modelData.References;
+        const lines: string[] = [];
+
+        // Project Header
+        const doc = this._Controller?.Document;
+        const projName = doc?.Design?.Name || "DASE_Project";
+        lines.push(`Project "${projName}" {`);
+        lines.push(`  database_type: 'Relational'`);
+        lines.push(`  Note: 'Generated by Tootega DASE ORM Designer'`);
+        lines.push(`}`);
+        lines.push("");
+
+        // Iterate over tables
+        for (const tbl of tables) {
+            if (tbl.IsShadow) continue; // Note: We only generate full DDL for local tables
+
+            lines.push(`Table "${tbl.Name}" {`);
+            for (const f of tbl.Fields) {
+                // Determine base DBML data type
+                let typeStr = f.DataType || "varchar";
+
+                // Construct DBML field settings (pk, note, not null, default)
+                const settings: string[] = [];
+                if (f.IsPrimaryKey) settings.push("pk");
+                if (f.IsAutoIncrement) settings.push("increment");
+                if (f.IsRequired && !f.IsPrimaryKey) settings.push("not null");
+
+                if (f.DefaultValue) {
+                    // check if string vs numeric for escaping
+                    const isNum = !isNaN(Number(f.DefaultValue));
+                    settings.push(`default: ${isNum ? f.DefaultValue : `'${f.DefaultValue}'`}`);
+                }
+
+                if (f.Description) {
+                    settings.push(`note: '${f.Description.replace(/'/g, "''")}'`);
+                }
+
+                // If it has allowed values, we might just append a note here or inline an enum
+                if (f.AllowedValues) {
+                    settings.push(`note: 'Values: ${f.AllowedValues}'`);
+                }
+
+                const settingsStr = settings.length > 0 ? ` [${settings.join(", ")}]` : "";
+                lines.push(`  "${f.Name}" ${typeStr}${settingsStr}`);
+            }
+
+            const hasNotes = !!tbl.Description;
+            const hasSeeds = !!tbl.SeedData;
+
+            if (hasNotes || hasSeeds) {
+                lines.push(`  Note: '`);
+                if (hasNotes && tbl.Description)
+                    lines.push(`    ${tbl.Description.replace(/'/g, "''")}`);
+
+                if (hasSeeds && tbl.SeedData) {
+                    if (hasNotes) lines.push(``); // Blank line to separate
+
+                    lines.push(`    @seed`);
+                    lines.push(`    | ${tbl.SeedData.Headers.join(" | ")} |`);
+                    for (const row of tbl.SeedData.Tuples) {
+                        lines.push(`    | ${row.join(" | ")} |`);
+                    }
+                }
+                lines.push(`  '`);
+            }
+
+            lines.push(`}`);
+            lines.push("");
+        }
+
+        // Iterate over References (Relationships)
+        for (const ref of refs) {
+            // DASE captures relationships as lines from SourceTable.SourceField -> TargetTable.??? (Usually TargetTable PK)
+            // But references have: SourceFieldID and TargetTableID
+            // Let's find names:
+            let sourceTbl: ITableData | undefined;
+            let sourceField: IFieldData | undefined;
+
+            for (const t of tables) {
+                const f = t.Fields.find(x => x.ID === ref.SourceFieldID);
+                if (f) {
+                    sourceTbl = t;
+                    sourceField = f;
+                    break;
+                }
+            }
+
+            const targetTbl = tables.find(t => t.ID === ref.TargetTableID);
+
+            if (sourceTbl && sourceField && targetTbl) {
+                let targetField = targetTbl.Fields.find(f => f.IsPrimaryKey);
+                if (!targetField && targetTbl.Fields.length > 0)
+                    targetField = targetTbl.Fields[0];
+
+                if (targetField) {
+                    const relChar = sourceField.IsPrimaryKey ? "-" : ">";
+                    lines.push(`Ref "${ref.Name || 'FK'}": "${sourceTbl.Name}"."${sourceField.Name}" ${relChar} "${targetTbl.Name}"."${targetField.Name}"`);
+                }
+            }
+        }
+
+        return lines.join("\n");
+    }
+
+    /**
      * Persists seed rows into the table's XORMDataSet.
      * Replaces all existing tuples with the supplied rows.
      */
-    SaveSeedData(pTableID: string, pRows: ISeedRowSave[]): XIOperationResult
-    {
+    SaveSeedData(pTableID: string, pRows: ISeedRowSave[]): XIOperationResult {
         this.Initialize();
 
         const table = this._Controller?.GetElementByID(pTableID) as XORMTable | null;
@@ -1623,8 +1679,7 @@ export class XTFXBridge
         const existingSets = (table as any).GetChildrenOfType?.(XORMDataSet) as XORMDataSet[];
         let dataSet: XORMDataSet = existingSets?.[0];
 
-        if (!dataSet)
-        {
+        if (!dataSet) {
             dataSet = new XORMDataSet();
             dataSet.ID = XGuid.NewValue();
             dataSet.Name = "T";
@@ -1636,13 +1691,11 @@ export class XTFXBridge
             dataSet.RemoveChild(tuple);
 
         // Create new tuples
-        for (const rowData of pRows)
-        {
+        for (const rowData of pRows) {
             const tuple = new XORMDataTuple();
             tuple.ID = rowData.TupleID === "NEW" ? XGuid.NewValue() : rowData.TupleID;
 
-            for (const [fieldID, value] of Object.entries(rowData.Values))
-            {
+            for (const [fieldID, value] of Object.entries(rowData.Values)) {
                 const fv = new XFieldValue();
                 fv.ID = XGuid.NewValue();
                 fv.FieldID = fieldID;
@@ -1656,8 +1709,7 @@ export class XTFXBridge
         return { Success: true, ElementID: dataSet.ID };
     }
 
-    GetElementInfo(pElementID: string): { ID: string; Name: string; Type: string } | null
-    {
+    GetElementInfo(pElementID: string): { ID: string; Name: string; Type: string } | null {
         this.Initialize();
 
         const element = this._Controller?.GetElementByID(pElementID);
@@ -1683,8 +1735,7 @@ export class XTFXBridge
         };
     }
 
-    GetModelData(): IModelData
-    {
+    GetModelData(): IModelData {
         this.Initialize();
 
         const doc = this._Controller?.Document;
@@ -1698,17 +1749,62 @@ export class XTFXBridge
         const tablesData: ITableData[] = tables.map((t: any) => {
             // Get fields using GetChildrenOfType or directly from Fields array
             const fields = t.GetChildrenOfType?.(XORMField) ?? t.Fields ?? [];
-            
+
             // Get fill color as HTML hex string - handle both XColor objects and strings
             let fillColor: string | undefined;
-            if (t.Fill)
-            {
+            if (t.Fill) {
                 if (typeof t.Fill.ToString === 'function')
                     fillColor = `#${t.Fill.ToString().substring(2)}`;
                 else if (typeof t.Fill === 'string')
                     fillColor = t.Fill.startsWith('#') ? t.Fill : `#${t.Fill.substring(2)}`;
             }
-            
+
+            // Extract Seed Data if a DataSet is present
+            let seedData: { Headers: string[], Tuples: string[][] } | undefined = undefined;
+            const dataSets = t.GetChildrenOfType
+                ? t.GetChildrenOfType(XORMDataSet)
+                : t.Children?.filter((c: any) => c.Class === 'XORMDataSet') || [];
+
+            if (dataSets && dataSets.length > 0) {
+                const dataSet = dataSets[0];
+                const tuples = dataSet.GetTuples
+                    ? dataSet.GetTuples()
+                    : dataSet.Children?.filter((c: any) => c.Class === 'XORMDataTuple') || [];
+
+                if (tuples.length > 0) {
+                    const headersMap: Record<string, string> = {};
+                    const rows: string[][] = [];
+
+                    // Pass 1: Gather all unique Field IDs to form Headers mapping
+                    fields.forEach((f: any) => {
+                        headersMap[f.ID] = f.Name;
+                    });
+                    const orderedFieldIDs = fields.map((f: any) => f.ID);
+                    const headers = orderedFieldIDs.map((id: string) => headersMap[id] || id);
+
+                    // Pass 2: Extract Tuples
+                    for (const tuple of tuples) {
+                        const rowMap: Record<string, string> = {};
+                        const fieldValues = tuple.GetChildrenOfType
+                            ? tuple.GetChildrenOfType(XFieldValue)
+                            : tuple.Children?.filter((c: any) => c.Class === 'XFieldValue') || [];
+
+                        for (const fv of fieldValues) {
+                            rowMap[fv.FieldID] = fv.Value || "";
+                        }
+
+                        // Ensure ordering corresponds to Headers
+                        const row = orderedFieldIDs.map((id: string) => rowMap[id] || "");
+                        rows.push(row);
+                    }
+
+                    seedData = {
+                        Headers: headers,
+                        Tuples: rows
+                    };
+                }
+            }
+
             return {
                 ID: t.ID,
                 Name: t.Name,
@@ -1717,6 +1813,7 @@ export class XTFXBridge
                 Width: t.Bounds.Width,
                 Height: t.Bounds.Height,
                 FillProp: fillColor,
+                Description: t.Description || undefined,
                 PKType: t.PKType,
                 IsShadow: t.IsShadow || false,
                 ShadowDocumentID: t.ShadowDocumentID || undefined,
@@ -1731,15 +1828,19 @@ export class XTFXBridge
                     DataType: f.DataType,
                     IsPrimaryKey: f.IsPrimaryKey,
                     IsForeignKey: f.IsForeignKey,
-                    IsRequired: f.IsRequired
-                }))
+                    IsRequired: f.IsRequired,
+                    IsAutoIncrement: f.IsAutoIncrement,
+                    DefaultValue: f.DefaultValue,
+                    Description: f.Description || undefined,
+                    AllowedValues: f.AllowedValues || undefined
+                })),
+                SeedData: seedData
             };
         });
 
         // Helper to simplify route points for webview rendering (does not modify the route, only cleans)
         // Correct routing is done by XORMDesign.ts which follows the defined rules
-        const simplifyRoutePoints = (points: Array<{X: number, Y: number}>, sourceTable: any, targetTable: any): Array<{X: number, Y: number}> =>
-        {
+        const simplifyRoutePoints = (points: Array<{ X: number, Y: number }>, sourceTable: any, targetTable: any): Array<{ X: number, Y: number }> => {
             // Return as-is when not enough points
             if (points.length < 2) return points;
 
@@ -1749,9 +1850,8 @@ export class XTFXBridge
                 return [];
 
             // 2) Remove consecutive duplicates (1px tolerance)
-            const unique: Array<{X: number, Y: number}> = [valid[0]];
-            for (let i = 1; i < valid.length; i++)
-            {
+            const unique: Array<{ X: number, Y: number }> = [valid[0]];
+            for (let i = 1; i < valid.length; i++) {
                 const prev = unique[unique.length - 1];
                 if (Math.abs(valid[i].X - prev.X) > 1 || Math.abs(valid[i].Y - prev.Y) > 1)
                     unique.push({ X: valid[i].X, Y: valid[i].Y });
@@ -1761,9 +1861,8 @@ export class XTFXBridge
                 return [];
 
             // 3) Remove collinear intermediate points
-            const simplified: Array<{X: number, Y: number}> = [unique[0]];
-            for (let i = 1; i < unique.length - 1; i++)
-            {
+            const simplified: Array<{ X: number, Y: number }> = [unique[0]];
+            for (let i = 1; i < unique.length - 1; i++) {
                 const a = simplified[simplified.length - 1];
                 const b = unique[i];
                 const c = unique[i + 1];
@@ -1787,10 +1886,10 @@ export class XTFXBridge
                 return fields.some((f: any) => f.ID === r.Source);
             });
             const targetTable = tables.find((t: any) => t.ID === r.Target);
-            
+
             const rawPoints = r.Points?.map((p: any) => ({ X: p.X, Y: p.Y })) || [];
             const simplifiedPoints = simplifyRoutePoints(rawPoints, sourceTable, targetTable);
-            
+
             // Detect 1:1 relationship: source field is the PK of the source table
             const srcTbl: any = sourceTable;
             const srcFieldsRaw: any[] | null | undefined = srcTbl
@@ -1800,7 +1899,7 @@ export class XTFXBridge
             const sourceFields: any[] = srcFieldsRaw ?? [];
             const sourceField = sourceFields.find((f: any) => f.ID === r.Source);
             const isOneToOne = !!(sourceField?.IsPrimaryKey);
-            
+
             return {
                 ID: r.ID,
                 Name: r.Name,
@@ -1814,8 +1913,7 @@ export class XTFXBridge
         return { DesignID: design.ID, Tables: tablesData, References: refsData };
     }
 
-    LoadFromJson(pDoc: any, pData: IJsonData): void
-    {
+    LoadFromJson(pDoc: any, pData: IJsonData): void {
         if (!pData || !pDoc.Design)
             return;
 
@@ -1827,10 +1925,11 @@ export class XTFXBridge
         if (pData.Schema)
             design.Schema = pData.Schema;
 
-        if (pData.Tables && Array.isArray(pData.Tables))
-        {
-            for (const tData of pData.Tables)
-            {
+        if (pData.StateControlTable !== undefined)
+            design.StateControlTable = pData.StateControlTable;
+
+        if (pData.Tables && Array.isArray(pData.Tables)) {
+            for (const tData of pData.Tables) {
                 const table = design.CreateTable({
                     X: tData.X || 0,
                     Y: tData.Y || 0,
@@ -1845,8 +1944,7 @@ export class XTFXBridge
                     table.Description = tData.Description;
 
                 // Restore shadow metadata
-                if (tData.IsShadow)
-                {
+                if (tData.IsShadow) {
                     table.IsShadow = true;
                     if (tData.ShadowDocumentID) table.ShadowDocumentID = tData.ShadowDocumentID;
                     if (tData.ShadowDocumentName) table.ShadowDocumentName = tData.ShadowDocumentName;
@@ -1856,11 +1954,9 @@ export class XTFXBridge
                     if (tData.ShadowModuleName) table.ShadowModuleName = tData.ShadowModuleName;
                 }
 
-                if (tData.Fields && Array.isArray(tData.Fields))
-                {
+                if (tData.Fields && Array.isArray(tData.Fields)) {
                     const pkData = tData.Fields.find(f => f.IsPrimaryKey);
-                    if (pkData)
-                    {
+                    if (pkData) {
                         let pkField = table.GetPKField();
                         if (!pkField)
                             pkField = table.CreatePKField();
@@ -1868,11 +1964,9 @@ export class XTFXBridge
                         if (pkData.Name)
                             pkField.Name = pkData.Name;
 
-                        if (pkData.DataType)
-                        {
+                        if (pkData.DataType) {
                             let normalizedPKType: string = pkData.DataType;
-                            switch (normalizedPKType)
-                            {
+                            switch (normalizedPKType) {
                                 case "Integer":
                                     normalizedPKType = "Int32";
                                     break;
@@ -1894,8 +1988,7 @@ export class XTFXBridge
                             pkField.Description = pkData.Description;
                     }
 
-                    for (const fData of tData.Fields)
-                    {
+                    for (const fData of tData.Fields) {
                         if (fData.IsPrimaryKey)
                             continue;
 
@@ -1905,7 +1998,8 @@ export class XTFXBridge
                             Length: fData.Length || 0,
                             IsRequired: fData.IsRequired || false,
                             IsAutoIncrement: fData.IsAutoIncrement || false,
-                            DefaultValue: fData.DefaultValue || ""
+                            DefaultValue: fData.DefaultValue || "",
+                            AllowedValues: fData.AllowedValues || ""
                         });
 
                         if (fData.ID)
@@ -1917,12 +2011,9 @@ export class XTFXBridge
             }
         }
 
-        if (pData.References && Array.isArray(pData.References))
-        {
-            for (const rData of pData.References)
-            {
-                try
-                {
+        if (pData.References && Array.isArray(pData.References)) {
+            for (const rData of pData.References) {
+                try {
                     const ref = design.CreateReference({
                         SourceFieldID: rData.SourceFieldID || rData.SourceID || "",
                         TargetTableID: rData.TargetTableID || rData.TargetID || "",
@@ -1937,16 +2028,14 @@ export class XTFXBridge
                     if (rData.Points && Array.isArray(rData.Points))
                         ref.Points = rData.Points.map((p: any) => new XPoint(p.X, p.Y));
                 }
-                catch (error)
-                {
+                catch (error) {
                     GetLogService().Warn(`Failed to create reference: ${rData.Name} - ${error}`);
                 }
             }
         }
     }
 
-    SaveToJson(pDoc: any): IJsonData
-    {
+    SaveToJson(pDoc: any): IJsonData {
         if (!pDoc || !pDoc.Design)
             return {};
 
@@ -1959,7 +2048,7 @@ export class XTFXBridge
             Tables: tables.map((t: any) => {
                 // Get fields using GetChildrenOfType or directly from Fields array
                 const fields = t.GetChildrenOfType?.(XORMField) ?? t.Fields ?? [];
-                
+
                 return {
                     ID: t.ID,
                     Name: t.Name,

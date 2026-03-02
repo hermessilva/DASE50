@@ -137,6 +137,22 @@ export class XORMValidator extends XValidator<XORMDocument, XORMDesign>
             // Validate Scale only for Decimal types
             if (field.DataType !== "Decimal" && field.Scale > 0)
                 this.AddWarning(field.ID, field.Name, "Scale is only applicable for Decimal fields.");
+
+            // AllowedValues consistency checks
+            if (field.HasAllowedValues)
+            {
+                if (field.DefaultValue && !field.IsAllowedValue(field.DefaultValue))
+                    this.AddWarning(
+                        field.ID, field.Name,
+                        `Default value "${field.DefaultValue}" is not in the AllowedValues list for field ${field.Name}.`
+                    );
+
+                if (field.IsAutoIncrement)
+                    this.AddWarning(
+                        field.ID, field.Name,
+                        `Field ${field.Name} has both AllowedValues and IsAutoIncrement set. These are mutually exclusive.`
+                    );
+            }
         }
     }
 
