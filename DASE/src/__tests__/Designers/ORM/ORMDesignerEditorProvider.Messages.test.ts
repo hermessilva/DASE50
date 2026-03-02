@@ -1217,6 +1217,23 @@ describe('XORMDesignerEditorProvider', () => {
     });
 
     describe('GenerateORMCode message', () => {
+        let mockPanel: any;
+        let mockState: any;
+
+        beforeEach(() => {
+            mockPanel = createMockWebviewPanel();
+            mockState = {
+                GetModelData: jest.fn().mockReturnValue({ Tables: [], References: [] }),
+                Validate: jest.fn().mockReturnValue([]),
+                GetProperties: jest.fn().mockReturnValue([]),
+                Bridge: { LastSyncMutated: false, GetAllDataTypes: jest.fn().mockReturnValue([]) },
+                IsDirty: false,
+                Document: { uri: Uri.file('/test/model.dsorm') },
+                IssueService: { SetIssues: jest.fn() },
+                SelectionService: { HasSelection: false, PrimaryID: null }
+            };
+        });
+
         it('should execute Dase.GenerateORMCode command', async () => {
             await provider.HandleMessage(mockPanel, mockState, {
                 Type: 'GenerateORMCode',
@@ -1228,6 +1245,23 @@ describe('XORMDesignerEditorProvider', () => {
     });
 
     describe('GenerateORMCodeExecute message', () => {
+        let mockPanel: any;
+        let mockState: any;
+
+        beforeEach(() => {
+            mockPanel = createMockWebviewPanel();
+            mockState = {
+                GetModelData: jest.fn().mockReturnValue({ Tables: [], References: [] }),
+                Validate: jest.fn().mockReturnValue([]),
+                GetProperties: jest.fn().mockReturnValue([]),
+                Bridge: { LastSyncMutated: false, GetAllDataTypes: jest.fn().mockReturnValue([]) },
+                IsDirty: false,
+                Document: { uri: Uri.file('/test/model.dsorm') },
+                IssueService: { SetIssues: jest.fn() },
+                SelectionService: { HasSelection: false, PrimaryID: null }
+            };
+        });
+
         it('should execute Dase.GenerateORMCodeExecute with payload fields', async () => {
             await provider.HandleMessage(mockPanel, mockState, {
                 Type: 'GenerateORMCodeExecute',
@@ -1252,6 +1286,23 @@ describe('XORMDesignerEditorProvider', () => {
     });
 
     describe('ORMGenBrowseContext message', () => {
+        let mockPanel: any;
+        let mockState: any;
+
+        beforeEach(() => {
+            mockPanel = createMockWebviewPanel();
+            mockState = {
+                GetModelData: jest.fn().mockReturnValue({ Tables: [], References: [] }),
+                Validate: jest.fn().mockReturnValue([]),
+                GetProperties: jest.fn().mockReturnValue([]),
+                Bridge: { LastSyncMutated: false, GetAllDataTypes: jest.fn().mockReturnValue([]) },
+                IsDirty: false,
+                Document: { uri: Uri.file('/test/model.dsorm') },
+                IssueService: { SetIssues: jest.fn() },
+                SelectionService: { HasSelection: false, PrimaryID: null }
+            };
+        });
+
         it('should execute Dase.ORMGenBrowseContext with OrmId', async () => {
             await provider.HandleMessage(mockPanel, mockState, {
                 Type: 'ORMGenBrowseContext',

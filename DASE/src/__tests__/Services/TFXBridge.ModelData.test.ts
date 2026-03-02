@@ -1000,4 +1000,52 @@ describe('XTFXBridge', () => {
         });
     });
 
+    describe('GetModelData seed data Children fallbacks (lines 1770, 1777, 1796)', () => {
+        it('should use t.Children to find XORMDataSet when GetChildrenOfType is absent, and cover || branches in tuple extraction', async () => {
+            await bridge.LoadOrmModelFromText('{}');
+
+            // f1 has empty Name → headersMap['f1'] = '' (falsy) → covers `headersMap[id] || id` branch
+            // f2 has a Name → it will have no matching fieldValue → covers `rowMap[id] || ""` branch
+            const mockTuple = {
+                Class: 'XORMDataTuple',
+                GetChildrenOfType: undefined,
+                Children: [
+                    { Class: 'XFieldValue', FieldID: 'f1', Value: '' }  // empty Value → covers `fv.Value || ""`
+                ]
+            };
+            const mockDataSet = {
+                Class: 'XORMDataSet',
+                GetTuples: undefined,
+                Children: [mockTuple]
+            };
+            const mockTable = {
+                ID: 'tbl-1',
+                Name: 'Users',
+                PKType: 'Int32',
+                Bounds: { Left: 0, Top: 0, Width: 200, Height: 100 },
+                // f1 empty name → headersMap fallback; f2 not in tuple → rowMap fallback
+                Fields: [
+                    { ID: 'f1', Name: '', IsPrimaryKey: false },
+                    { ID: 'f2', Name: 'Email', IsPrimaryKey: false }
+                ],
+                // No GetChildrenOfType — forces all three Children fallbacks
+                Children: [mockDataSet]
+            };
+
+            bridge.Controller.Document = { Name: 'Test', Design: {} };
+            bridge.Controller.GetTables = jest.fn().mockReturnValue([mockTable]);
+            bridge.Controller.GetReferences = jest.fn().mockReturnValue([]);
+
+            const result = bridge.GetModelData();
+
+            expect(result.Tables).toHaveLength(1);
+            const tbl = result.Tables[0];
+            expect(tbl.SeedData).toBeDefined();
+            // f1 has empty Name → header falls back to 'f1'; f2 has Name 'Email'
+            expect(tbl.SeedData!.Headers).toEqual(['f1', 'Email']);
+            // f1 value is '' (empty) → rowMap['f1'] || "" == ""; f2 has no entry → rowMap['f2'] || "" == ""
+            expect(tbl.SeedData!.Tuples).toEqual([['', '']]);
+        });
+    });
+
 });
