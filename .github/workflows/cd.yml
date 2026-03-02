@@ -187,7 +187,7 @@ jobs:
         run: |
           VERSION="${{ needs.build_test.outputs.full_version }}"
           BUILD="${{ needs.build_test.outputs.build_number }}"
-          vsce package --out dase-${VERSION}.vsix
+          vsce package --no-dependencies --out dase-${VERSION}.vsix
           echo "📦 Created dase-${VERSION}.vsix (build #$BUILD)"
 
       - name: Upload VSIX artifact
