@@ -490,6 +490,36 @@ describe('XORMDesignerEditorProvider', () => {
             expect(mockPanel.webview.postMessage).not.toHaveBeenCalled();
         });
 
+        it('should execute OrganizeTablesAI command on OrganizeTablesAI message', async () => {
+            const executeMock = vscode.commands.executeCommand as jest.MockedFunction<typeof vscode.commands.executeCommand>;
+            await provider.HandleMessage(mockPanel, mockState, { Type: 'OrganizeTablesAI' });
+            expect(executeMock).toHaveBeenCalledWith('Dase.OrganizeTablesAI');
+        });
+
+        it('should execute OrganizeTablesAIExecute command with model index on OrganizeTablesAIExecute message', async () => {
+            const executeMock = vscode.commands.executeCommand as jest.MockedFunction<typeof vscode.commands.executeCommand>;
+            await provider.HandleMessage(mockPanel, mockState, { Type: 'OrganizeTablesAIExecute', Payload: { ModelIndex: 2 } });
+            expect(executeMock).toHaveBeenCalledWith('Dase.OrganizeTablesAIExecute', 2);
+        });
+
+        it('should default to model index 0 when ModelIndex is missing in OrganizeTablesAIExecute message', async () => {
+            const executeMock = vscode.commands.executeCommand as jest.MockedFunction<typeof vscode.commands.executeCommand>;
+            await provider.HandleMessage(mockPanel, mockState, { Type: 'OrganizeTablesAIExecute', Payload: {} });
+            expect(executeMock).toHaveBeenCalledWith('Dase.OrganizeTablesAIExecute', 0);
+        });
+
+        it('should execute OrganizeTablesAIRevert command on AIOrganizeRevert message', async () => {
+            const executeMock = vscode.commands.executeCommand as jest.MockedFunction<typeof vscode.commands.executeCommand>;
+            await provider.HandleMessage(mockPanel, mockState, { Type: 'AIOrganizeRevert' });
+            expect(executeMock).toHaveBeenCalledWith('Dase.OrganizeTablesAIRevert');
+        });
+
+        it('should execute ExportToDBML command on ExportToDBML message', async () => {
+            const executeMock = vscode.commands.executeCommand as jest.MockedFunction<typeof vscode.commands.executeCommand>;
+            await provider.HandleMessage(mockPanel, mockState, { Type: 'ExportToDBML' });
+            expect(executeMock).toHaveBeenCalledWith('Dase.ExportToDBML');
+        });
+
         it('should warn on unknown message type', async () => {
             const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
 

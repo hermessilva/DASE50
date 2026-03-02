@@ -83,6 +83,10 @@ interface IAddShadowTablePayload {
     TableName: string;
 }
 
+interface IOrganizeTablesAIExecutePayload {
+    ModelIndex: number;
+}
+
 interface IDesignerMessage {
     Type: string;
     Payload?: unknown;
@@ -345,6 +349,24 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
 
             case XDesignerMessageType.AddShadowTable:
                 await this.OnAddShadowTable(pPanel, pState, payload as IAddShadowTablePayload);
+                break;
+
+            // ----------------------------------------------------
+            // AI Organization
+            // ----------------------------------------------------
+            case XDesignerMessageType.OrganizeTablesAI:
+                vscode.commands.executeCommand("Dase.OrganizeTablesAI");
+                break;
+
+            case XDesignerMessageType.OrganizeTablesAIExecute:
+                vscode.commands.executeCommand(
+                    "Dase.OrganizeTablesAIExecute",
+                    (payload as IOrganizeTablesAIExecutePayload).ModelIndex ?? 0
+                );
+                break;
+
+            case XDesignerMessageType.AIOrganizeRevert:
+                vscode.commands.executeCommand("Dase.OrganizeTablesAIRevert");
                 break;
 
             default:
@@ -925,6 +947,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
 <body>
     <div id="designer-container">
         <div id="canvas-container">
+            <div id="zoom-indicator">100%</div>
             <svg id="canvas" xmlns="http://www.w3.org/2000/svg">
                 <defs>
                     <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
@@ -947,6 +970,8 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         <div class="context-menu-item" data-action="align-lines"><span class="icon">📐</span>Align Lines</div>
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="export-dbml"><span class="icon">📤</span>Export to DBML</div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-action="organize-tables-ai"><span class="icon">✨</span>Organize Tables using AI</div>
     </div>
     <div id="table-context-menu" class="context-menu">
         <div class="context-menu-item" data-action="add-field"><span class="icon">➕</span>Add Field</div>
@@ -1022,6 +1047,57 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="delete-field"><span class="icon">🗑️</span>Delete Field</div>
     </div>
+
+    <!-- AI Organization progress overlay -->
+    <div id="ai-organize-overlay" class="ai-overlay" style="display:none" aria-hidden="true">
+        <div id="ai-organize-modal" class="ai-modal" role="dialog" aria-labelledby="ai-modal-title" aria-live="polite">
+            <div class="ai-modal-header">
+                <div class="ai-modal-title-block">
+                    <span class="ai-modal-icon" id="ai-modal-icon">✨</span>
+                    <div>
+                        <h2 id="ai-modal-title" class="ai-modal-title">Organize Tables with AI</h2>
+                        <div id="ai-model-badge" class="ai-model-badge"></div>
+                    </div>
+                </div>
+                <div id="ai-status-dot" class="ai-status-dot ai-status-dot--idle"></div>
+            </div>
+            <!-- Phase 1: model picker (prompt preview + compact selector) -->
+            <div id="ai-picker-section" class="ai-picker-section" style="display:none">
+                <div class="ai-prompt-preview-wrap">
+                    <div class="ai-prompt-preview-label">Prompt preview</div>
+                    <textarea class="ai-prompt-preview" id="ai-prompt-preview" readonly spellcheck="false"></textarea>
+                </div>
+                <div class="ai-model-selector-row">
+                    <span class="ai-model-selector-label">Model</span>
+                    <div class="ai-model-selector-wrap">
+                        <button class="ai-model-selector-btn" id="ai-model-selector-btn" type="button">
+                            <span class="ai-model-selector-name" id="ai-model-selector-name">Select model…</span>
+                            <span class="ai-model-selector-cost" id="ai-model-selector-cost"></span>
+                            <span class="ai-model-selector-chevron">▾</span>
+                        </button>
+                        <div id="ai-model-dropdown" class="ai-model-dropdown" style="display:none"></div>
+                    </div>
+                </div>
+            </div>
+            <!-- Phase 2: progress (visible during and after execution) -->
+            <div id="ai-progress-section" class="ai-progress-section" style="display:none">
+                <div class="ai-progress-bar-track">
+                    <div class="ai-progress-bar-fill" id="ai-progress-fill" style="width:0%"></div>
+                </div>
+                <div id="ai-progress-label" class="ai-progress-label">Initializing…</div>
+            </div>
+            <div id="ai-steps-list" class="ai-steps-list" style="display:none"></div>
+            <div id="ai-result-section" class="ai-result-section" style="display:none">
+                <div id="ai-group-chips" class="ai-group-chips"></div>
+            </div>
+            <!-- Footer: changes buttons per phase -->
+            <div class="ai-modal-footer" id="ai-modal-footer">
+                <button id="ai-cancel-btn" class="seed-btn seed-btn-secondary">Cancel</button>
+                <button id="ai-execute-btn" class="seed-btn seed-btn-primary">Execute</button>
+            </div>
+        </div>
+    </div>
+
     <script src="${jsUri}"></script>
 </body>
 </html>`;
