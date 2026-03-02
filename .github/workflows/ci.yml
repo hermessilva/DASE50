@@ -168,6 +168,7 @@ jobs:
       - name: Copy TFX to node_modules
         if: github.ref == 'refs/heads/master' && github.event_name == 'push'
         run: |
+          rm -rf DASE/node_modules/@tootega/tfx
           mkdir -p DASE/node_modules/@tootega/tfx/dist
           cp -r TFX/dist/* DASE/node_modules/@tootega/tfx/dist/
           cp TFX/package.json DASE/node_modules/@tootega/tfx/
