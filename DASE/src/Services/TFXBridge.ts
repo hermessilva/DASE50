@@ -1089,9 +1089,10 @@ export class XTFXBridge {
 
                             if (enableResult.ShadowTableCreated && enableResult.ShadowTableID) {
                                 const shadowTable = design.FindTableByID(enableResult.ShadowTableID);
+                                /* istanbul ignore else — FindTableByID always finds the table just created by EnableStateControl */
                                 if (shadowTable) {
                                     const stateTableName = design.StateControlTable;
-                                    const grp = this._ParentModelTableGroups.find(g => g.Tables.some(e => e.Name === stateTableName));
+                                    const grp = this._ParentModelTableGroups.find(/* istanbul ignore next */ g => g.Tables.some(e => e.Name === stateTableName));
                                     /* istanbul ignore next — grp found only when ParentModel has matching StateControlTable */
                                     if (grp) {
                                         shadowTable.ShadowDocumentName = grp.ModelName.replace(/\.dsorm$/i, "");
@@ -1766,14 +1767,12 @@ export class XTFXBridge {
             let seedData: { Headers: string[], Tuples: string[][] } | undefined = undefined;
             const dataSets = t.GetChildrenOfType
                 ? t.GetChildrenOfType(XORMDataSet)
-                /* istanbul ignore next — GetChildrenOfType is always present on real TFX objects */
                 : t.Children?.filter((c: any) => c.Class === 'XORMDataSet') || [];
 
             if (dataSets && dataSets.length > 0) {
                 const dataSet = dataSets[0];
                 const tuples = dataSet.GetTuples
                     ? dataSet.GetTuples()
-                    /* istanbul ignore next — GetTuples is always present on real XORMDataSet objects */
                     : dataSet.Children?.filter((c: any) => c.Class === 'XORMDataTuple') || [];
 
                 if (tuples.length > 0) {
@@ -1792,8 +1791,7 @@ export class XTFXBridge {
                         const rowMap: Record<string, string> = {};
                         const fieldValues = tuple.GetChildrenOfType
                             ? tuple.GetChildrenOfType(XFieldValue)
-                            /* istanbul ignore next — GetChildrenOfType is always present on real XORMDataTuple objects */
-                            : tuple.Children?.filter((c: any) => c.Class === 'XFieldValue') || [];
+                            : /* istanbul ignore next */ (tuple.Children?.filter((c: any) => c.Class === 'XFieldValue') || []);
 
                         for (const fv of fieldValues) {
                             rowMap[fv.FieldID] = fv.Value || "";

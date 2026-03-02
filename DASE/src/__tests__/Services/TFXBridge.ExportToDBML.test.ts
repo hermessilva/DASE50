@@ -169,4 +169,111 @@ describe('XTFXBridge — ExportToDBML', () => {
         expect(dbml).toContain(`    | 2 | Inactive |`);
         expect(dbml).toContain(`  '`);
     });
+
+    it('should use varchar fallback when field has no DataType', () => {
+        bridge.Initialize();
+        // Override GetModelData to inject a field whose DataType is empty (unreachable via TFX model,
+        // but the branch must be exercised to guarantee the safety fallback is correct)
+        jest.spyOn(bridge, 'GetModelData').mockReturnValueOnce({
+            Tables: [{
+                ID: 't1', Name: 'Items', X: 0, Y: 0, Width: 100, Height: 100,
+                PKType: 'Int32', IsShadow: false,
+                Fields: [{ ID: 'f1', Name: 'Tag', DataType: '', IsPrimaryKey: false, IsRequired: false, IsAutoIncrement: false, Index: 0 }],
+            }],
+            References: []
+        } as any);
+        const dbml = bridge.ExportToDBML();
+        expect(dbml).toContain('"Tag" varchar');
+    });
+
+    it('should quote non-numeric DefaultValue as string literal', () => {
+        const model = JSON.stringify({
+            Name: 'DefaultProj',
+            Tables: [{
+                ID: 't1', Name: 'Items',
+                Fields: [{ ID: 'f1', Name: 'Status', DataType: 'varchar', DefaultValue: 'ACTIVE' }]
+            }]
+        });
+        bridge.LoadOrmModelFromText(model);
+        const dbml = bridge.ExportToDBML();
+        expect(dbml).toContain(`default: 'ACTIVE'`);
+    });
+
+    it('should generate @seed block without description separator when table has SeedData but no Description', () => {
+        const model = JSON.stringify({
+            Name: 'SeedOnlyProj',
+            Tables: [{
+                ID: 't1', Name: 'Colors',
+                Fields: [
+                    { ID: 'f1', Name: 'ID', DataType: 'int', IsPrimaryKey: true },
+                    { ID: 'f2', Name: 'Name', DataType: 'varchar' }
+                ]
+            }]
+        });
+        bridge.LoadOrmModelFromText(model);
+
+        const table = (bridge as any)._Controller.GetElementByID('t1') as tfx.XORMTable;
+        const ds = new tfx.XORMDataSet();
+        ds.ID = 'ds1';
+        ds.Name = 'T';
+        const tuple = new tfx.XORMDataTuple();
+        tuple.ID = 'tup1';
+        const fv1 = new tfx.XFieldValue(); fv1.FieldID = 'f1'; fv1.Value = '1';
+        const fv2 = new tfx.XFieldValue(); fv2.FieldID = 'f2'; fv2.Value = 'Red';
+        tuple.AppendChild(fv1);
+        tuple.AppendChild(fv2);
+        ds.AppendChild(tuple);
+        table.AppendChild(ds);
+
+        const dbml = bridge.ExportToDBML();
+        expect(dbml).toContain(`    @seed`);
+        expect(dbml).toContain(`    | ID | Name |`);
+        expect(dbml).toContain(`    | 1 | Red |`);
+        // No blank separator line because no Description
+        expect(dbml).not.toContain(`    System`);
+    });
+
+    it('should skip Ref line when targetTable has no fields (targetField = undefined)', () => {
+        bridge.Initialize();
+        // Mock GetModelData: sourceTbl and sourceField found, but targetTbl has empty Fields.
+        // This exercises the false branch of `if (targetField)`.
+        jest.spyOn(bridge, 'GetModelData').mockReturnValueOnce({
+            Tables: [
+                {
+                    ID: 't1', Name: 'Parent', X: 0, Y: 0, Width: 100, Height: 100, PKType: 'Int32', IsShadow: false,
+                    Fields: [] as any[]  // No fields — targetField will be undefined
+                },
+                {
+                    ID: 't2', Name: 'Child', X: 200, Y: 0, Width: 100, Height: 100, PKType: 'Int32', IsShadow: false,
+                    Fields: [{ ID: 'fk1', Name: 'ParentID', DataType: 'int', IsPrimaryKey: false, IsRequired: false, IsAutoIncrement: false, Index: 0 }]
+                }
+            ],
+            References: [{
+                ID: 'r1', Name: 'FK', SourceFieldID: 'fk1', TargetTableID: 't1',
+                SourceTable: '', TargetTable: '', Points: [], IsOneToOne: false
+            }]
+        } as any);
+        const dbml = bridge.ExportToDBML();
+        // Should not generate any Ref line because targetTbl has no fields
+        expect(dbml).not.toContain('Ref');
+    });
+
+    it('should skip Ref generation when reference has an invalid SourceFieldID', () => {
+        bridge.Initialize();
+        // Mock GetModelData to return a ref whose SourceFieldID doesn't match any table field.
+        // This exercises the false branch of `if (sourceTbl && sourceField && targetTbl)`.
+        jest.spyOn(bridge, 'GetModelData').mockReturnValueOnce({
+            Tables: [{
+                ID: 't1', Name: 'Items', X: 0, Y: 0, Width: 100, Height: 100, PKType: 'Int32', IsShadow: false,
+                Fields: [{ ID: 'f1', Name: 'ID', DataType: 'int', IsPrimaryKey: true, IsRequired: true, IsAutoIncrement: false, Index: 0 }]
+            }],
+            References: [{
+                ID: 'r1', Name: 'FK', SourceFieldID: 'nonexistent', TargetTableID: 't1',
+                SourceTable: '', TargetTable: '', Points: [], IsOneToOne: false
+            }]
+        } as any);
+        const dbml = bridge.ExportToDBML();
+        // Ref block should be absent because sourceTbl/sourceField could not be resolved
+        expect(dbml).not.toContain('Ref');
+    });
 });
