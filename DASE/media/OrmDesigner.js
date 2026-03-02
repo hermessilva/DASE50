@@ -33,7 +33,16 @@
         // Shadow table picker
         RequestShadowTablePicker: "RequestShadowTablePicker",
         ShadowTablePickerData: "ShadowTablePickerData",
-        AddShadowTable: "AddShadowTable"
+        AddShadowTable: "AddShadowTable",
+        // AI Organization
+        OrganizeTablesAI: "OrganizeTablesAI",
+        AIOrganizeShowPicker: "AIOrganizeShowPicker",
+        OrganizeTablesAIExecute: "OrganizeTablesAIExecute",
+        AIOrganizeStart: "AIOrganizeStart",
+        AIOrganizeProgress: "AIOrganizeProgress",
+        AIOrganizeComplete: "AIOrganizeComplete",
+        AIOrganizeError: "AIOrganizeError",
+        AIOrganizeRevert: "AIOrganizeRevert"
     };
 
     let _Model = { DesignID: null, Tables: [], References: [] };
@@ -45,6 +54,13 @@
     let _ContextMenuTarget = null;
     let _FieldContextMenuTarget = null;
     let _Issues = [];
+
+    // ── Viewport state (zoom + pan) ─────────────────────────────────────────
+    let _Zoom = 1.0;
+    let _PanX = 0;
+    let _PanY = 0;
+    let _SpaceDown = false;
+    let _SpacePan = null; // { startClientX, startClientY, startPanX, startPanY }
 
     // Seed editor state
     let _SeedEditor = null; // { TableID, Columns, Rows, OriginalRows, SelectedRows: Set<number> }
@@ -110,6 +126,7 @@
     function Initialize() {
         SetupCanvasEvents();
         SetupContextMenu();
+        SetupZoomPan();
         SetupMessageHandler();
         SendMessage(XMessageType.DesignerReady, {});
     }
@@ -157,6 +174,26 @@
             case XMessageType.ShadowTablePickerData:
                 OpenShadowPickerModal(pMsg.Payload);
                 break;
+
+            case XMessageType.AIOrganizeShowPicker:
+                OpenAIPickerOverlay(pMsg.Payload);
+                break;
+
+            case XMessageType.AIOrganizeStart:
+                OpenAIOrganizeOverlay(pMsg.Payload);
+                break;
+
+            case XMessageType.AIOrganizeProgress:
+                UpdateAIOrganizeProgress(pMsg.Payload);
+                break;
+
+            case XMessageType.AIOrganizeComplete:
+                CompleteAIOrganize(pMsg.Payload);
+                break;
+
+            case XMessageType.AIOrganizeError:
+                ErrorAIOrganize(pMsg.Payload);
+                break;
         }
     }
 
@@ -191,6 +228,9 @@
                     break;
                 case "export-dbml":
                     SendMessage("ExportToDBML", {});
+                    break;
+                case "organize-tables-ai":
+                    SendMessage(XMessageType.OrganizeTablesAI, {});
                     break;
             }
         });
@@ -348,6 +388,152 @@
         _FieldContextMenuTarget = null;
     }
 
+    // ── Viewport helpers ─────────────────────────────────────────────────────
+
+    /** Convert client (screen) coordinates to canvas (SVG world) coordinates. */
+    function ClientToCanvas(pClientX, pClientY) {
+        const r = _CanvasContainer.getBoundingClientRect();
+        return {
+            x: (pClientX - r.left - _PanX) / _Zoom,
+            y: (pClientY - r.top  - _PanY) / _Zoom
+        };
+    }
+
+    /** Apply current _Pan + _Zoom to the canvas element. */
+    function ApplyViewport() {
+        _Canvas.style.transform = `translate(${_PanX}px,${_PanY}px) scale(${_Zoom})`;
+        const indicator = document.getElementById("zoom-indicator");
+        if (indicator) indicator.textContent = Math.round(_Zoom * 100) + "%";
+    }
+
+    /** Zoom centred on a client-coordinate point, scaling by pFactor. */
+    function ZoomAtPoint(pClientX, pClientY, pFactor) {
+        const r   = _CanvasContainer.getBoundingClientRect();
+        const wx  = (pClientX - r.left - _PanX) / _Zoom;
+        const wy  = (pClientY - r.top  - _PanY) / _Zoom;
+        _Zoom = Math.max(0.1, Math.min(4.0, _Zoom * pFactor));
+        _PanX = pClientX - r.left - wx * _Zoom;
+        _PanY = pClientY - r.top  - wy * _Zoom;
+        ApplyViewport();
+    }
+
+    /** Reset zoom to 100 % and pan to origin. */
+    function ZoomReset() {
+        _Zoom = 1.0;
+        _PanX = 0;
+        _PanY = 0;
+        ApplyViewport();
+    }
+
+    function SetupZoomPan() {
+        const ZOOM_FACTOR = 1.1;
+        const PAN_STEP    = 40;
+
+        // ── Ctrl+Wheel → zoom; plain Wheel → pan ─────────────────────────
+        _CanvasContainer.addEventListener("wheel", function (e) {
+            e.preventDefault();
+
+            if (e.ctrlKey) {
+                const factor = e.deltaY < 0 ? ZOOM_FACTOR : 1 / ZOOM_FACTOR;
+                ZoomAtPoint(e.clientX, e.clientY, factor);
+                return;
+            }
+
+            // Plain scroll → pan
+            const dx = e.shiftKey ? -(e.deltaY || PAN_STEP) : -(e.deltaX || 0);
+            const dy = e.shiftKey ? 0 : -(e.deltaY || PAN_STEP);
+            _PanX += dx;
+            _PanY += dy;
+            ApplyViewport();
+        }, { passive: false });
+
+        // ── Space-bar held → hand-tool pan (Photoshop style) ─────────────
+        document.addEventListener("keydown", function (e) {
+            if (e.code === "Space" && !e.repeat &&
+                !e.ctrlKey && document.activeElement === document.body) {
+                e.preventDefault();
+                _SpaceDown = true;
+                _CanvasContainer.classList.add("space-pan");
+            }
+
+            // Ctrl+0 → reset to 100 %
+            if (e.code === "Digit0" && e.ctrlKey) {
+                e.preventDefault();
+                ZoomReset();
+            }
+
+            // Ctrl+= / Ctrl++ → zoom in
+            if ((e.code === "Equal" || e.code === "NumpadAdd") && e.ctrlKey) {
+                e.preventDefault();
+                const r = _CanvasContainer.getBoundingClientRect();
+                ZoomAtPoint(r.left + r.width / 2, r.top + r.height / 2, ZOOM_FACTOR);
+            }
+
+            // Ctrl+- → zoom out
+            if ((e.code === "Minus" || e.code === "NumpadSubtract") && e.ctrlKey) {
+                e.preventDefault();
+                const r = _CanvasContainer.getBoundingClientRect();
+                ZoomAtPoint(r.left + r.width / 2, r.top + r.height / 2, 1 / ZOOM_FACTOR);
+            }
+        });
+
+        document.addEventListener("keyup", function (e) {
+            if (e.code === "Space") {
+                _SpaceDown = false;
+                _SpacePan = null;
+                _CanvasContainer.classList.remove("space-pan", "space-pan-dragging");
+            }
+        });
+
+        // ── Space-pan drag ────────────────────────────────────────────────
+        _CanvasContainer.addEventListener("mousedown", function (e) {
+            if (!_SpaceDown) return;
+            e.preventDefault();
+            _SpacePan = {
+                startClientX: e.clientX,
+                startClientY: e.clientY,
+                startPanX:   _PanX,
+                startPanY:   _PanY
+            };
+            _CanvasContainer.classList.add("space-pan-dragging");
+        });
+
+        document.addEventListener("mousemove", function (e) {
+            if (!_SpacePan) return;
+            _PanX = _SpacePan.startPanX + (e.clientX - _SpacePan.startClientX);
+            _PanY = _SpacePan.startPanY + (e.clientY - _SpacePan.startClientY);
+            ApplyViewport();
+        });
+
+        document.addEventListener("mouseup", function () {
+            if (_SpacePan) {
+                _SpacePan = null;
+                _CanvasContainer.classList.remove("space-pan-dragging");
+            }
+        });
+
+        // ── Middle-mouse-button drag → pan (bonus, matches Photoshop) ────
+        _CanvasContainer.addEventListener("mousedown", function (e) {
+            if (e.button !== 1) return;
+            e.preventDefault();
+            const start = { x: e.clientX, y: e.clientY, px: _PanX, py: _PanY };
+            _CanvasContainer.style.cursor = "grabbing";
+
+            const onMove = function (me) {
+                _PanX = start.px + (me.clientX - start.x);
+                _PanY = start.py + (me.clientY - start.y);
+                ApplyViewport();
+            };
+            const onUp = function () {
+                _CanvasContainer.style.cursor = "";
+                document.removeEventListener("mousemove", onMove);
+                document.removeEventListener("mouseup", onUp);
+            };
+            document.addEventListener("mousemove", onMove);
+            document.addEventListener("mouseup", onUp);
+        });
+    }
+
     function SetupCanvasEvents() {
         _Canvas.addEventListener("click", function (e) {
             if (e.target === _Canvas || e.target.id === "relations-layer" || e.target.id === "tables-layer") {
@@ -362,11 +548,8 @@
         _CanvasContainer.addEventListener("contextmenu", function (e) {
             e.preventDefault();
 
-            const rect = _CanvasContainer.getBoundingClientRect();
-            const canvasX = e.clientX - rect.left + _CanvasContainer.scrollLeft;
-            const canvasY = e.clientY - rect.top + _CanvasContainer.scrollTop;
-
-            ShowContextMenu(e.clientX, e.clientY, canvasX, canvasY);
+            const cPos = ClientToCanvas(e.clientX, e.clientY);
+            ShowContextMenu(e.clientX, e.clientY, cPos.x, cPos.y);
         });
     }
 
@@ -624,6 +807,11 @@
         let elementStartY = pTable.Y;
 
         pElement.addEventListener("mousedown", function (e) {
+            if (e.button !== 0) return;
+
+            // Let space-pan take over when Space is held
+            if (_SpaceDown) return;
+
             if (e.target.classList.contains("orm-table-anchor")) {
                 StartRelationDrag(pTable, e);
                 return;
@@ -647,8 +835,8 @@
                 if (!isDragging)
                     return;
 
-                const dx = e.clientX - dragStartX;
-                const dy = e.clientY - dragStartY;
+                const dx = (e.clientX - dragStartX) / _Zoom;
+                const dy = (e.clientY - dragStartY) / _Zoom;
                 const newX = Math.max(0, elementStartX + dx);
                 const newY = Math.max(0, elementStartY + dy);
 
@@ -790,9 +978,9 @@
         ghost.appendChild(fieldClone);
 
         // Calculate mouse offset from field's top-left for stable dragging
-        const rect = _CanvasContainer.getBoundingClientRect();
-        const mouseX = pEvent.clientX - rect.left + _CanvasContainer.scrollLeft;
-        const mouseY = pEvent.clientY - rect.top + _CanvasContainer.scrollTop;
+        const _ccStart = ClientToCanvas(pEvent.clientX, pEvent.clientY);
+        const mouseX = _ccStart.x;
+        const mouseY = _ccStart.y;
 
         // Calculate offset relative to field's top-left corner on canvas
         const dragOffsetX = mouseX - (pTable.X + bbox.x);
@@ -834,9 +1022,9 @@
             return;
 
         // Get mouse position relative to canvas
-        const rect = _CanvasContainer.getBoundingClientRect();
-        const mouseX = pEvent.clientX - rect.left + _CanvasContainer.scrollLeft;
-        const mouseY = pEvent.clientY - rect.top + _CanvasContainer.scrollTop;
+        const _ccMove = ClientToCanvas(pEvent.clientX, pEvent.clientY);
+        const mouseX = _ccMove.x;
+        const mouseY = _ccMove.y;
 
         // Update ghost position to follow mouse maintaining initial offset
         if (_FieldDragState.Ghost) {
@@ -1019,9 +1207,9 @@
             if (!_RelationDragState)
                 return;
 
-            const rect = _CanvasContainer.getBoundingClientRect();
-            const x = e.clientX - rect.left + _CanvasContainer.scrollLeft;
-            const y = e.clientY - rect.top + _CanvasContainer.scrollTop;
+            const _ccRm = ClientToCanvas(e.clientX, e.clientY);
+            const x = _ccRm.x;
+            const y = _ccRm.y;
 
             _RelationDragState.Line.setAttribute("x2", x);
             _RelationDragState.Line.setAttribute("y2", y);
@@ -1031,9 +1219,9 @@
             if (!_RelationDragState)
                 return;
 
-            const rect = _CanvasContainer.getBoundingClientRect();
-            const x = e.clientX - rect.left + _CanvasContainer.scrollLeft;
-            const y = e.clientY - rect.top + _CanvasContainer.scrollTop;
+            const _ccRu = ClientToCanvas(e.clientX, e.clientY);
+            const x = _ccRu.x;
+            const y = _ccRu.y;
 
             const targetTable = FindTableAtPoint(x, y);
 
@@ -1342,40 +1530,36 @@
         if (!table && !field)
             return;
 
-        let g, elementX, elementY, elementWidth, currentName;
+        let g, screenX, screenY, inputWidth, currentName;
+        const cRect = _CanvasContainer.getBoundingClientRect();
 
         if (table) {
             g = _TablesLayer.querySelector('[data-id="' + pElementID + '"]');
-            if (!g)
-                return;
-            elementX = table.X;
-            elementY = table.Y;
-            elementWidth = table.Width || 200;
+            if (!g) return;
+            // Canvas → screen using current viewport transform
+            screenX  = table.X * _Zoom + _PanX + cRect.left;
+            screenY  = table.Y * _Zoom + _PanY + cRect.top;
+            inputWidth = (table.Width || 200) * _Zoom;
             currentName = table.Name || "";
         }
         else {
             g = _TablesLayer.querySelector('[data-field-id="' + pElementID + '"]');
-            if (!g)
-                return;
+            if (!g) return;
+            // DOM element already positioned by CSS transform → getBoundingClientRect is correct
             const fieldRect = g.getBoundingClientRect();
-            const canvasRect = _CanvasContainer.getBoundingClientRect();
-            elementX = parentTable.X;
-            elementY = fieldRect.top - canvasRect.top + _CanvasContainer.scrollTop;
-            elementWidth = parentTable.Width || 200;
+            screenX  = fieldRect.left;
+            screenY  = fieldRect.top;
+            inputWidth = (parentTable.Width || 200) * _Zoom;
             currentName = field.Name || "";
         }
-
-        const rect = _CanvasContainer.getBoundingClientRect();
-        const scrollLeft = _CanvasContainer.scrollLeft;
-        const scrollTop = _CanvasContainer.scrollTop;
 
         const input = document.createElement("input");
         input.setAttribute("type", "text");
         input.setAttribute("class", "rename-input");
         input.value = currentName;
-        input.style.left = (elementX - scrollLeft + rect.left + 10) + "px";
-        input.style.top = (elementY - scrollTop + rect.top + 4) + "px";
-        input.style.width = (elementWidth - 20) + "px";
+        input.style.left  = (screenX + 10) + "px";
+        input.style.top   = (screenY  + 4) + "px";
+        input.style.width = (inputWidth - 20) + "px";
 
         document.body.appendChild(input);
         input.focus();
@@ -2314,6 +2498,359 @@
             return;
         el.textContent = pMsg;
         el.className = "seed-status-msg" + (pType ? " status-" + pType : "");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    //  AI ORGANIZER OVERLAY
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    const _AI_STEP_LABELS = {
+        context:   "Building model context",
+        sending:   "Sending to AI model",
+        analyzing: "AI analyzing table relationships",
+        grouping:  "Grouping tables by domain",
+        parsing:   "Parsing AI response",
+        layout:    "Computing layout",
+        applying:  "Applying positions & colors",
+        done:      "Complete"
+    };
+
+    let _AICompletedSteps = [];
+    let _AISelectedModelIndex = 0;
+    let _AIPickerModels = [];
+
+    // ── Picker Phase ─────────────────────────────────────────────────────────
+
+    function _AISetSelectorLabel(pIndex) {
+        const m = _AIPickerModels[pIndex];
+        if (!m) return;
+        document.getElementById("ai-model-selector-name").textContent = m.name;
+        const costEl = document.getElementById("ai-model-selector-cost");
+        costEl.textContent = m.costLabel || "";
+        costEl.style.display = m.costLabel ? "" : "none";
+    }
+
+    function _AIBuildDropdown() {
+        const dropdown = document.getElementById("ai-model-dropdown");
+        dropdown.innerHTML = "";
+        for (let i = 0; i < _AIPickerModels.length; i++) {
+            const m = _AIPickerModels[i];
+            const row = document.createElement("div");
+            row.className = "ai-model-row" + (i === _AISelectedModelIndex ? " ai-model-row--selected" : "");
+            row.setAttribute("data-index", String(i));
+            const costLabel = m.costLabel || "";
+            row.innerHTML =
+                '<span class="ai-model-check">\u2713</span>' +
+                '<span class="ai-model-name">' + EscapeHtml(m.name) + '</span>' +
+                (costLabel ? '<span class="ai-model-cost">' + EscapeHtml(costLabel) + '</span>' : "");
+            row.addEventListener("click", function (e) {
+                e.stopPropagation();
+                const rows = dropdown.querySelectorAll(".ai-model-row");
+                rows.forEach(function (r) { r.classList.remove("ai-model-row--selected"); });
+                row.classList.add("ai-model-row--selected");
+                _AISelectedModelIndex = parseInt(row.getAttribute("data-index"), 10);
+                _AISetSelectorLabel(_AISelectedModelIndex);
+                dropdown.style.display = "none";
+            });
+            dropdown.appendChild(row);
+        }
+        // Scroll to selected
+        const sel = dropdown.querySelector(".ai-model-row--selected");
+        if (sel) setTimeout(function () { sel.scrollIntoView({ block: "nearest" }); }, 0);
+    }
+
+    function OpenAIPickerOverlay(pPayload) {
+        const overlay = document.getElementById("ai-organize-overlay");
+        if (!overlay) return;
+
+        _AIPickerModels = (pPayload && pPayload.models) ? pPayload.models : [];
+        _AICompletedSteps = [];
+
+        // Reset all sections
+        document.getElementById("ai-picker-section").style.display = "block";
+        document.getElementById("ai-progress-section").style.display = "none";
+        document.getElementById("ai-steps-list").style.display = "none";
+        document.getElementById("ai-result-section").style.display = "none";
+        document.getElementById("ai-model-dropdown").style.display = "none";
+
+        document.getElementById("ai-modal-icon").textContent = "\u2728";
+        document.getElementById("ai-modal-title").textContent = "Organize Tables with AI";
+        document.getElementById("ai-model-badge").textContent =
+            pPayload && pPayload.tableCount ? pPayload.tableCount + " tables" : "";
+
+        const statusDot = document.getElementById("ai-status-dot");
+        statusDot.className = "ai-status-dot ai-status-dot--idle";
+
+        // Pre-select last used model
+        const lastModelName = _AIGetLastModelName();
+        _AISelectedModelIndex = 0;
+        for (let i = 0; i < _AIPickerModels.length; i++) {
+            if (lastModelName && _AIPickerModels[i].name === lastModelName) {
+                _AISelectedModelIndex = i;
+                break;
+            }
+        }
+        _AISetSelectorLabel(_AISelectedModelIndex);
+
+        // Prompt preview
+        const promptEl = document.getElementById("ai-prompt-preview");
+        if (promptEl) promptEl.value = (pPayload && pPayload.promptPreview) ? pPayload.promptPreview : "";
+
+        // Wire model selector button
+        const selectorBtn = document.getElementById("ai-model-selector-btn");
+        selectorBtn.onclick = function (e) {
+            e.stopPropagation();
+            const dropdown = document.getElementById("ai-model-dropdown");
+            if (dropdown.style.display === "none") {
+                const rect = selectorBtn.getBoundingClientRect();
+                dropdown.style.top = (rect.bottom + 4) + "px";
+                dropdown.style.left = rect.left + "px";
+                dropdown.style.width = rect.width + "px";
+                _AIBuildDropdown();
+                dropdown.style.display = "block";
+            } else {
+                dropdown.style.display = "none";
+            }
+        };
+
+        // Close dropdown on outside click
+        document.addEventListener("click", function _closeDropdown() {
+            const dropdown = document.getElementById("ai-model-dropdown");
+            if (dropdown) dropdown.style.display = "none";
+            document.removeEventListener("click", _closeDropdown);
+        });
+
+        // Footer: Cancel + Execute
+        const footer = document.getElementById("ai-modal-footer");
+        footer.innerHTML =
+            '<button id="ai-cancel-btn" class="seed-btn seed-btn-secondary">Cancel</button>' +
+            '<button id="ai-execute-btn" class="seed-btn seed-btn-primary">Execute</button>';
+
+        document.getElementById("ai-cancel-btn").onclick = CloseAIOrganizeOverlay;
+        document.getElementById("ai-execute-btn").onclick = function () {
+            SendMessage(XMessageType.OrganizeTablesAIExecute, { ModelIndex: _AISelectedModelIndex });
+        };
+
+        overlay.style.display = "flex";
+        overlay.setAttribute("aria-hidden", "false");
+    }
+
+    // ── Running Phase ─────────────────────────────────────────────────────────
+
+    function OpenAIOrganizeOverlay(pPayload) {
+        const overlay = document.getElementById("ai-organize-overlay");
+        if (!overlay) return;
+
+        _AICompletedSteps = [];
+
+        // Switch to progress phase
+        document.getElementById("ai-picker-section").style.display = "none";
+        document.getElementById("ai-progress-section").style.display = "block";
+        document.getElementById("ai-steps-list").style.display = "block";
+        document.getElementById("ai-steps-list").innerHTML = "";
+        document.getElementById("ai-result-section").style.display = "none";
+
+        document.getElementById("ai-progress-fill").style.width = "0%";
+        document.getElementById("ai-progress-fill").className = "ai-progress-bar-fill";
+        document.getElementById("ai-progress-label").textContent = "Initializing\u2026";
+        document.getElementById("ai-modal-icon").textContent = "\u2728";
+
+        const statusDot = document.getElementById("ai-status-dot");
+        statusDot.className = "ai-status-dot ai-status-dot--running";
+
+        const badge = document.getElementById("ai-model-badge");
+        if (pPayload && pPayload.model) {
+            const vendor = pPayload.vendor ? " \u00B7 " + pPayload.vendor : "";
+            badge.textContent = pPayload.model + vendor;
+        } else {
+            badge.textContent = "";
+        }
+
+        const title = document.getElementById("ai-modal-title");
+        const tableCount = pPayload && pPayload.tableCount ? pPayload.tableCount : 0;
+        title.textContent = "Organizing " + (tableCount > 0 ? tableCount + " tables" : "Tables") + " with AI";
+
+        // Footer: empty during run (no buttons while AI works)
+        const footer = document.getElementById("ai-modal-footer");
+        footer.innerHTML = "";
+
+        overlay.style.display = "flex";
+        overlay.setAttribute("aria-hidden", "false");
+    }
+
+    function UpdateAIOrganizeProgress(pPayload) {
+        if (!pPayload) return;
+
+        const fill = document.getElementById("ai-progress-fill");
+        const label = document.getElementById("ai-progress-label");
+        const stepsList = document.getElementById("ai-steps-list");
+
+        if (fill && typeof pPayload.percent === "number")
+            fill.style.width = Math.min(100, pPayload.percent) + "%";
+
+        if (label && pPayload.message)
+            label.textContent = pPayload.message;
+
+        const stepKey = pPayload.step;
+        if (stepKey && stepKey !== "done" && !_AICompletedSteps.includes(stepKey)) {
+            _AICompletedSteps.push(stepKey);
+            const stepLabel = _AI_STEP_LABELS[stepKey] || stepKey;
+            const item = document.createElement("div");
+            item.className = "ai-step-item ai-step-item--running";
+            item.setAttribute("data-step", stepKey);
+            item.innerHTML =
+                '<span class="ai-step-spinner"></span>' +
+                '<span class="ai-step-text">' + EscapeHtml(stepLabel) + '</span>';
+            stepsList.appendChild(item);
+
+            const prev = stepsList.querySelectorAll(".ai-step-item--running");
+            for (let i = 0; i < prev.length - 1; i++) {
+                prev[i].className = "ai-step-item ai-step-item--done";
+                prev[i].innerHTML =
+                    '<span class="ai-step-check">\u2713</span>' +
+                    '<span class="ai-step-text">' + prev[i].querySelector(".ai-step-text").textContent + '</span>';
+            }
+
+            stepsList.scrollTop = stepsList.scrollHeight;
+        }
+    }
+
+    // ── Complete Phase ────────────────────────────────────────────────────────
+
+    function CompleteAIOrganize(pPayload) {
+        const fill = document.getElementById("ai-progress-fill");
+        const label = document.getElementById("ai-progress-label");
+        const stepsList = document.getElementById("ai-steps-list");
+        const resultSection = document.getElementById("ai-result-section");
+        const footer = document.getElementById("ai-modal-footer");
+        const icon = document.getElementById("ai-modal-icon");
+        const statusDot = document.getElementById("ai-status-dot");
+
+        if (fill) fill.style.width = "100%";
+        if (fill) fill.classList.add("ai-progress-bar-fill--done");
+        if (label) label.textContent = pPayload && pPayload.tablesOrganized
+            ? pPayload.tablesOrganized + " tables organized into " + pPayload.groupCount + " groups"
+            : "Done!";
+
+        if (icon) icon.textContent = "\u2705";
+        if (statusDot) statusDot.className = "ai-status-dot ai-status-dot--done";
+
+        // Save the last used model name to localStorage
+        if (_AIPickerModels.length > 0 && _AISelectedModelIndex < _AIPickerModels.length)
+            _AISaveLastModelName(_AIPickerModels[_AISelectedModelIndex].name);
+
+        if (stepsList) {
+            const pending = stepsList.querySelectorAll(".ai-step-item--running");
+            pending.forEach(function (item) {
+                item.className = "ai-step-item ai-step-item--done";
+                const txt = item.querySelector(".ai-step-text");
+                const textContent = txt ? txt.textContent : "";
+                item.innerHTML =
+                    '<span class="ai-step-check">\u2713</span>' +
+                    '<span class="ai-step-text">' + EscapeHtml(textContent) + '</span>';
+            });
+        }
+
+        if (resultSection && pPayload && pPayload.groups && pPayload.groups.length > 0) {
+            const chips = document.getElementById("ai-group-chips");
+            chips.innerHTML = "";
+            for (const group of pPayload.groups) {
+                const chip = document.createElement("div");
+                chip.className = "ai-group-chip";
+                chip.style.setProperty("--chip-color", group.color || "#888888");
+                chip.innerHTML =
+                    '<span class="ai-chip-swatch"></span>' +
+                    '<span class="ai-chip-label">' + EscapeHtml(group.name) + '</span>' +
+                    '<span class="ai-chip-count">' + (group.count || 0) + '</span>';
+                chips.appendChild(chip);
+            }
+            resultSection.style.display = "block";
+        }
+
+        // Footer: Revert (if canRevert) + Close
+        if (footer) {
+            footer.innerHTML = "";
+            if (pPayload && pPayload.canRevert) {
+                const revertBtn = document.createElement("button");
+                revertBtn.id = "ai-revert-btn";
+                revertBtn.className = "seed-btn seed-btn-secondary";
+                revertBtn.textContent = "Revert";
+                revertBtn.onclick = function () {
+                    SendMessage(XMessageType.AIOrganizeRevert, {});
+                    CloseAIOrganizeOverlay();
+                };
+                footer.appendChild(revertBtn);
+            }
+            const closeBtn = document.createElement("button");
+            closeBtn.id = "ai-close-btn";
+            closeBtn.className = "seed-btn seed-btn-primary";
+            closeBtn.textContent = "Close";
+            closeBtn.onclick = CloseAIOrganizeOverlay;
+            footer.appendChild(closeBtn);
+            closeBtn.focus();
+        }
+    }
+
+    function ErrorAIOrganize(pPayload) {
+        const fill = document.getElementById("ai-progress-fill");
+        const label = document.getElementById("ai-progress-label");
+        const icon = document.getElementById("ai-modal-icon");
+        const statusDot = document.getElementById("ai-status-dot");
+        const footer = document.getElementById("ai-modal-footer");
+        const stepsList = document.getElementById("ai-steps-list");
+
+        if (fill) { fill.style.width = "100%"; fill.classList.add("ai-progress-bar-fill--error"); }
+        if (label) label.textContent = (pPayload && pPayload.message) ? pPayload.message : "An error occurred.";
+        if (icon) icon.textContent = "\u274C";
+        if (statusDot) statusDot.className = "ai-status-dot ai-status-dot--error";
+
+        if (stepsList) {
+            const pending = stepsList.querySelectorAll(".ai-step-item--running");
+            pending.forEach(function (item) {
+                item.className = "ai-step-item ai-step-item--error";
+                const txt = item.querySelector(".ai-step-text");
+                const textContent = txt ? txt.textContent : "";
+                item.innerHTML =
+                    '<span class="ai-step-err">\u2715</span>' +
+                    '<span class="ai-step-text">' + EscapeHtml(textContent) + '</span>';
+            });
+        }
+
+        if (footer) {
+            footer.innerHTML =
+                '<button id="ai-close-btn" class="seed-btn seed-btn-primary">Close</button>';
+            document.getElementById("ai-close-btn").onclick = CloseAIOrganizeOverlay;
+        }
+    }
+
+    function CloseAIOrganizeOverlay() {
+        const overlay = document.getElementById("ai-organize-overlay");
+        if (overlay) {
+            overlay.style.display = "none";
+            overlay.setAttribute("aria-hidden", "true");
+        }
+        _AICompletedSteps = [];
+    }
+
+    // ── Persistence helpers ───────────────────────────────────────────────────
+
+    function _AIGetLastModelName() {
+        try { return localStorage.getItem("dase.ai.lastModel") || ""; }
+        catch { return ""; }
+    }
+
+    function _AISaveLastModelName(pName) {
+        try { localStorage.setItem("dase.ai.lastModel", pName || ""); }
+        catch { /* storage unavailable */ }
+    }
+
+    function EscapeHtml(pStr) {
+        if (!pStr) return "";
+        return String(pStr)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
     }
 
 })();

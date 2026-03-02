@@ -30,7 +30,16 @@ export const XDesignerMessageType = {
     // Shadow table picker
     RequestShadowTablePicker: "RequestShadowTablePicker",
     ShadowTablePickerData: "ShadowTablePickerData",
-    AddShadowTable: "AddShadowTable"
+    AddShadowTable: "AddShadowTable",
+    // AI Organization
+    OrganizeTablesAI: "OrganizeTablesAI",
+    AIOrganizeShowPicker: "AIOrganizeShowPicker",
+    OrganizeTablesAIExecute: "OrganizeTablesAIExecute",
+    AIOrganizeStart: "AIOrganizeStart",
+    AIOrganizeProgress: "AIOrganizeProgress",
+    AIOrganizeComplete: "AIOrganizeComplete",
+    AIOrganizeError: "AIOrganizeError",
+    AIOrganizeRevert: "AIOrganizeRevert"
 } as const;
 
 export type TDesignerMessageType = typeof XDesignerMessageType[keyof typeof XDesignerMessageType];

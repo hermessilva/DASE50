@@ -41,32 +41,44 @@ Table SYSxUser {
   Name                 nvarchar(100)    [not null, note: 'User first name']
   CreatedAt            datetime2        [not null, default: `GETUTCDATE()`, note: 'Record creation timestamp']
   LastLoginAt          datetime2        [not null, note: 'Last login timestamp']
-  SYSxStateID          byte             [not null, ref: > SYSxState.ID, delete: restrict, update: no action, note: 'FK to SYSxState']
+  SYSxStateID          byte             [not null, note: 'FK to SYSxState']
 
   Note: 'System users table extending ASP.NET Identity'
 }
 
+Ref: SYSxUser.SYSxStateID > SYSxState.ID [delete: restrict, update: no action]
+
 Table SYSxUserProfile {
   ID                uniqueidentifier [pk, note: 'Primary key']
-  SYSxUserID        uniqueidentifier [not null, ref: > SYSxUser.ID, delete: restrict, update: no action, note: 'FK to SYSxUser']
-  SYSxStateID       byte             [not null, ref: > SYSxState.ID, delete: restrict, update: no action, note: 'FK to SYSxState']
-  SYSxRoleProfileID uniqueidentifier [not null, ref: > SYSxRoleProfile.ID, delete: restrict, update: no action, note: 'FK to SYSxRoleProfile']
+  SYSxUserID        uniqueidentifier [not null, note: 'FK to SYSxUser']
+  SYSxStateID       byte             [not null, note: 'FK to SYSxState']
+  SYSxRoleProfileID uniqueidentifier [not null, note: 'FK to SYSxRoleProfile']
   Note: 'Extended user profile information'
 }
 
+Ref: SYSxUserProfile.SYSxUserID > SYSxUser.ID [delete: restrict, update: no action]
+Ref: SYSxUserProfile.SYSxStateID > SYSxState.ID [delete: restrict, update: no action]
+Ref: SYSxUserProfile.SYSxRoleProfileID > SYSxRoleProfile.ID [delete: restrict, update: no action]
+
 Table SYSxRoleProfile {
   ID          uniqueidentifier [pk, note: 'Primary key']
-  SYSxStateID byte             [not null, ref: > SYSxState.ID, delete: restrict, update: no action, note: 'FK to SYSxState']
+  SYSxStateID byte             [not null, note: 'FK to SYSxState']
   Name        nvarchar(45)     [not null, note: 'User role name']
 }
 
+Ref: SYSxRoleProfile.SYSxStateID > SYSxState.ID [delete: restrict, update: no action]
+
 Table SYSxUserRoleClaim {
   ID              uniqueidentifier [pk, increment, note: 'Primary key']
-  SYSxUserRoleID  uniqueidentifier [not null, ref: > SYSxRoleProfile.ID, delete: restrict, update: no action, note: 'FK to SYSxRoleProfile']
-  SYSxStateID     byte             [not null, ref: > SYSxState.ID, delete: restrict, update: no action, note: 'FK to SYSxState']
-  SYSxRoleClaimID uniqueidentifier [not null, ref: > SYSxRoleClaims.ID, delete: restrict, update: no action, note: 'FK to SYSxRoleClaims']
+  SYSxUserRoleID  uniqueidentifier [not null, note: 'FK to SYSxRoleProfile']
+  SYSxStateID     byte             [not null, note: 'FK to SYSxState']
+  SYSxRoleClaimID uniqueidentifier [not null, note: 'FK to SYSxRoleClaims']
   Note: 'User role claims table for ASP.NET Identity'
 }
+
+Ref: SYSxUserRoleClaim.SYSxUserRoleID > SYSxRoleProfile.ID [delete: restrict, update: no action]
+Ref: SYSxUserRoleClaim.SYSxStateID > SYSxState.ID [delete: restrict, update: no action]
+Ref: SYSxUserRoleClaim.SYSxRoleClaimID > SYSxRoleClaims.ID [delete: restrict, update: no action]
 
 Table SYSxRole {
   ID               uniqueidentifier [pk, note: 'Primary key']
@@ -78,16 +90,17 @@ Table SYSxRole {
   Priority         int              [not null, default: 0, note: 'Priority for permission conflict resolution']
   CreatedAt        datetime2        [not null, default: `GETUTCDATE()`, note: 'Record creation timestamp']
   UpdatedAt        datetime2        [not null, note: 'Last update timestamp']
-  SYSxStateID      byte             [not null, ref: > SYSxState.ID, delete: restrict, update: no action, note: 'FK to SYSxState']
+  SYSxStateID      byte             [not null, note: 'FK to SYSxState']
 
   Note: 'System roles table extending ASP.NET Identity'
 }
 
+Ref: SYSxRole.SYSxStateID > SYSxState.ID [delete: restrict, update: no action]
 
 Table SYSxClaimGroup {
   ID          int          [pk, note: 'Primary key']
   Name        nvarchar(30) [not null, note: 'Group name']
-  SYSxStateID byte         [not null, ref: > SYSxState.ID, delete: restrict, update: no action, note: 'FK to SYSxState']
+  SYSxStateID byte         [not null, note: 'FK to SYSxState']
 
   Note: '
   Claim       groups for organizing role claims
@@ -102,20 +115,26 @@ Table SYSxClaimGroup {
   '
 }
 
+Ref: SYSxClaimGroup.SYSxStateID > SYSxState.ID [delete: restrict, update: no action]
+
 Table SYSxRoleClaims {
   ID               uniqueidentifier [pk, increment, note: 'Primary key']
-  SYSxRoleID       uniqueidentifier [not null, ref: > SYSxRole.ID, delete: restrict, update: no action, note: 'FK to SYSxRole']
+  SYSxRoleID       uniqueidentifier [not null, note: 'FK to SYSxRole']
   ClaimType        nvarchar(30)     [not null, note: 'Claim type identifier']
   ClaimValue       nvarchar(80)     [not null, note: 'Claim value']
-  SYSxClaimGroupID int              [not null, ref: > SYSxClaimGroup.ID, delete: restrict, update: no action, note: 'FK to SYSxClaimGroup']
-  SYSxStateID      byte             [not null, ref: > SYSxState.ID, delete: restrict, update: no action, note: 'FK to SYSxState']
+  SYSxClaimGroupID int              [not null, note: 'FK to SYSxClaimGroup']
+  SYSxStateID      byte             [not null, note: 'FK to SYSxState']
 
   Note: 'Role claims table for ASP.NET Identity'
 }
 
+Ref: SYSxRoleClaims.SYSxRoleID > SYSxRole.ID [delete: restrict, update: no action]
+Ref: SYSxRoleClaims.SYSxClaimGroupID > SYSxClaimGroup.ID [delete: restrict, update: no action]
+Ref: SYSxRoleClaims.SYSxStateID > SYSxState.ID [delete: restrict, update: no action]
+
 Table SYSxRefreshToken {
   ID              uniqueidentifier [pk, note: 'Primary key']
-  SYSxUserID      uniqueidentifier [not null, ref: > SYSxUser.ID, delete: restrict, update: no action, note: 'FK to SYSxUser']
+  SYSxUserID      uniqueidentifier [not null, note: 'FK to SYSxUser']
   Token           nvarchar(500)    [not null, note: 'Refresh token value']
   JwtID           nvarchar(100)    [not null, note: 'Associated JWT ID']
   CreatedAt       datetime2        [not null, note: 'Token creation timestamp']
@@ -124,10 +143,13 @@ Table SYSxRefreshToken {
   ReplacedByToken nvarchar(500)    [not null, note: 'Replacement token value']
   RevokedReason   nvarchar(500)    [not null, note: 'Reason for revocation']
   CreatedByIP     nvarchar(50)     [not null, note: 'IP address that created the token']
-  SYSxStateID     byte             [not null, ref: > SYSxState.ID, delete: restrict, update: no action, note: 'FK to SYSxState']
+  SYSxStateID     byte             [not null, note: 'FK to SYSxState']
 
  Note: 'Refresh tokens for JWT authentication'
 }
+
+Ref: SYSxRefreshToken.SYSxUserID > SYSxUser.ID [delete: restrict, update: no action]
+Ref: SYSxRefreshToken.SYSxStateID > SYSxState.ID [delete: restrict, update: no action]
 
                                                                                     
 // ============================================================================
@@ -149,19 +171,25 @@ Table SYSxApplication {
   CanPrint    bit              [not null, default: true, note: 'Supports print operations']
   CreatedAt   datetime2        [not null, default: `GETUTCDATE()`, note: 'Record creation timestamp']
   UpdatedAt   datetime2        [not null, note: 'Last update timestamp']
-  SYSxStateID byte             [not null, ref: > SYSxState.ID, delete: restrict, update: no action, note: 'FK to SYSxState']
+  SYSxStateID byte             [not null, note: 'FK to SYSxState']
 
   Note: 'System applications/modules registry'
 }
 
+Ref: SYSxApplication.SYSxStateID > SYSxState.ID [delete: restrict, update: no action]
+
 Table SYSxApplicationClaim {
   ID                uniqueidentifier [pk, note: 'Primary key']
-  SYSxRoleClaimID   uniqueidentifier [not null, ref: > SYSxRoleClaims.ID, delete: restrict, update: no action, note: 'FK to SYSxRoleClaims']
-  SYSxApplicationID uniqueidentifier [not null, ref: > SYSxApplication.ID, delete: restrict, update: no action, note: 'FK to SYSxApplication']
-  SYSxStateID       byte             [not null, ref: > SYSxState.ID, delete: restrict, update: no action, note: 'FK to SYSxState']
+  SYSxRoleClaimID   uniqueidentifier [not null, note: 'FK to SYSxRoleClaims']
+  SYSxApplicationID uniqueidentifier [not null, note: 'FK to SYSxApplication']
+  SYSxStateID       byte             [not null, note: 'FK to SYSxState']
 
   Note: 'Junction table: permissions required by applications'
 }
+
+Ref: SYSxApplicationClaim.SYSxRoleClaimID > SYSxRoleClaims.ID [delete: restrict, update: no action]
+Ref: SYSxApplicationClaim.SYSxApplicationID > SYSxApplication.ID [delete: restrict, update: no action]
+Ref: SYSxApplicationClaim.SYSxStateID > SYSxState.ID [delete: restrict, update: no action]
 
 // ============================================================================
 // MENU SYSTEM
@@ -175,15 +203,17 @@ Table SYSxMenuGroup {
   DisplayOrder int              [not null, default: 0, note: 'Display order in navigation']
   CreatedAt    datetime2        [not null, default: `GETUTCDATE()`, note: 'Record creation timestamp']
   UpdatedAt    datetime2        [not null, note: 'Last update timestamp']
-  SYSxStateID  byte             [not null, ref: > SYSxState.ID, delete: restrict, update: no action, note: 'FK to SYSxState']
+  SYSxStateID  byte             [not null, note: 'FK to SYSxState']
 
   Note: 'Menu groups for navigation organization'
 }
 
+Ref: SYSxMenuGroup.SYSxStateID > SYSxState.ID [delete: restrict, update: no action]
+
 Table SYSxMenuItem {
   ID                uniqueidentifier [pk, note: 'Primary key']
-  SYSxApplicationID uniqueidentifier [not null, ref: > SYSxApplication.ID, delete: restrict, update: no action, note: 'FK to SYSxApplication']
-  SYSxMenuGroupID   uniqueidentifier [not null, ref: > SYSxMenuGroup.ID, delete: restrict, update: no action, note: 'FK to SYSxMenuGroup']
+  SYSxApplicationID uniqueidentifier [not null, note: 'FK to SYSxApplication']
+  SYSxMenuGroupID   uniqueidentifier [not null, note: 'FK to SYSxMenuGroup']
   Name              nvarchar(100)    [not null, note: 'Menu item identifier']
   Title             nvarchar(200)    [not null, note: 'Display title']
   Icon              nvarchar(100)    [not null, note: 'Icon identifier or class']
@@ -191,19 +221,26 @@ Table SYSxMenuItem {
   DisplayOrder      int              [not null, default: 0, note: 'Display order within group']
   CreatedAt         datetime2        [not null, default: `GETUTCDATE()`, note: 'Record creation timestamp']
   UpdatedAt         datetime2        [not null, note: 'Last update timestamp']
-  SYSxStateID       byte             [not null, ref: > SYSxState.ID, delete: restrict, update: no action, note: 'FK to SYSxState']
+  SYSxStateID       byte             [not null, note: 'FK to SYSxState']
 
   Note: 'Menu items linked to applications'
 }
 
+Ref: SYSxMenuItem.SYSxApplicationID > SYSxApplication.ID [delete: restrict, update: no action]
+Ref: SYSxMenuItem.SYSxMenuGroupID > SYSxMenuGroup.ID [delete: restrict, update: no action]
+Ref: SYSxMenuItem.SYSxStateID > SYSxState.ID [delete: restrict, update: no action]
+
 Table SYSxMenuItemMRU {
   ID             uniqueidentifier [pk, note: 'Primary key']
-  SYSxUserID     uniqueidentifier [not null, ref: > SYSxUser.ID, delete: restrict, update: no action, note: 'FK to SYSxUser']
-  SYSxMenuItemID uniqueidentifier [not null, ref: > SYSxMenuItem.ID, delete: restrict, update: no action, note: 'FK to SYSxMenuItem']
+  SYSxUserID     uniqueidentifier [not null, note: 'FK to SYSxUser']
+  SYSxMenuItemID uniqueidentifier [not null, note: 'FK to SYSxMenuItem']
   AccessedAt     datetime2        [not null, note: 'Last access timestamp']
   AccessCount    int              [not null, default: 1, note: 'Total access count']
   Note: 'Most Recently Used menu items per user'
 }
+
+Ref: SYSxMenuItemMRU.SYSxUserID > SYSxUser.ID [delete: restrict, update: no action]
+Ref: SYSxMenuItemMRU.SYSxMenuItemID > SYSxMenuItem.ID [delete: restrict, update: no action]
 
 // ============================================================================
 // PROFILE-APP RELATIONSHIP
@@ -211,21 +248,29 @@ Table SYSxMenuItemMRU {
 
 Table SYSxProfileApp {
   ID                uniqueidentifier [pk, note: 'Primary key']
-  SYSxRoleProfileID uniqueidentifier [not null, ref: > SYSxRoleProfile.ID, delete: restrict, update: no action, note: 'FK to SYSxRoleProfile']
-  SYSxApplicationID uniqueidentifier [not null, ref: > SYSxApplication.ID, delete: restrict, update: no action, note: 'FK to SYSxApplication']
-  SYSxStateID       byte             [not null, ref: > SYSxState.ID, delete: restrict, update: no action, note: 'FK to SYSxState']
+  SYSxRoleProfileID uniqueidentifier [not null, note: 'FK to SYSxRoleProfile']
+  SYSxApplicationID uniqueidentifier [not null, note: 'FK to SYSxApplication']
+  SYSxStateID       byte             [not null, note: 'FK to SYSxState']
 
   Note: 'Junction table: profiles to applications'
 }
 
+Ref: SYSxProfileApp.SYSxRoleProfileID > SYSxRoleProfile.ID [delete: restrict, update: no action]
+Ref: SYSxProfileApp.SYSxApplicationID > SYSxApplication.ID [delete: restrict, update: no action]
+Ref: SYSxProfileApp.SYSxStateID > SYSxState.ID [delete: restrict, update: no action]
+
 Table SYSxProfileAppClaim {
   ID               uniqueidentifier [pk, note: 'Primary key']
-  SYSxProfileAppID uniqueidentifier [not null, ref: > SYSxProfileApp.ID, delete: restrict, update: no action, note: 'FK to SYSxProfileApp']
-  SYSxRoleClaimID  int              [not null, ref: > SYSxRoleClaims.ID, delete: restrict, update: no action, note: 'FK to SYSxRoleClaims']
-  SYSxStateID      byte             [not null, ref: > SYSxState.ID, delete: restrict, update: no action, note: 'FK to SYSxState']
+  SYSxProfileAppID uniqueidentifier [not null, note: 'FK to SYSxProfileApp']
+  SYSxRoleClaimID  int              [not null, note: 'FK to SYSxRoleClaims']
+  SYSxStateID      byte             [not null, note: 'FK to SYSxState']
 
   Note: 'Claims for a profile within an application'
 }
+
+Ref: SYSxProfileAppClaim.SYSxProfileAppID > SYSxProfileApp.ID [delete: restrict, update: no action]
+Ref: SYSxProfileAppClaim.SYSxRoleClaimID > SYSxRoleClaims.ID [delete: restrict, update: no action]
+Ref: SYSxProfileAppClaim.SYSxStateID > SYSxState.ID [delete: restrict, update: no action]
 
 
 // ============================================================================
@@ -248,7 +293,7 @@ Table SYSxSubscriptionPlan {
   SortOrder             tinyint       [not null, default: 0, note: 'Display order in plan listing']
   CreatedAt             datetime2     [not null, default: `GETUTCDATE()`, note: 'Record creation timestamp']
   UpdatedAt             datetime2     [note: 'Last update timestamp']
-  SYSxStateID           byte          [not null, ref: > SYSxState.ID, delete: restrict, update: no action, note: 'FK to SYSxState']
+  SYSxStateID           byte          [not null, note: 'FK to SYSxState']
 
   Note: '
   Available             subscription plans with pricing
@@ -262,12 +307,14 @@ Table SYSxSubscriptionPlan {
   '
 }
 
+Ref: SYSxSubscriptionPlan.SYSxStateID > SYSxState.ID [delete: restrict, update: no action]
+
 Table SYSxSubscription {
   ID                     uniqueidentifier [pk, note: 'Primary key']
-  SYSxUserID             uniqueidentifier [not null, ref: > SYSxUser.ID, delete: restrict, update: no action, note: 'FK to SYSxUser']
-  SYSxCreditCardID       uniqueidentifier [null, ref: > SYSxCreditCard.ID, delete: set null, update: no action, note: 'FK to SYSxCreditCard (nullable for non-card payments)']
+  SYSxUserID             uniqueidentifier [not null, note: 'FK to SYSxUser']
+  SYSxCreditCardID       uniqueidentifier [null, note: 'FK to SYSxCreditCard (nullable for non-card payments)']
 
-  SYSxSubscriptionPlanID smallint         [not null, ref: > SYSxSubscriptionPlan.ID, delete: restrict, update: no action, note: 'FK to SYSxSubscriptionPlan']
+  SYSxSubscriptionPlanID smallint         [not null, note: 'FK to SYSxSubscriptionPlan']
   BillingCycle           tinyint          [not null, note: 'BillingCycle enum: 1=Monthly, 2=Annual']
   Status                 tinyint          [not null, default: 1, note: 'SubscriptionStatus enum (default: PendingPayment)']
   PaymentMethod          tinyint          [not null, note: 'PaymentMethod enum: 1=Pix, 2=CreditCard, 3=BankSlip']
@@ -283,11 +330,15 @@ Table SYSxSubscription {
   Note: 'User subscriptions linking users to plans with billing lifecycle tracking'
 }
 
+Ref: SYSxSubscription.SYSxUserID > SYSxUser.ID [delete: restrict, update: no action]
+Ref: SYSxSubscription.SYSxCreditCardID > SYSxCreditCard.ID [delete: set null, update: no action]
+Ref: SYSxSubscription.SYSxSubscriptionPlanID > SYSxSubscriptionPlan.ID [delete: restrict, update: no action]
+
 Table SYSxCreditCard {
   ID                 uniqueidentifier [pk, note: 'Primary key']
-  SYSxSubscriptionID uniqueidentifier [not null, ref: > SYSxSubscription.ID, delete: restrict, update: no action, note: 'FK to SYSxSubscription']
-  SYSxUserID         uniqueidentifier [not null, ref: > SYSxUser.ID, delete: restrict, update: no action, note: 'FK to SYSxUser']
-  SYSxStateID        byte             [not null, ref: > SYSxState.ID, delete: restrict, update: no action, note: 'FK to SYSxState']
+  SYSxSubscriptionID uniqueidentifier [not null, note: 'FK to SYSxSubscription']
+  SYSxUserID         uniqueidentifier [not null, note: 'FK to SYSxUser']
+  SYSxStateID        byte             [not null, note: 'FK to SYSxState']
   Data               varbinary(max)   [not null, note: 'Encrypted credit card data (PCI compliant encryption)']
   CardholderName     nvarchar(100)    [not null, note: 'Name on the card']
   Last4Digits        char(4)          [not null, note: 'Last 4 digits of the card number']
@@ -298,10 +349,14 @@ Table SYSxCreditCard {
   Note: 'Stored credit card information for users (only non-sensitive data)'
 }
 
+Ref: SYSxCreditCard.SYSxSubscriptionID > SYSxSubscription.ID [delete: restrict, update: no action]
+Ref: SYSxCreditCard.SYSxUserID > SYSxUser.ID [delete: restrict, update: no action]
+Ref: SYSxCreditCard.SYSxStateID > SYSxState.ID [delete: restrict, update: no action]
+
 Table SYSxPayment {
   ID                 uniqueidentifier [pk, note: 'Primary key']
-  SYSxSubscriptionID uniqueidentifier [not null, ref: > SYSxSubscription.ID, delete: restrict, update: no action, note: 'FK to SYSxSubscription']
-  SYSxCreditCardID   uniqueidentifier [null, ref: > SYSxCreditCard.ID, delete: set null, update: no action, note: 'FK to SYSxCreditCard (nullable for non-card payments)']
+  SYSxSubscriptionID uniqueidentifier [not null, note: 'FK to SYSxSubscription']
+  SYSxCreditCardID   uniqueidentifier [null, note: 'FK to SYSxCreditCard (nullable for non-card payments)']
   PaymentMethod      tinyint          [not null, note: 'PaymentMethod enum: 1=Pix, 2=CreditCard, 3=BankSlip']
   Status             tinyint          [not null, default: 1, note: 'PaymentStatus enum (default: Pending)']
   Amount             decimal(10,2)    [not null, note: 'Payment amount (BRL)']
@@ -320,3 +375,6 @@ Table SYSxPayment {
 
   Note: 'Individual payment transactions tied to subscriptions'
 }
+
+Ref: SYSxPayment.SYSxSubscriptionID > SYSxSubscription.ID [delete: restrict, update: no action]
+Ref: SYSxPayment.SYSxCreditCardID > SYSxCreditCard.ID [delete: set null, update: no action]

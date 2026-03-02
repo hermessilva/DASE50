@@ -7,12 +7,15 @@ import { XAddFieldCommand } from "./Designers/ORM/Commands/AddFieldCommand";
 import { XAlignLinesCommand } from "./Designers/ORM/Commands/AlignLinesCommand";
 import { XValidateORMModelCommand } from "./Designers/ORM/Commands/ValidateORMModelCommand";
 import { XExportToDBMLCommand } from "./Designers/ORM/Commands/ExportToDBMLCommand";
+import { XImportFromDBMLCommand } from "./Designers/ORM/Commands/ImportFromDBMLCommand";
 import { XDeleteSelectedCommand } from "./Commands/DeleteSelectedCommand";
 import { XRenameSelectedCommand } from "./Commands/RenameSelectedCommand";
 import { XReloadDataTypesCommand } from "./Commands/ReloadDataTypesCommand";
 import { XIssuesViewProvider } from "./Views/IssuesViewProvider";
 import { XPropertiesViewProvider } from "./Views/PropertiesViewProvider";
 import { InitializeLogService, GetLogService } from "./Services/LogService";
+import { RegisterAgentIntegration } from "./AgentIntegration";
+import { XOrganizeTablesCommand } from "./Designers/ORM/Commands/OrganizeTablesCommand";
 
 export function activate(pContext: vscode.ExtensionContext): void {
     const log = InitializeLogService(pContext);
@@ -27,13 +30,18 @@ export function activate(pContext: vscode.ExtensionContext): void {
         XAddFieldCommand.Register(pContext, designerProvider);
         XAlignLinesCommand.Register(pContext, designerProvider);
         XExportToDBMLCommand.Register(pContext, designerProvider);
+        XImportFromDBMLCommand.Register(pContext);
         XValidateORMModelCommand.Register(pContext, designerProvider);
         XDeleteSelectedCommand.Register(pContext, designerProvider);
         XRenameSelectedCommand.Register(pContext, designerProvider);
         XReloadDataTypesCommand.Register(pContext, designerProvider);
+        XOrganizeTablesCommand.Register(pContext, designerProvider);
 
         XIssuesViewProvider.Register(pContext);
         XPropertiesViewProvider.Register(pContext, designerProvider);
+
+        // Register AI Agent Integration (Chat Participant + Language Model Tools)
+        RegisterAgentIntegration(pContext, designerProvider);
 
         log.Info("DASE extension activated successfully");
     }
