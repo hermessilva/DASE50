@@ -1,4 +1,4 @@
-(function() {
+(function () {
     "use strict";
 
     const vscode = acquireVsCodeApi();
@@ -71,13 +71,11 @@
         "Text": "Txt"
     };
 
-    function GetDataTypeIcon(pDataType)
-    {
+    function GetDataTypeIcon(pDataType) {
         return DataTypeIcons[pDataType] || pDataType?.substring(0, 3) || "?";
     }
 
-    function GetLuminance(pHexColor)
-    {
+    function GetLuminance(pHexColor) {
         if (!pHexColor) return 0;
         // TFX stores colors as ARGB hex (8 chars, no #): AARRGGBB
         // HTML #RRGGBB has 7 chars. Normalise to plain RRGGBB in both cases.
@@ -90,8 +88,7 @@
         return 0.2126 * r + 0.7152 * g + 0.0722 * b;
     }
 
-    function ArgbToCssColor(pArgb)
-    {
+    function ArgbToCssColor(pArgb) {
         // Convert TFX ARGB hex (AARRGGBB) to CSS #RRGGBB.
         // If already #RRGGBB pass through unchanged.
         if (!pArgb) return null;
@@ -110,31 +107,26 @@
     const _TableContextMenu = document.getElementById("table-context-menu");
     const _FieldContextMenu = document.getElementById("field-context-menu");
 
-    function Initialize()
-    {
+    function Initialize() {
         SetupCanvasEvents();
         SetupContextMenu();
         SetupMessageHandler();
         SendMessage(XMessageType.DesignerReady, {});
     }
 
-    function SendMessage(pType, pPayload)
-    {
+    function SendMessage(pType, pPayload) {
         vscode.postMessage({ Type: pType, Payload: pPayload });
     }
 
-    function SetupMessageHandler()
-    {
-        window.addEventListener("message", function(pEvent) {
+    function SetupMessageHandler() {
+        window.addEventListener("message", function (pEvent) {
             const msg = pEvent.data;
             HandleMessage(msg);
         });
     }
 
-    function HandleMessage(pMsg)
-    {
-        switch (pMsg.Type)
-        {
+    function HandleMessage(pMsg) {
+        switch (pMsg.Type) {
             case XMessageType.LoadModel:
                 _Model = pMsg.Payload || { DesignID: null, Tables: [], References: [] };
                 RenderModel();
@@ -168,9 +160,8 @@
         }
     }
 
-    function SetupContextMenu()
-    {
-        _ContextMenu.addEventListener("click", function(e) {
+    function SetupContextMenu() {
+        _ContextMenu.addEventListener("click", function (e) {
             const item = e.target.closest(".context-menu-item");
             if (!item)
                 return;
@@ -178,8 +169,7 @@
             const action = item.getAttribute("data-action");
             HideContextMenu();
 
-            switch (action)
-            {
+            switch (action) {
                 case "add-table":
                     SendMessage(XMessageType.AddTable, { X: _ContextMenuPosition.X, Y: _ContextMenuPosition.Y });
                     break;
@@ -199,10 +189,13 @@
                 case "align-lines":
                     SendMessage(XMessageType.AlignLines, {});
                     break;
+                case "export-dbml":
+                    SendMessage("ExportToDBML", {});
+                    break;
             }
         });
 
-        _TableContextMenu.addEventListener("click", function(e) {
+        _TableContextMenu.addEventListener("click", function (e) {
             const item = e.target.closest(".context-menu-item");
             if (!item)
                 return;
@@ -211,8 +204,7 @@
             const tableID = _ContextMenuTarget;
             HideContextMenu();
 
-            switch (action)
-            {
+            switch (action) {
                 case "add-field":
                     if (tableID)
                         SendMessage(XMessageType.AddField, { TableID: tableID, Name: "NewField", DataType: "String" });
@@ -231,9 +223,8 @@
             }
         });
 
-        if (_FieldContextMenu)
-        {
-            _FieldContextMenu.addEventListener("click", function(e) {
+        if (_FieldContextMenu) {
+            _FieldContextMenu.addEventListener("click", function (e) {
                 const item = e.target.closest(".context-menu-item");
                 if (!item)
                     return;
@@ -242,11 +233,9 @@
                 const fieldID = _FieldContextMenuTarget;
                 HideContextMenu();
 
-                switch (action)
-                {
+                switch (action) {
                     case "delete-field":
-                        if (fieldID)
-                        {
+                        if (fieldID) {
                             SendMessage(XMessageType.SelectElement, { ElementID: fieldID });
                             SendMessage(XMessageType.DeleteSelected, {});
                         }
@@ -259,35 +248,32 @@
             });
         }
 
-        document.addEventListener("click", function(e) {
+        document.addEventListener("click", function (e) {
             if (!_ContextMenu.contains(e.target) && !_TableContextMenu.contains(e.target) &&
                 (!_FieldContextMenu || !_FieldContextMenu.contains(e.target)))
                 HideContextMenu();
         });
     }
 
-    function ShowFieldContextMenu(pX, pY, pFieldID)
-    {
+    function ShowFieldContextMenu(pX, pY, pFieldID) {
         _FieldContextMenuTarget = pFieldID;
         _ContextMenu.classList.remove("visible");
         _TableContextMenu.classList.remove("visible");
-        if (_FieldContextMenu)
-        {
+        if (_FieldContextMenu) {
             _FieldContextMenu.style.left = pX + "px";
             _FieldContextMenu.style.top = pY + "px";
             _FieldContextMenu.classList.add("visible");
         }
     }
 
-    function UpdateIssueVisuals()
-    {
+    function UpdateIssueVisuals() {
         const fieldGroups = _TablesLayer.querySelectorAll(".orm-field-group");
-        fieldGroups.forEach(function(fg) {
+        fieldGroups.forEach(function (fg) {
             const fieldID = fg.getAttribute("data-field-id");
-            const hasError = _Issues.some(function(issue) {
+            const hasError = _Issues.some(function (issue) {
                 return issue.ElementID === fieldID && issue.Severity >= 2;
             });
-            const hasWarning = _Issues.some(function(issue) {
+            const hasWarning = _Issues.some(function (issue) {
                 return issue.ElementID === fieldID;
             });
             fg.classList.toggle("has-error", hasError);
@@ -295,12 +281,12 @@
         });
 
         const tables = _TablesLayer.querySelectorAll(".orm-table");
-        tables.forEach(function(t) {
+        tables.forEach(function (t) {
             const tableID = t.getAttribute("data-id");
-            const hasError = _Issues.some(function(issue) {
+            const hasError = _Issues.some(function (issue) {
                 return issue.ElementID === tableID && issue.Severity >= 2;
             });
-            const hasWarning = _Issues.some(function(issue) {
+            const hasWarning = _Issues.some(function (issue) {
                 return issue.ElementID === tableID;
             });
             t.classList.toggle("has-error", hasError);
@@ -308,8 +294,7 @@
         });
     }
 
-    function ShowContextMenu(pX, pY, pCanvasX, pCanvasY)
-    {
+    function ShowContextMenu(pX, pY, pCanvasX, pCanvasY) {
         _ContextMenuPosition.X = pCanvasX;
         _ContextMenuPosition.Y = pCanvasY;
         _ContextMenuTarget = null;
@@ -317,14 +302,12 @@
         // Update menu items based on selection
         const deleteItem = _ContextMenu.querySelector('[data-action="delete-selected"]');
         const renameItem = _ContextMenu.querySelector('[data-action="rename-selected"]');
-        
-        if (_SelectedIDs.length === 0)
-        {
+
+        if (_SelectedIDs.length === 0) {
             deleteItem.classList.add("disabled");
             renameItem.classList.add("disabled");
         }
-        else
-        {
+        else {
             deleteItem.classList.remove("disabled");
             renameItem.classList.remove("disabled");
         }
@@ -335,19 +318,17 @@
         _ContextMenu.classList.add("visible");
     }
 
-    function ShowTableContextMenu(pX, pY, pTableID)
-    {
+    function ShowTableContextMenu(pX, pY, pTableID) {
         _ContextMenuTarget = pTableID;
         _ContextMenu.classList.remove("visible");
         _TableContextMenu.style.left = pX + "px";
         _TableContextMenu.style.top = pY + "px";
 
-        const table = _Model.Tables.find(function(t) { return t.ID === pTableID; });
+        const table = _Model.Tables.find(function (t) { return t.ID === pTableID; });
         const isShadow = table && table.IsShadow;
         const shadowRestricted = ["add-field", "edit-seed-data", "rename-table"];
         const items = _TableContextMenu.querySelectorAll(".context-menu-item");
-        for (const item of items)
-        {
+        for (const item of items) {
             const action = item.getAttribute("data-action");
             item.style.display = (isShadow && shadowRestricted.indexOf(action) >= 0) ? "none" : "";
         }
@@ -358,8 +339,7 @@
         _TableContextMenu.classList.add("visible");
     }
 
-    function HideContextMenu()
-    {
+    function HideContextMenu() {
         _ContextMenu.classList.remove("visible");
         _TableContextMenu.classList.remove("visible");
         if (_FieldContextMenu)
@@ -368,11 +348,9 @@
         _FieldContextMenuTarget = null;
     }
 
-    function SetupCanvasEvents()
-    {
-        _Canvas.addEventListener("click", function(e) {
-            if (e.target === _Canvas || e.target.id === "relations-layer" || e.target.id === "tables-layer")
-            {
+    function SetupCanvasEvents() {
+        _Canvas.addEventListener("click", function (e) {
+            if (e.target === _Canvas || e.target.id === "relations-layer" || e.target.id === "tables-layer") {
                 // Select the Design when clicking on the background
                 if (_Model.DesignID)
                     SendMessage(XMessageType.SelectElement, { ElementID: _Model.DesignID });
@@ -381,37 +359,33 @@
             }
         });
 
-        _CanvasContainer.addEventListener("contextmenu", function(e) {
+        _CanvasContainer.addEventListener("contextmenu", function (e) {
             e.preventDefault();
-            
+
             const rect = _CanvasContainer.getBoundingClientRect();
             const canvasX = e.clientX - rect.left + _CanvasContainer.scrollLeft;
             const canvasY = e.clientY - rect.top + _CanvasContainer.scrollTop;
-            
+
             ShowContextMenu(e.clientX, e.clientY, canvasX, canvasY);
         });
     }
 
-    function RenderModel()
-    {
+    function RenderModel() {
         RenderRelations();
         RenderTables();
         UpdateSelectionVisuals();
     }
 
-    function RenderTables()
-    {
+    function RenderTables() {
         _TablesLayer.innerHTML = "";
-        
-        for (const table of _Model.Tables)
-        {
+
+        for (const table of _Model.Tables) {
             const g = CreateTableElement(table);
             _TablesLayer.appendChild(g);
         }
     }
 
-    function CreateTableElement(pTable)
-    {
+    function CreateTableElement(pTable) {
         const isShadow = !!pTable.IsShadow;
         const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
         g.setAttribute("class", "orm-table" + (isShadow ? " shadow-table" : ""));
@@ -421,7 +395,7 @@
         const width = pTable.Width || 200;
         const headerHeight = 28;
         const fieldHeight = 16;
-        
+
         // Shadow tables render header only — no body or fields
         // ALWAYS calculate - never use pTable.Height to ensure consistency
         const fieldCount = isShadow ? 0 : ((pTable.Fields && pTable.Fields.length) || 0);
@@ -452,8 +426,7 @@
         g.appendChild(headerMask);
 
         // Subtle body background
-        if (fieldCount > 0)
-        {
+        if (fieldCount > 0) {
             const body = document.createElementNS("http://www.w3.org/2000/svg", "rect");
             body.setAttribute("class", "orm-table-body");
             body.setAttribute("y", headerHeight);
@@ -477,8 +450,7 @@
         g.appendChild(title);
 
         // Apply FillProp to header if defined (shadow tables inherit the original's colour)
-        if (pTable.FillProp)
-        {
+        if (pTable.FillProp) {
             const cssColor = ArgbToCssColor(pTable.FillProp);
             header.style.fill = cssColor;
             headerMask.style.fill = cssColor;
@@ -491,11 +463,9 @@
         }
 
         // Shadow table: ghost styling + source document badge
-        if (isShadow)
-        {
+        if (isShadow) {
             // Only apply grey header when no colour was inherited from the original
-            if (!pTable.FillProp)
-            {
+            if (!pTable.FillProp) {
                 header.style.fill = "#555";
                 headerMask.style.fill = "#555";
                 title.style.fill = "#bbb";
@@ -505,8 +475,7 @@
             rect.style.strokeDasharray = "6 3";
             rect.style.stroke = "#666";
             rect.style.fill = "rgba(60,60,60,0.4)";
-            if (pTable.ShadowDocumentName)
-            {
+            if (pTable.ShadowDocumentName) {
                 const badge = document.createElementNS("http://www.w3.org/2000/svg", "text");
                 badge.setAttribute("class", "orm-shadow-badge");
                 badge.setAttribute("x", width - 5);
@@ -514,8 +483,7 @@
                 badge.setAttribute("text-anchor", "end");
                 badge.textContent = "\u2197 " + pTable.ShadowDocumentName;
                 // Adapt badge colour to match the header contrast
-                if (pTable.FillProp)
-                {
+                if (pTable.FillProp) {
                     const luminance = GetLuminance(pTable.FillProp);
                     badge.style.fill = luminance > 0.35 ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.7)";
                 }
@@ -523,11 +491,9 @@
             }
         }
 
-        if (pTable.Fields && pTable.Fields.length > 0)
-        {
+        if (pTable.Fields && pTable.Fields.length > 0) {
             let y = headerHeight + 16;
-            for (const field of pTable.Fields)
-            {
+            for (const field of pTable.Fields) {
                 const fieldGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
                 fieldGroup.setAttribute("class", "orm-field-group");
                 fieldGroup.setAttribute("data-field-id", field.ID);
@@ -560,7 +526,7 @@
                 fieldText.setAttribute("class", "orm-table-field" + (field.IsPrimaryKey ? " orm-table-field-pk" : ""));
                 fieldText.setAttribute("x", 30);
                 fieldText.setAttribute("y", y);
-                
+
                 fieldText.textContent = field.Name || field.FieldName || "field";
                 fieldGroup.appendChild(fieldText);
 
@@ -579,8 +545,7 @@
                 checkboxBg.setAttribute("class", "orm-checkbox-bg");
                 checkboxGroup.appendChild(checkboxBg);
 
-                if (isRequired)
-                {
+                if (isRequired) {
                     const checkMark = document.createElementNS("http://www.w3.org/2000/svg", "path");
                     checkMark.setAttribute("d", "M2,5 L4,7 L8,3");
                     checkMark.setAttribute("class", "orm-checkbox-check");
@@ -588,10 +553,9 @@
                 }
 
                 // Only enable click for non-PK fields
-                if (!field.IsPrimaryKey)
-                {
+                if (!field.IsPrimaryKey) {
                     checkboxGroup.style.cursor = "pointer";
-                    checkboxGroup.addEventListener("click", function(e) {
+                    checkboxGroup.addEventListener("click", function (e) {
                         e.preventDefault();
                         e.stopPropagation();
                         SendMessage(XMessageType.UpdateProperty, {
@@ -605,7 +569,7 @@
 
                 SetupFieldEvents(fieldGroup, field, pTable);
                 g.appendChild(fieldGroup);
-                
+
                 y += 16;
             }
         }
@@ -625,19 +589,18 @@
         const anchorSize = 12;
         const anchorPositions = [
             // Corners - centered on hover border corners
-            { x: -hoverPadding - anchorSize/2, y: -hoverPadding - anchorSize/2, anchor: "top-left" },
-            { x: width + hoverPadding - anchorSize/2, y: -hoverPadding - anchorSize/2, anchor: "top-right" },
-            { x: -hoverPadding - anchorSize/2, y: height + hoverPadding - anchorSize/2, anchor: "bottom-left" },
-            { x: width + hoverPadding - anchorSize/2, y: height + hoverPadding - anchorSize/2, anchor: "bottom-right" },
+            { x: -hoverPadding - anchorSize / 2, y: -hoverPadding - anchorSize / 2, anchor: "top-left" },
+            { x: width + hoverPadding - anchorSize / 2, y: -hoverPadding - anchorSize / 2, anchor: "top-right" },
+            { x: -hoverPadding - anchorSize / 2, y: height + hoverPadding - anchorSize / 2, anchor: "bottom-left" },
+            { x: width + hoverPadding - anchorSize / 2, y: height + hoverPadding - anchorSize / 2, anchor: "bottom-right" },
             // Edge centers - centered on hover border edges
-            { x: width/2 - anchorSize/2, y: -hoverPadding - anchorSize/2, anchor: "top" },
-            { x: width/2 - anchorSize/2, y: height + hoverPadding - anchorSize/2, anchor: "bottom" },
-            { x: -hoverPadding - anchorSize/2, y: height/2 - anchorSize/2, anchor: "left" },
-            { x: width + hoverPadding - anchorSize/2, y: height/2 - anchorSize/2, anchor: "right" }
+            { x: width / 2 - anchorSize / 2, y: -hoverPadding - anchorSize / 2, anchor: "top" },
+            { x: width / 2 - anchorSize / 2, y: height + hoverPadding - anchorSize / 2, anchor: "bottom" },
+            { x: -hoverPadding - anchorSize / 2, y: height / 2 - anchorSize / 2, anchor: "left" },
+            { x: width + hoverPadding - anchorSize / 2, y: height / 2 - anchorSize / 2, anchor: "right" }
         ];
 
-        for (const pos of anchorPositions)
-        {
+        for (const pos of anchorPositions) {
             const anchor = document.createElementNS("http://www.w3.org/2000/svg", "rect");
             anchor.setAttribute("class", "orm-table-anchor");
             anchor.setAttribute("x", pos.x);
@@ -653,24 +616,22 @@
         return g;
     }
 
-    function SetupTableEvents(pElement, pTable)
-    {
+    function SetupTableEvents(pElement, pTable) {
         let isDragging = false;
         let dragStartX = 0;
         let dragStartY = 0;
         let elementStartX = pTable.X;
         let elementStartY = pTable.Y;
 
-        pElement.addEventListener("mousedown", function(e) {
-            if (e.target.classList.contains("orm-table-anchor"))
-            {
+        pElement.addEventListener("mousedown", function (e) {
+            if (e.target.classList.contains("orm-table-anchor")) {
                 StartRelationDrag(pTable, e);
                 return;
             }
 
             e.preventDefault();
             e.stopPropagation();
-            
+
             if (!e.ctrlKey)
                 SendMessage(XMessageType.SelectElement, { ElementID: pTable.ID });
             else
@@ -682,7 +643,7 @@
             elementStartX = pTable.X;
             elementStartY = pTable.Y;
 
-            const onMouseMove = function(e) {
+            const onMouseMove = function (e) {
                 if (!isDragging)
                     return;
 
@@ -696,16 +657,15 @@
                 pTable.Y = newY;
             };
 
-            const onMouseUp = function(e) {
-                if (isDragging && (pTable.X !== elementStartX || pTable.Y !== elementStartY))
-                {
+            const onMouseUp = function (e) {
+                if (isDragging && (pTable.X !== elementStartX || pTable.Y !== elementStartY)) {
                     SendMessage(XMessageType.MoveElement, {
                         ElementID: pTable.ID,
                         X: pTable.X,
                         Y: pTable.Y
                     });
                 }
-                
+
                 isDragging = false;
                 document.removeEventListener("mousemove", onMouseMove);
                 document.removeEventListener("mouseup", onMouseUp);
@@ -715,12 +675,12 @@
             document.addEventListener("mouseup", onMouseUp);
         });
 
-        pElement.addEventListener("dblclick", function(e) {
+        pElement.addEventListener("dblclick", function (e) {
             if (!pTable.IsShadow)
                 ShowRenameInput(pTable.ID);
         });
 
-        pElement.addEventListener("contextmenu", function(e) {
+        pElement.addEventListener("contextmenu", function (e) {
             e.preventDefault();
             e.stopPropagation();
             SendMessage(XMessageType.SelectElement, { ElementID: pTable.ID });
@@ -728,19 +688,17 @@
         });
     }
 
-    function SetupFieldEvents(pElement, pField, pTable)
-    {
+    function SetupFieldEvents(pElement, pField, pTable) {
         let isDragging = false;
         let dragStartY = 0;
         let dragThreshold = 5;
 
-        pElement.addEventListener("mousedown", function(e) {
+        pElement.addEventListener("mousedown", function (e) {
             e.preventDefault();
             e.stopPropagation();
-            
+
             // PKFields cannot be reordered
-            if (pField.IsPrimaryKey)
-            {
+            if (pField.IsPrimaryKey) {
                 if (!e.ctrlKey)
                     SendMessage(XMessageType.SelectElement, { ElementID: pField.ID });
                 else
@@ -751,11 +709,10 @@
             dragStartY = e.clientY;
             isDragging = false;
 
-            const onMouseMove = function(me) {
+            const onMouseMove = function (me) {
                 const dy = Math.abs(me.clientY - dragStartY);
-                
-                if (!isDragging && dy > dragThreshold)
-                {
+
+                if (!isDragging && dy > dragThreshold) {
                     isDragging = true;
                     StartFieldDrag(pField, pTable, pElement, me);
                 }
@@ -764,11 +721,10 @@
                     UpdateFieldDrag(me);
             };
 
-            const onMouseUp = function(me) {
+            const onMouseUp = function (me) {
                 if (isDragging && _FieldDragState)
                     EndFieldDrag();
-                else
-                {
+                else {
                     // Simple click - select field
                     if (!e.ctrlKey)
                         SendMessage(XMessageType.SelectElement, { ElementID: pField.ID });
@@ -785,25 +741,23 @@
             document.addEventListener("mouseup", onMouseUp);
         });
 
-        pElement.addEventListener("dblclick", function(e) {
+        pElement.addEventListener("dblclick", function (e) {
             e.preventDefault();
             e.stopPropagation();
             ShowRenameInput(pField.ID);
         });
 
-        pElement.addEventListener("contextmenu", function(e) {
+        pElement.addEventListener("contextmenu", function (e) {
             e.preventDefault();
             e.stopPropagation();
-            if (!pField.IsPrimaryKey)
-            {
+            if (!pField.IsPrimaryKey) {
                 SendMessage(XMessageType.SelectElement, { ElementID: pField.ID });
                 ShowFieldContextMenu(e.clientX, e.clientY, pField.ID);
             }
         });
     }
 
-    function StartFieldDrag(pField, pTable, pElement, pEvent)
-    {
+    function StartFieldDrag(pField, pTable, pElement, pEvent) {
         // Find field index within the table
         const fieldIndex = pTable.Fields.findIndex(f => f.ID === pField.ID);
         if (fieldIndex < 0)
@@ -839,7 +793,7 @@
         const rect = _CanvasContainer.getBoundingClientRect();
         const mouseX = pEvent.clientX - rect.left + _CanvasContainer.scrollLeft;
         const mouseY = pEvent.clientY - rect.top + _CanvasContainer.scrollTop;
-        
+
         // Calculate offset relative to field's top-left corner on canvas
         const dragOffsetX = mouseX - (pTable.X + bbox.x);
         const dragOffsetY = mouseY - (pTable.Y + bbox.y);
@@ -870,8 +824,7 @@
         UpdateFieldDropIndicators();
     }
 
-    function UpdateFieldDrag(pEvent)
-    {
+    function UpdateFieldDrag(pEvent) {
         if (!_FieldDragState)
             return;
 
@@ -886,8 +839,7 @@
         const mouseY = pEvent.clientY - rect.top + _CanvasContainer.scrollTop;
 
         // Update ghost position to follow mouse maintaining initial offset
-        if (_FieldDragState.Ghost)
-        {
+        if (_FieldDragState.Ghost) {
             const ghostX = mouseX - (_FieldDragState.DragOffsetX || 0);
             const ghostY = mouseY - (_FieldDragState.DragOffsetY || 0);
             _FieldDragState.Ghost.setAttribute("transform", `translate(${ghostX}, ${ghostY})`);
@@ -909,15 +861,13 @@
 
         targetIndex = Math.max(minIndex, Math.min(targetIndex, maxIndex));
 
-        if (targetIndex !== _FieldDragState.CurrentIndex)
-        {
+        if (targetIndex !== _FieldDragState.CurrentIndex) {
             _FieldDragState.CurrentIndex = targetIndex;
             UpdateFieldDropIndicators();
         }
     }
 
-    function UpdateFieldDropIndicators()
-    {
+    function UpdateFieldDropIndicators() {
         if (!_FieldDragState)
             return;
 
@@ -951,8 +901,7 @@
         tableElement.appendChild(indicator);
     }
 
-    function EndFieldDrag()
-    {
+    function EndFieldDrag() {
         if (!_FieldDragState)
             return;
 
@@ -968,15 +917,13 @@
         if (_FieldDragState.OriginalElement)
             _FieldDragState.OriginalElement.classList.remove("orm-field-drag-source");
 
-        if (tableElement)
-        {
+        if (tableElement) {
             const indicators = tableElement.querySelectorAll(".orm-field-drop-indicator");
             indicators.forEach(el => el.remove());
         }
 
         // If position changed, send reorder message
-        if (newIndex !== origIndex)
-        {
+        if (newIndex !== origIndex) {
             SendMessage(XMessageType.ReorderField, {
                 FieldID: fieldID,
                 NewIndex: newIndex
@@ -986,32 +933,30 @@
         _FieldDragState = null;
     }
 
-    function StartRelationDrag(pSourceTable, pEvent)
-    {
+    function StartRelationDrag(pSourceTable, pEvent) {
         pEvent.preventDefault();
         pEvent.stopPropagation();
 
         const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
         line.setAttribute("class", "relation-drag-line");
-        
+
         // Get anchor position from clicked element
         const anchor = pEvent.target;
         const anchorType = anchor.getAttribute("data-anchor");
-        
+
         // Calculate visual height (same as CreateTableElement)
         const headerHeight = 28;
         const fieldHeight = 16;
         const padding = 12;
         const fieldCount = pSourceTable.Fields ? pSourceTable.Fields.length : 0;
-        const visualHeight = fieldCount > 0 
+        const visualHeight = fieldCount > 0
             ? headerHeight + (fieldCount * fieldHeight) + padding
             : headerHeight;
         const width = pSourceTable.Width || 200;
-        
+
         // Calculate start position based on anchor type
         let startX, startY;
-        switch (anchorType)
-        {
+        switch (anchorType) {
             case "right":
                 startX = pSourceTable.X + width;
                 startY = pSourceTable.Y + visualHeight / 2;
@@ -1050,12 +995,12 @@
                 startY = pSourceTable.Y + visualHeight / 2;
                 break;
         }
-        
+
         line.setAttribute("x1", startX);
         line.setAttribute("y1", startY);
         line.setAttribute("x2", startX);
         line.setAttribute("y2", startY);
-        
+
         _RelationsLayer.appendChild(line);
 
         _RelationDragState = {
@@ -1070,7 +1015,7 @@
         if (pEvent.ctrlKey)
             line.setAttribute("stroke-dasharray", "6 4");
 
-        const onMouseMove = function(e) {
+        const onMouseMove = function (e) {
             if (!_RelationDragState)
                 return;
 
@@ -1082,7 +1027,7 @@
             _RelationDragState.Line.setAttribute("y2", y);
         };
 
-        const onMouseUp = function(e) {
+        const onMouseUp = function (e) {
             if (!_RelationDragState)
                 return;
 
@@ -1092,8 +1037,7 @@
 
             const targetTable = FindTableAtPoint(x, y);
 
-            if (targetTable && targetTable.ID !== _RelationDragState.SourceTable.ID)
-            {
+            if (targetTable && targetTable.ID !== _RelationDragState.SourceTable.ID) {
                 SendMessage(XMessageType.DragDropAddRelation, {
                     SourceID: _RelationDragState.SourceTable.ID,
                     TargetID: targetTable.ID,
@@ -1112,21 +1056,19 @@
         document.addEventListener("mouseup", onMouseUp);
     }
 
-    function FindTableAtPoint(pX, pY)
-    {
+    function FindTableAtPoint(pX, pY) {
         const headerHeight = 28;
         const fieldHeight = 16;
         const padding = 12;
-        
-        for (const table of _Model.Tables)
-        {
+
+        for (const table of _Model.Tables) {
             const x = table.X;
             const y = table.Y;
             const w = table.Width || 200;
-            
+
             // Calculate visual height based on field count
             const fieldCount = table.Fields ? table.Fields.length : 0;
-            const h = fieldCount > 0 
+            const h = fieldCount > 0
                 ? headerHeight + (fieldCount * fieldHeight) + padding
                 : headerHeight;
 
@@ -1136,8 +1078,7 @@
         return null;
     }
 
-    function BuildPathFromPoints(pPoints)
-    {
+    function BuildPathFromPoints(pPoints) {
         if (!pPoints || pPoints.length < 2)
             return "";
 
@@ -1147,8 +1088,7 @@
         function round(v) { return Math.round(v * 10) / 10; }
 
         // Helper: calcula ponto no círculo (mesmo algoritmo do XMath.PointCircle)
-        function pointCircle(pCenter, pPoint, pRadius)
-        {
+        function pointCircle(pCenter, pPoint, pRadius) {
             const dx = pPoint.X - pCenter.X;
             const dy = pPoint.Y - pCenter.Y;
             const dist = Math.sqrt(dx * dx + dy * dy);
@@ -1158,8 +1098,7 @@
         }
 
         // Helper: calcula os pontos do canto arredondado (mesmo algoritmo do XMath.AddCorner)
-        function addCorner(pCorner, pMaxRadius, pBefore, pAfter)
-        {
+        function addCorner(pCorner, pMaxRadius, pBefore, pAfter) {
             const p1 = { X: round(pBefore.X), Y: round(pBefore.Y) };
             const p2 = { X: round(pAfter.X), Y: round(pAfter.Y) };
             const c = { X: round(pCorner.X), Y: round(pCorner.Y) };
@@ -1173,7 +1112,7 @@
             // Calculate distance to previous and next points
             const distBefore = Math.sqrt(Math.pow(c.X - p1.X, 2) + Math.pow(c.Y - p1.Y, 2));
             const distAfter = Math.sqrt(Math.pow(c.X - p2.X, 2) + Math.pow(c.Y - p2.Y, 2));
-            
+
             // Radius must not exceed half of the shortest adjacent segment
             const maxBySegments = Math.min(distBefore, distAfter) / 2;
             const radius = Math.min(pMaxRadius, maxBySegments);
@@ -1188,31 +1127,26 @@
 
         let path = `M ${pPoints[0].X} ${pPoints[0].Y}`;
 
-        for (let i = 1; i < pPoints.length; i++)
-        {
+        for (let i = 1; i < pPoints.length; i++) {
             const prev = pPoints[i - 1];
             const curr = pPoints[i];
             const next = i < pPoints.length - 1 ? pPoints[i + 1] : null;
 
-            if (next)
-            {
+            if (next) {
                 // Tenta criar canto arredondado
                 const corner = addCorner(curr, CORNER_RADIUS, prev, next);
-                if (corner)
-                {
+                if (corner) {
                     // Linha até o ponto antes da curva
                     path += ` L ${corner.before.X} ${corner.before.Y}`;
                     // Curva Bezier quadrática (Q) usando o canto como ponto de controle
                     path += ` Q ${corner.corner.X} ${corner.corner.Y} ${corner.after.X} ${corner.after.Y}`;
                 }
-                else
-                {
+                else {
                     // Sem canto válido, linha reta normal
                     path += ` L ${curr.X} ${curr.Y}`;
                 }
             }
-            else
-            {
+            else {
                 // Último ponto, linha reta
                 path += ` L ${curr.X} ${curr.Y}`;
             }
@@ -1221,14 +1155,13 @@
         return path;
     }
 
-    function SimplifyReferencePoints(pPoints, pSourceTable, pTargetTable)
-    {
+    function SimplifyReferencePoints(pPoints, pSourceTable, pTargetTable) {
         // ══════════════════════════════════════════════════════════════════════════════
         // ROTEAMENTO É FEITO PELO TFX (XORMDesign.ts)
         // Esta função apenas valida e limpa os pontos recebidos
         // NÃO recalcular rotas - respeitar os pontos enviados pelo backend
         // ══════════════════════════════════════════════════════════════════════════════
-        
+
         if (!pPoints || pPoints.length < 2)
             return [];
 
@@ -1239,19 +1172,16 @@
 
         // Remover pontos duplicados consecutivos
         const cleaned = [valid[0]];
-        for (let i = 1; i < valid.length; i++)
-        {
+        for (let i = 1; i < valid.length; i++) {
             const prev = cleaned[cleaned.length - 1];
             if (Math.abs(valid[i].X - prev.X) > 1 || Math.abs(valid[i].Y - prev.Y) > 1)
                 cleaned.push(valid[i]);
         }
 
         // Remover pontos colineares intermediários
-        if (cleaned.length > 2)
-        {
+        if (cleaned.length > 2) {
             const final = [cleaned[0]];
-            for (let i = 1; i < cleaned.length - 1; i++)
-            {
+            for (let i = 1; i < cleaned.length - 1; i++) {
                 const a = final[final.length - 1];
                 const b = cleaned[i];
                 const c = cleaned[i + 1];
@@ -1267,31 +1197,27 @@
         return cleaned;
     }
 
-    function RenderRelations()
-    {
+    function RenderRelations() {
         _RelationsLayer.innerHTML = "";
-        
-        for (const ref of _Model.References)
-        {
+
+        for (const ref of _Model.References) {
             const g = CreateRelationElement(ref);
             if (g)
                 _RelationsLayer.appendChild(g);
         }
     }
 
-    function GetTableColor(pTableID)
-    {
+    function GetTableColor(pTableID) {
         const table = _Model.Tables.find(t => t.ID === pTableID);
         if (table && table.FillProp)
             return ArgbToCssColor(table.FillProp);
         return "#2d8a4e";
     }
 
-    function CreateRelationElement(pRef)
-    {
+    function CreateRelationElement(pRef) {
         // Source is normally a field ID - find the table that contains this field.
         // Fallback: legacy 1:1 Table→Table references use the source table ID directly.
-        let sourceTable = _Model.Tables.find(t => 
+        let sourceTable = _Model.Tables.find(t =>
             t.Fields && t.Fields.some(f => f.ID === pRef.SourceFieldID)
         );
         if (!sourceTable)
@@ -1309,11 +1235,10 @@
         // Se há pontos de roteamento, use-os; caso contrário, calcule um caminho simples
         const pointsRaw = pRef.Points && pRef.Points.length >= 2 ? pRef.Points : [];
         const points = SimplifyReferencePoints(pointsRaw, sourceTable, targetTable);
-        
+
         const lineColor = GetTableColor(pRef.TargetTableID);
 
-        if (points.length >= 2)
-        {
+        if (points.length >= 2) {
             // Hit-area path (wide, transparent) — makes the thin line easy to click
             const hitPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
             hitPath.setAttribute("class", "orm-reference-hit");
@@ -1331,8 +1256,7 @@
             path.setAttribute("marker-end", "url(#arrowhead)");
             g.appendChild(path);
         }
-        else
-        {
+        else {
             // Fallback: straight line
             const x1 = sourceTable.X + (sourceTable.Width || 200);
             const y1 = sourceTable.Y + (sourceTable.Height || 150) / 2;
@@ -1356,7 +1280,7 @@
             g.appendChild(line);
         }
 
-        g.addEventListener("click", function(e) {
+        g.addEventListener("click", function (e) {
             e.stopPropagation();
             if (!e.ctrlKey)
                 SendMessage(XMessageType.SelectElement, { ElementID: pRef.ID });
@@ -1367,10 +1291,9 @@
         return g;
     }
 
-    function UpdateSelectionVisuals()
-    {
+    function UpdateSelectionVisuals() {
         const tables = _TablesLayer.querySelectorAll(".orm-table");
-        tables.forEach(function(t) {
+        tables.forEach(function (t) {
             const id = t.getAttribute("data-id");
             if (_SelectedIDs.indexOf(id) >= 0)
                 t.classList.add("selected");
@@ -1379,7 +1302,7 @@
         });
 
         const refs = _RelationsLayer.querySelectorAll(".orm-reference");
-        refs.forEach(function(r) {
+        refs.forEach(function (r) {
             const id = r.getAttribute("data-id");
             if (_SelectedIDs.indexOf(id) >= 0)
                 r.classList.add("selected");
@@ -1388,7 +1311,7 @@
         });
 
         const fields = _TablesLayer.querySelectorAll(".orm-field-group");
-        fields.forEach(function(f) {
+        fields.forEach(function (f) {
             const id = f.getAttribute("data-field-id");
             if (_SelectedIDs.indexOf(id) >= 0)
                 f.classList.add("selected");
@@ -1397,23 +1320,18 @@
         });
     }
 
-    function ShowRenameInput(pElementID)
-    {
+    function ShowRenameInput(pElementID) {
         // Try to find table first
         let table = _Model.Tables.find(t => t.ID === pElementID);
         let field = null;
         let parentTable = null;
 
         // If not a table, look for a field
-        if (!table)
-        {
-            for (const t of _Model.Tables)
-            {
-                if (t.Fields)
-                {
+        if (!table) {
+            for (const t of _Model.Tables) {
+                if (t.Fields) {
                     field = t.Fields.find(f => f.ID === pElementID);
-                    if (field)
-                    {
+                    if (field) {
                         parentTable = t;
                         break;
                     }
@@ -1426,8 +1344,7 @@
 
         let g, elementX, elementY, elementWidth, currentName;
 
-        if (table)
-        {
+        if (table) {
             g = _TablesLayer.querySelector('[data-id="' + pElementID + '"]');
             if (!g)
                 return;
@@ -1436,8 +1353,7 @@
             elementWidth = table.Width || 200;
             currentName = table.Name || "";
         }
-        else
-        {
+        else {
             g = _TablesLayer.querySelector('[data-field-id="' + pElementID + '"]');
             if (!g)
                 return;
@@ -1465,24 +1381,21 @@
         input.focus();
         input.select();
 
-        const commit = function() {
+        const commit = function () {
             const newName = input.value.trim();
-            if (newName && newName !== currentName)
-            {
+            if (newName && newName !== currentName) {
                 SendMessage(XMessageType.RenameCompleted, { NewName: newName });
             }
             input.remove();
         };
 
         input.addEventListener("blur", commit);
-        input.addEventListener("keydown", function(e) {
-            if (e.key === "Enter")
-            {
+        input.addEventListener("keydown", function (e) {
+            if (e.key === "Enter") {
                 e.preventDefault();
                 commit();
             }
-            else if (e.key === "Escape")
-            {
+            else if (e.key === "Escape") {
                 e.preventDefault();
                 input.remove();
             }
@@ -1495,8 +1408,7 @@
     // SHADOW TABLE PICKER
     // ═══════════════════════════════════════════════════════════════════════
 
-    function OpenShadowPickerModal(pPayload)
-    {
+    function OpenShadowPickerModal(pPayload) {
         if (!pPayload || !pPayload.Models)
             return;
 
@@ -1515,16 +1427,37 @@
         document.getElementById("shadow-picker-close").onclick = CloseShadowPickerModal;
         document.getElementById("shadow-btn-cancel").onclick = CloseShadowPickerModal;
 
-        overlay.addEventListener("mousedown", function(e) {
-            if (e.target === overlay)
-                CloseShadowPickerModal();
-        }, { once: true });
+        const addBtn = document.getElementById("shadow-btn-add");
+        if (addBtn) {
+            addBtn.onclick = function () {
+                const selectedItems = document.querySelectorAll(".shadow-table-item.selected");
+                if (selectedItems.length === 0)
+                    return;
 
-        searchInput.oninput = function() {
+                for (const item of selectedItems) {
+                    const m = JSON.parse(item.getAttribute("data-model"));
+                    const t = JSON.parse(item.getAttribute("data-table"));
+                    SendMessage(XMessageType.AddShadowTable, {
+                        X: _ShadowPickerData.X,
+                        Y: _ShadowPickerData.Y,
+                        ModelName: m.ModelName,
+                        DocumentID: m.DocumentID,
+                        DocumentName: m.DocumentName,
+                        ModuleID: m.ModuleID,
+                        ModuleName: m.ModuleName,
+                        TableID: t.ID,
+                        TableName: t.Name
+                    });
+                }
+                CloseShadowPickerModal();
+            };
+        }
+
+        searchInput.oninput = function () {
             BuildShadowTree(pPayload.Models, searchInput.value);
         };
 
-        searchInput.onkeydown = function(e) {
+        searchInput.onkeydown = function (e) {
             if (e.key === "Escape")
                 CloseShadowPickerModal();
         };
@@ -1533,16 +1466,14 @@
         searchInput.focus();
     }
 
-    function CloseShadowPickerModal()
-    {
+    function CloseShadowPickerModal() {
         const overlay = document.getElementById("shadow-picker-overlay");
         if (overlay)
             overlay.style.display = "none";
         _ShadowPickerData = null;
     }
 
-    function BuildShadowTree(pModels, pFilter)
-    {
+    function BuildShadowTree(pModels, pFilter) {
         const tree = document.getElementById("shadow-tree");
         tree.innerHTML = "";
 
@@ -1550,9 +1481,8 @@
         let visibleCount = 0;
         let totalCount = 0;
 
-        for (const model of pModels)
-        {
-            const matchingTables = model.Tables.filter(function(t) {
+        for (const model of pModels) {
+            const matchingTables = model.Tables.filter(function (t) {
                 totalCount++;
                 return !filter || t.Name.toLowerCase().indexOf(filter) >= 0;
             });
@@ -1567,15 +1497,29 @@
             groupEl.textContent = model.ModelName || model.DocumentName;
             tree.appendChild(groupEl);
 
-            for (const tbl of matchingTables)
-            {
+            for (const tbl of matchingTables) {
                 const itemEl = document.createElement("div");
                 itemEl.className = "shadow-table-item";
                 itemEl.textContent = tbl.Name;
                 itemEl.title = model.DocumentName + " \u203a " + tbl.Name;
 
-                itemEl.addEventListener("click", (function(m, t) {
-                    return function() {
+                itemEl.setAttribute("data-model", JSON.stringify(model));
+                itemEl.setAttribute("data-table", JSON.stringify(tbl));
+
+                itemEl.addEventListener("click", function (e) {
+                    if (e.ctrlKey || e.metaKey) {
+                        itemEl.classList.toggle("selected");
+                    }
+                    else {
+                        const items = tree.querySelectorAll(".shadow-table-item");
+                        for (const it of items)
+                            it.classList.remove("selected");
+                        itemEl.classList.add("selected");
+                    }
+                });
+
+                itemEl.addEventListener("dblclick", (function (m, t) {
+                    return function () {
                         if (!_ShadowPickerData)
                             return;
                         SendMessage(XMessageType.AddShadowTable, {
@@ -1606,8 +1550,7 @@
     // SEED DATA EDITOR
     // ═══════════════════════════════════════════════════════════════════════
 
-    function OpenSeedEditorModal(pPayload)
-    {
+    function OpenSeedEditorModal(pPayload) {
         if (!pPayload || !pPayload.TableID)
             return;
 
@@ -1615,7 +1558,7 @@
             TableID: pPayload.TableID,
             TableName: pPayload.TableName || "Table",
             Columns: pPayload.Columns || [],
-            Rows: (pPayload.Rows || []).map(function(r) {
+            Rows: (pPayload.Rows || []).map(function (r) {
                 return { TupleID: r.TupleID, Values: Object.assign({}, r.Values), IsNew: false };
             }),
             SelectedRows: new Set()
@@ -1623,7 +1566,7 @@
         _SeedNextNewId = 0;
 
         const overlay = document.getElementById("seed-editor-overlay");
-        const title   = document.getElementById("seed-modal-title");
+        const title = document.getElementById("seed-modal-title");
 
         title.textContent = "Seed Data — " + _SeedEditor.TableName;
 
@@ -1638,7 +1581,7 @@
         // Close handlers
         document.getElementById("seed-modal-close").onclick = CloseSeedEditorModal;
         document.getElementById("seed-btn-cancel").onclick = CloseSeedEditorModal;
-        overlay.addEventListener("mousedown", function(e) {
+        overlay.addEventListener("mousedown", function (e) {
             if (e.target === overlay)
                 CloseSeedEditorModal();
         }, { once: true });
@@ -1653,46 +1596,39 @@
         overlay.focus();
     }
 
-    function CloseSeedEditorModal()
-    {
+    function CloseSeedEditorModal() {
         const overlay = document.getElementById("seed-editor-overlay");
         overlay.style.display = "none";
         document.removeEventListener("keydown", HandleSeedKeydown);
         _SeedEditor = null;
     }
 
-    function HandleSeedKeydown(pEvent)
-    {
-        if (pEvent.key === "Escape")
-        {
+    function HandleSeedKeydown(pEvent) {
+        if (pEvent.key === "Escape") {
             pEvent.preventDefault();
             CloseSeedEditorModal();
         }
-        else if (pEvent.key === "Enter" && (pEvent.ctrlKey || pEvent.metaKey))
-        {
+        else if (pEvent.key === "Enter" && (pEvent.ctrlKey || pEvent.metaKey)) {
             pEvent.preventDefault();
             SaveSeedEditorData();
         }
-        else if (pEvent.key === "Delete" && !IsEditableTarget(pEvent.target))
-        {
+        else if (pEvent.key === "Delete" && !IsEditableTarget(pEvent.target)) {
             DeleteSelectedSeedRows();
         }
     }
 
-    function IsEditableTarget(pTarget)
-    {
+    function IsEditableTarget(pTarget) {
         return pTarget && (pTarget.tagName === "INPUT" || pTarget.tagName === "SELECT" || pTarget.tagName === "TEXTAREA");
     }
 
     // ── Grid rendering ───────────────────────────────────────────────────
 
-    function BuildSeedGrid()
-    {
+    function BuildSeedGrid() {
         if (!_SeedEditor)
             return;
 
         const columns = _SeedEditor.Columns;
-        const rows    = _SeedEditor.Rows;
+        const rows = _SeedEditor.Rows;
 
         // Build header
         const thead = document.getElementById("seed-grid-head");
@@ -1706,14 +1642,12 @@
         selectAllChk.type = "checkbox";
         selectAllChk.className = "seed-row-checkbox";
         selectAllChk.title = "Select all";
-        selectAllChk.addEventListener("change", function() {
-            if (this.checked)
-            {
+        selectAllChk.addEventListener("change", function () {
+            if (this.checked) {
                 for (let i = 0; i < _SeedEditor.Rows.length; i++)
                     _SeedEditor.SelectedRows.add(i);
             }
-            else
-            {
+            else {
                 _SeedEditor.SelectedRows.clear();
             }
             UpdateRowSelectionVisuals();
@@ -1721,8 +1655,7 @@
         thSelect.appendChild(selectAllChk);
         headerRow.appendChild(thSelect);
 
-        for (const col of columns)
-        {
+        for (const col of columns) {
             const th = document.createElement("th");
             const inner = document.createElement("div");
             inner.className = "th-inner";
@@ -1731,23 +1664,20 @@
             nameSpan.textContent = col.Name;
             inner.appendChild(nameSpan);
 
-            if (col.IsPrimaryKey)
-            {
+            if (col.IsPrimaryKey) {
                 const badge = document.createElement("span");
                 badge.className = "seed-col-badge seed-col-pk";
                 badge.textContent = "PK";
                 inner.appendChild(badge);
             }
-            else if (col.IsForeignKey)
-            {
+            else if (col.IsForeignKey) {
                 const badge = document.createElement("span");
                 badge.className = "seed-col-badge seed-col-fk";
                 badge.textContent = "FK";
                 inner.appendChild(badge);
             }
 
-            if (col.IsRequired && !col.IsPrimaryKey)
-            {
+            if (col.IsRequired && !col.IsPrimaryKey) {
                 const req = document.createElement("span");
                 req.className = "seed-col-req";
                 req.textContent = "*";
@@ -1771,8 +1701,7 @@
         const tbody = document.getElementById("seed-grid-body");
         tbody.innerHTML = "";
 
-        if (rows.length === 0)
-        {
+        if (rows.length === 0) {
             const tr = document.createElement("tr");
             const td = document.createElement("td");
             td.colSpan = columns.length + 1;
@@ -1780,15 +1709,13 @@
             tr.appendChild(td);
             tbody.appendChild(tr);
         }
-        else
-        {
+        else {
             for (let i = 0; i < rows.length; i++)
                 tbody.appendChild(BuildSeedGridRow(rows[i], columns, i));
         }
     }
 
-    function BuildSeedGridRow(pRow, pColumns, pRowIndex)
-    {
+    function BuildSeedGridRow(pRow, pColumns, pRowIndex) {
         const tr = document.createElement("tr");
         tr.setAttribute("data-row-index", pRowIndex);
         if (pRow.IsNew)
@@ -1803,7 +1730,7 @@
         chk.type = "checkbox";
         chk.className = "seed-row-checkbox";
         chk.checked = _SeedEditor.SelectedRows.has(pRowIndex);
-        chk.addEventListener("change", function() {
+        chk.addEventListener("change", function () {
             if (this.checked)
                 _SeedEditor.SelectedRows.add(pRowIndex);
             else
@@ -1815,8 +1742,7 @@
         tr.appendChild(tdSelect);
 
         // Data cells
-        for (const col of pColumns)
-        {
+        for (const col of pColumns) {
             const td = document.createElement("td");
             const currentValue = pRow.Values[col.FieldID] !== undefined ? pRow.Values[col.FieldID] : "";
 
@@ -1826,19 +1752,17 @@
         }
 
         // Row click for selection (not on input/select)
-        tr.addEventListener("click", function(e) {
+        tr.addEventListener("click", function (e) {
             if (IsEditableTarget(e.target) || e.target.type === "checkbox")
                 return;
             const isSelected = _SeedEditor.SelectedRows.has(pRowIndex);
-            if (e.ctrlKey || e.metaKey)
-            {
+            if (e.ctrlKey || e.metaKey) {
                 if (isSelected)
                     _SeedEditor.SelectedRows.delete(pRowIndex);
                 else
                     _SeedEditor.SelectedRows.add(pRowIndex);
             }
-            else
-            {
+            else {
                 _SeedEditor.SelectedRows.clear();
                 _SeedEditor.SelectedRows.add(pRowIndex);
             }
@@ -1848,16 +1772,14 @@
         return tr;
     }
 
-    function BuildCellWidget(pCol, pCurrentValue, pRow, pAllColumns)
-    {
+    function BuildCellWidget(pCol, pCurrentValue, pRow, pAllColumns) {
         // Boolean type → checkbox
-        if (pCol.DataType === "Boolean")
-        {
+        if (pCol.DataType === "Boolean") {
             const chk = document.createElement("input");
             chk.type = "checkbox";
             chk.className = "seed-cell-checkbox";
             chk.checked = pCurrentValue === "true" || pCurrentValue === "1";
-            chk.addEventListener("change", function() {
+            chk.addEventListener("change", function () {
                 pRow.Values[pCol.FieldID] = this.checked ? "true" : "false";
                 ClearCellError(this.parentElement);
             });
@@ -1865,23 +1787,20 @@
         }
 
         // FK field with options → select
-        if (pCol.IsForeignKey && pCol.FKOptions && pCol.FKOptions.length > 0)
-        {
+        if (pCol.IsForeignKey && pCol.FKOptions && pCol.FKOptions.length > 0) {
             const sel = document.createElement("select");
             sel.className = "seed-cell-select";
             sel.title = pCol.FKTableName ? "References: " + pCol.FKTableName : "";
 
             // Blank option for non-required
-            if (!pCol.IsRequired)
-            {
+            if (!pCol.IsRequired) {
                 const blankOpt = document.createElement("option");
                 blankOpt.value = "";
                 blankOpt.textContent = "— none —";
                 sel.appendChild(blankOpt);
             }
 
-            for (const opt of pCol.FKOptions)
-            {
+            for (const opt of pCol.FKOptions) {
                 const option = document.createElement("option");
                 option.value = opt.Value;
                 option.textContent = opt.Label || opt.Value;
@@ -1891,8 +1810,7 @@
             }
 
             // If current value not in options, add it (data from C#)
-            if (pCurrentValue && !pCol.FKOptions.some(function(o) { return o.Value === pCurrentValue; }))
-            {
+            if (pCurrentValue && !pCol.FKOptions.some(function (o) { return o.Value === pCurrentValue; })) {
                 const orphan = document.createElement("option");
                 orphan.value = pCurrentValue;
                 orphan.textContent = pCurrentValue + " ⚠";
@@ -1900,7 +1818,7 @@
                 sel.appendChild(orphan);
             }
 
-            sel.addEventListener("change", function() {
+            sel.addEventListener("change", function () {
                 pRow.Values[pCol.FieldID] = this.value;
                 ClearCellError(this.parentElement);
             });
@@ -1909,18 +1827,17 @@
         }
 
         // Date/DateTime → date input
-        if (pCol.DataType === "Date" || pCol.DataType === "DateTime")
-        {
+        if (pCol.DataType === "Date" || pCol.DataType === "DateTime") {
             const inp = document.createElement("input");
             inp.type = pCol.DataType === "Date" ? "date" : "datetime-local";
             inp.className = "seed-cell-input";
             inp.value = FormatDateForInput(pCurrentValue, pCol.DataType);
 
-            inp.addEventListener("input", function() {
+            inp.addEventListener("input", function () {
                 pRow.Values[pCol.FieldID] = this.value;
                 ClearCellError(this.parentElement);
             });
-            inp.addEventListener("change", function() {
+            inp.addEventListener("change", function () {
                 pRow.Values[pCol.FieldID] = this.value;
             });
 
@@ -1928,8 +1845,7 @@
         }
 
         // Number types → numeric input
-        if (IsNumericType(pCol.DataType))
-        {
+        if (IsNumericType(pCol.DataType)) {
             const inp = document.createElement("input");
             inp.type = "text";
             inp.inputMode = "numeric";
@@ -1939,11 +1855,11 @@
             if (pCol.IsPrimaryKey && pCurrentValue === "")
                 inp.value = SuggestNextPKValue(pAllColumns, pCol);
 
-            inp.addEventListener("input", function() {
+            inp.addEventListener("input", function () {
                 pRow.Values[pCol.FieldID] = this.value;
                 ClearCellError(this.parentElement);
             });
-            inp.addEventListener("blur", function() {
+            inp.addEventListener("blur", function () {
                 const err = ValidateCellValue(pCol, this.value);
                 if (err)
                     ShowCellError(this.parentElement, err);
@@ -1953,8 +1869,7 @@
         }
 
         // Guid type → text with pattern
-        if (pCol.DataType === "Guid")
-        {
+        if (pCol.DataType === "Guid") {
             const inp = document.createElement("input");
             inp.type = "text";
             inp.className = "seed-cell-input" + (pCol.IsPrimaryKey ? " seed-cell-pk" : "");
@@ -1962,11 +1877,11 @@
             inp.placeholder = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx";
             inp.maxLength = 36;
 
-            inp.addEventListener("input", function() {
+            inp.addEventListener("input", function () {
                 pRow.Values[pCol.FieldID] = this.value;
                 ClearCellError(this.parentElement);
             });
-            inp.addEventListener("blur", function() {
+            inp.addEventListener("blur", function () {
                 const err = ValidateCellValue(pCol, this.value);
                 if (err)
                     ShowCellError(this.parentElement, err);
@@ -1981,17 +1896,16 @@
 
         if (pCol.DataType === "Text")
             inp.title = "Text (unlimited length)";
-        else if (pCol.Length && pCol.Length > 0)
-        {
+        else if (pCol.Length && pCol.Length > 0) {
             inp.maxLength = pCol.Length;
             inp.title = "Max length: " + pCol.Length;
         }
 
-        inp.addEventListener("input", function() {
+        inp.addEventListener("input", function () {
             pRow.Values[pCol.FieldID] = this.value;
             ClearCellError(this.parentElement);
         });
-        inp.addEventListener("blur", function() {
+        inp.addEventListener("blur", function () {
             const err = ValidateCellValue(pCol, this.value);
             if (err)
                 ShowCellError(this.parentElement, err);
@@ -2000,8 +1914,7 @@
         return inp;
     }
 
-    function SuggestNextPKValue(pAllColumns, pPKColumn)
-    {
+    function SuggestNextPKValue(pAllColumns, pPKColumn) {
         if (!_SeedEditor)
             return "";
 
@@ -2010,11 +1923,9 @@
 
         // Find max existing PK value and return max+1
         let max = -1;
-        for (const row of _SeedEditor.Rows)
-        {
+        for (const row of _SeedEditor.Rows) {
             const val = row.Values[pPKColumn.FieldID];
-            if (val !== undefined && val !== "")
-            {
+            if (val !== undefined && val !== "") {
                 const n = parseInt(val, 10);
                 if (!isNaN(n) && n > max)
                     max = n;
@@ -2029,43 +1940,40 @@
      * The first 48 bits are the current timestamp in ms, making values
      * naturally sortable by creation order while remaining unique.
      */
-    function GenerateSequentialGuid()
-    {
+    function GenerateSequentialGuid() {
         const now = Date.now();
         _GuidSeq = (_GuidSeq + 1) & 0xFFF;
 
         // p1 + p2: 48-bit ms timestamp (sortable prefix)
         const tsHex = now.toString(16).padStart(12, "0");
-        const p1    = tsHex.substring(0, 8);
-        const p2    = tsHex.substring(8, 12);
+        const p1 = tsHex.substring(0, 8);
+        const p2 = tsHex.substring(8, 12);
 
         // p3: version nibble (7) + 12-bit sequence counter
         const p3 = "7" + _GuidSeq.toString(16).padStart(3, "0");
 
         // p4: variant bits (10xx) + 14 random bits
         const varNibble = (0x8 | (Math.random() * 4 | 0)).toString(16);
-        const randA     = (Math.random() * 0xFFF | 0).toString(16).padStart(3, "0");
+        const randA = (Math.random() * 0xFFF | 0).toString(16).padStart(3, "0");
         const p4 = varNibble + randA;
 
         // p5: 48 random bits
         const p5 = (Math.random() * 0xFFFFFFFF | 0).toString(16).padStart(8, "0") +
-                   (Math.random() * 0xFFFF     | 0).toString(16).padStart(4, "0");
+            (Math.random() * 0xFFFF | 0).toString(16).padStart(4, "0");
 
         return p1 + "-" + p2 + "-" + p3 + "-" + p4 + "-" + p5;
     }
 
     // ── Row operations ────────────────────────────────────────────────────
 
-    function AddSeedRow()
-    {
+    function AddSeedRow() {
         if (!_SeedEditor)
             return;
 
         const newRow = { TupleID: "NEW_" + (_SeedNextNewId++), Values: {}, IsNew: true };
 
         // Pre-populate defaults
-        for (const col of _SeedEditor.Columns)
-        {
+        for (const col of _SeedEditor.Columns) {
             if (col.DataType === "Boolean")
                 newRow.Values[col.FieldID] = "false";
             else if (col.IsPrimaryKey)
@@ -2087,11 +1995,9 @@
         // Focus first editable cell of the new row
         const tbody = document.getElementById("seed-grid-body");
         const newTR = tbody.lastElementChild;
-        if (newTR)
-        {
+        if (newTR) {
             const firstInput = newTR.querySelector("input:not([type=checkbox]), select");
-            if (firstInput)
-            {
+            if (firstInput) {
                 firstInput.focus();
                 if (firstInput.type === "text")
                     firstInput.select();
@@ -2100,12 +2006,11 @@
         }
     }
 
-    function DeleteSelectedSeedRows()
-    {
+    function DeleteSelectedSeedRows() {
         if (!_SeedEditor || _SeedEditor.SelectedRows.size === 0)
             return;
 
-        const indices = Array.from(_SeedEditor.SelectedRows).sort(function(a, b) { return b - a; });
+        const indices = Array.from(_SeedEditor.SelectedRows).sort(function (a, b) { return b - a; });
         for (const idx of indices)
             _SeedEditor.Rows.splice(idx, 1);
 
@@ -2118,15 +2023,14 @@
 
     // ── Selection visuals ─────────────────────────────────────────────────
 
-    function UpdateRowSelectionVisuals()
-    {
+    function UpdateRowSelectionVisuals() {
         if (!_SeedEditor)
             return;
 
         const tbody = document.getElementById("seed-grid-body");
-        const rows  = tbody.querySelectorAll("tr[data-row-index]");
+        const rows = tbody.querySelectorAll("tr[data-row-index]");
 
-        rows.forEach(function(tr) {
+        rows.forEach(function (tr) {
             const idx = parseInt(tr.getAttribute("data-row-index"), 10);
             const selected = _SeedEditor.SelectedRows.has(idx);
             tr.classList.toggle("seed-row-selected", selected);
@@ -2138,8 +2042,7 @@
         SyncSelectAllCheckbox();
     }
 
-    function SyncSelectAllCheckbox()
-    {
+    function SyncSelectAllCheckbox() {
         if (!_SeedEditor)
             return;
         const selectAll = document.querySelector("#seed-grid-head .seed-row-checkbox");
@@ -2151,8 +2054,7 @@
         selectAll.indeterminate = selectedCount > 0 && selectedCount < total;
     }
 
-    function UpdateSeedRowCount()
-    {
+    function UpdateSeedRowCount() {
         if (!_SeedEditor)
             return;
         const badge = document.getElementById("seed-row-count");
@@ -2164,13 +2066,11 @@
 
     const NumericTypes = ["Int8", "Int16", "Int32", "Int64", "Decimal", "Float", "Double", "Numeric", "Byte"];
 
-    function IsNumericType(pDataType)
-    {
+    function IsNumericType(pDataType) {
         return NumericTypes.indexOf(pDataType) >= 0;
     }
 
-    function GetShortTypeName(pDataType)
-    {
+    function GetShortTypeName(pDataType) {
         const map = {
             "String": "str", "Text": "txt", "Int8": "i8", "Int16": "i16",
             "Int32": "i32", "Int64": "i64", "Decimal": "dec", "Numeric": "num",
@@ -2180,13 +2080,11 @@
         return map[pDataType] || pDataType.toLowerCase().substring(0, 4);
     }
 
-    function FormatDateForInput(pValue, pDataType)
-    {
+    function FormatDateForInput(pValue, pDataType) {
         if (!pValue)
             return "";
         // Try to parse and reformat for date/datetime-local inputs
-        try
-        {
+        try {
             const d = new Date(pValue);
             if (isNaN(d.getTime()))
                 return pValue;
@@ -2195,41 +2093,35 @@
             // datetime-local: YYYY-MM-DDTHH:MM
             return d.toISOString().substring(0, 16);
         }
-        catch
-        {
+        catch {
             return pValue;
         }
     }
 
-    function ValidateCellValue(pCol, pValue)
-    {
-        if (!pValue && pValue !== "0" && pValue !== "false")
-        {
+    function ValidateCellValue(pCol, pValue) {
+        if (!pValue && pValue !== "0" && pValue !== "false") {
             if (pCol.IsRequired || pCol.IsPrimaryKey)
                 return pCol.Name + " is required.";
             return null;
         }
 
-        if (IsNumericType(pCol.DataType))
-        {
+        if (IsNumericType(pCol.DataType)) {
             const n = Number(pValue);
             if (isNaN(n))
                 return pCol.Name + ": expected a number.";
             if ((pCol.DataType === "Int8" || pCol.DataType === "Int16" ||
-                 pCol.DataType === "Int32" || pCol.DataType === "Int64") && !Number.isInteger(n))
+                pCol.DataType === "Int32" || pCol.DataType === "Int64") && !Number.isInteger(n))
                 return pCol.Name + ": expected an integer.";
         }
 
-        if (pCol.DataType === "Guid")
-        {
+        if (pCol.DataType === "Guid") {
             const guidRe = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
             if (!guidRe.test(pValue))
                 return pCol.Name + ": invalid GUID format.";
         }
 
-        if (pCol.IsForeignKey && pCol.FKOptions && pCol.FKOptions.length > 0)
-        {
-            const valid = pCol.FKOptions.some(function(o) { return o.Value === pValue; });
+        if (pCol.IsForeignKey && pCol.FKOptions && pCol.FKOptions.length > 0) {
+            const valid = pCol.FKOptions.some(function (o) { return o.Value === pValue; });
             if (!valid)
                 return pCol.Name + ": value not found in " + (pCol.FKTableName || "referenced table") + ".";
         }
@@ -2240,21 +2132,18 @@
         return null;
     }
 
-    function ValidateAllSeedRows()
-    {
+    function ValidateAllSeedRows() {
         if (!_SeedEditor)
             return [];
 
         const errors = [];
-        const pkColumn = _SeedEditor.Columns.find(function(c) { return c.IsPrimaryKey; });
+        const pkColumn = _SeedEditor.Columns.find(function (c) { return c.IsPrimaryKey; });
         const pkValues = new Set();
 
-        for (let i = 0; i < _SeedEditor.Rows.length; i++)
-        {
+        for (let i = 0; i < _SeedEditor.Rows.length; i++) {
             const row = _SeedEditor.Rows[i];
 
-            for (const col of _SeedEditor.Columns)
-            {
+            for (const col of _SeedEditor.Columns) {
                 const value = row.Values[col.FieldID] !== undefined ? row.Values[col.FieldID] : "";
                 const err = ValidateCellValue(col, value);
                 if (err)
@@ -2262,11 +2151,9 @@
             }
 
             // PK uniqueness
-            if (pkColumn)
-            {
+            if (pkColumn) {
                 const pkVal = row.Values[pkColumn.FieldID];
-                if (pkVal !== undefined && pkVal !== "")
-                {
+                if (pkVal !== undefined && pkVal !== "") {
                     if (pkValues.has(pkVal))
                         errors.push({ Row: i, FieldID: pkColumn.FieldID, Message: "Duplicate PK value: " + pkVal });
                     else
@@ -2278,8 +2165,7 @@
         return errors;
     }
 
-    function ShowCellError(pTD, pMessage)
-    {
+    function ShowCellError(pTD, pMessage) {
         if (!pTD)
             return;
         const widget = pTD.querySelector("input, select");
@@ -2287,8 +2173,7 @@
             widget.classList.add("cell-error");
 
         let errSpan = pTD.querySelector(".seed-cell-error-msg");
-        if (!errSpan)
-        {
+        if (!errSpan) {
             errSpan = document.createElement("span");
             errSpan.className = "seed-cell-error-msg";
             pTD.appendChild(errSpan);
@@ -2297,8 +2182,7 @@
         pTD.closest("tr").classList.add("seed-row-error");
     }
 
-    function ClearCellError(pTD)
-    {
+    function ClearCellError(pTD) {
         if (!pTD)
             return;
         const widget = pTD.querySelector("input, select");
@@ -2314,27 +2198,25 @@
             tr.classList.remove("seed-row-error");
     }
 
-    function HighlightValidationErrors(pErrors)
-    {
+    function HighlightValidationErrors(pErrors) {
         if (!_SeedEditor)
             return;
 
         // Clear existing errors first
         const tbody = document.getElementById("seed-grid-body");
-        tbody.querySelectorAll(".cell-error").forEach(function(el) { el.classList.remove("cell-error"); });
-        tbody.querySelectorAll(".seed-cell-error-msg").forEach(function(el) { el.remove(); });
-        tbody.querySelectorAll(".seed-row-error").forEach(function(tr) { tr.classList.remove("seed-row-error"); });
+        tbody.querySelectorAll(".cell-error").forEach(function (el) { el.classList.remove("cell-error"); });
+        tbody.querySelectorAll(".seed-cell-error-msg").forEach(function (el) { el.remove(); });
+        tbody.querySelectorAll(".seed-row-error").forEach(function (tr) { tr.classList.remove("seed-row-error"); });
 
         const columns = _SeedEditor.Columns;
 
-        for (const err of pErrors)
-        {
+        for (const err of pErrors) {
             const tr = tbody.querySelector("tr[data-row-index='" + err.Row + "']");
             if (!tr)
                 continue;
 
             // Column index: +1 because of select column
-            const colIdx = columns.findIndex(function(c) { return c.FieldID === err.FieldID; });
+            const colIdx = columns.findIndex(function (c) { return c.FieldID === err.FieldID; });
             if (colIdx < 0)
                 continue;
 
@@ -2346,16 +2228,13 @@
         }
     }
 
-    function SetSeedValidationBadge(pErrors)
-    {
+    function SetSeedValidationBadge(pErrors) {
         const badge = document.getElementById("seed-validation-badge");
-        if (!pErrors || pErrors.length === 0)
-        {
+        if (!pErrors || pErrors.length === 0) {
             badge.style.display = "none";
             badge.textContent = "";
         }
-        else
-        {
+        else {
             badge.style.display = "flex";
             badge.textContent = "⚠ " + pErrors.length + " validation error" + (pErrors.length > 1 ? "s" : "");
         }
@@ -2363,12 +2242,11 @@
 
     // ── Save / Collect ────────────────────────────────────────────────────
 
-    function CollectSeedData()
-    {
+    function CollectSeedData() {
         if (!_SeedEditor)
             return [];
 
-        return _SeedEditor.Rows.map(function(row) {
+        return _SeedEditor.Rows.map(function (row) {
             return {
                 TupleID: row.TupleID.startsWith("NEW_") ? "NEW" : row.TupleID,
                 Values: Object.assign({}, row.Values)
@@ -2376,8 +2254,7 @@
         });
     }
 
-    function SaveSeedEditorData()
-    {
+    function SaveSeedEditorData() {
         if (!_SeedEditor)
             return;
 
@@ -2388,8 +2265,7 @@
 
         // Validate
         const errors = ValidateAllSeedRows();
-        if (errors.length > 0)
-        {
+        if (errors.length > 0) {
             HighlightValidationErrors(errors);
             SetSeedValidationBadge(errors);
             SetSeedStatusMessage("Please fix validation errors before saving.", "err");
@@ -2408,8 +2284,7 @@
         });
     }
 
-    function OnSeedDataSaved(pPayload)
-    {
+    function OnSeedDataSaved(pPayload) {
         if (!_SeedEditor)
             return;
 
@@ -2417,16 +2292,14 @@
         if (!btnSave)
             return;
 
-        if (pPayload && pPayload.Success)
-        {
+        if (pPayload && pPayload.Success) {
             SetSeedStatusMessage("✓ Saved successfully.", "ok");
             btnSave.disabled = false;
             // Update internal row IDs so any "NEW" rows get proper IDs on next refresh
             // Close after brief confirmation
             setTimeout(CloseSeedEditorModal, 900);
         }
-        else
-        {
+        else {
             const msg = (pPayload && pPayload.Message) ? pPayload.Message : "Failed to save.";
             SetSeedStatusMessage("✕ " + msg, "err");
             btnSave.disabled = false;
@@ -2435,8 +2308,7 @@
 
     // ── Status helpers ────────────────────────────────────────────────────
 
-    function SetSeedStatusMessage(pMsg, pType)
-    {
+    function SetSeedStatusMessage(pMsg, pType) {
         const el = document.getElementById("seed-status-msg");
         if (!el)
             return;

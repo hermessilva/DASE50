@@ -3,6 +3,9 @@ import { XProperty } from "../../Core/XProperty.js";
 import type { XORMDesign } from "./XORMDesign.js";
 import type { XORMTable } from "./XORMTable.js";
 
+/** Separator used to store the allowed-values list as a single serialisable string. */
+const ALLOWED_VALUES_SEPARATOR = "|";
+
 export class XORMField extends XField
 {
     public static readonly IsAutoIncrementProp = XProperty.Register<XORMField, boolean>(
@@ -24,6 +27,31 @@ export class XORMField extends XField
         "IsFK",
         "Is Foreign Key",
         false
+    );
+
+    /**
+     * Pipe-separated list of allowed values for this field.
+     *
+     * Models enum-like constraints (MySQL ENUM/SET, CHECK constraints, domain types).
+     * Each entry is a non-empty trimmed string.  The separator is '|'.
+     *
+     * Examples:
+     *   "Active|Inactive|Pending"
+     *   "1|2|3"
+     *   "Male|Female|Other"
+     *
+     * When non-empty:
+     *   - DefaultValue (if set) should belong to this list.
+     *   - IsAutoIncrement conflicts with AllowedValues and triggers a warning.
+     *
+     * TS-native GUID — no C# equivalent.
+     */
+    public static readonly AllowedValuesProp = XProperty.Register<XORMField, string>(
+        (p: XORMField) => p.AllowedValues,
+        "E7B3A1C5-D2F4-4E68-9A0B-1C2D3E4F5A6B",
+        "AllowedValues",
+        "Allowed Values",
+        ""
     );
 
     /**
@@ -54,6 +82,79 @@ export class XORMField extends XField
     public set IsFK(pValue: boolean)
     {
         this.SetValue(XORMField.IsFKProp, pValue);
+    }
+
+    /**
+     * Raw pipe-separated string of allowed values.
+     * Set to "" to clear the constraint.
+     * Use AllowedValuesList for a parsed array, HasAllowedValues for a quick check.
+     */
+    public get AllowedValues(): string
+    {
+        return this.GetValue(XORMField.AllowedValuesProp) as string;
+    }
+
+    public set AllowedValues(pValue: string)
+    {
+        this.SetValue(XORMField.AllowedValuesProp, pValue.trim());
+    }
+
+    /** Parsed list of allowed values, trimmed and with empty strings removed. */
+    public get AllowedValuesList(): string[]
+    {
+        const raw = this.AllowedValues;
+        if (!raw)
+            return [];
+        const result: string[] = [];
+        for (const entry of raw.split(ALLOWED_VALUES_SEPARATOR))
+        {
+            const trimmed = entry.trim();
+            if (trimmed)
+                result.push(trimmed);
+        }
+        return result;
+    }
+
+    /** True when at least one allowed value is defined. */
+    public get HasAllowedValues(): boolean
+    {
+        return this.AllowedValuesList.length > 0;
+    }
+
+    /**
+     * Returns true when the given value is in the AllowedValues list.
+     * Comparison is case-sensitive.
+     * Always returns true when HasAllowedValues is false (no constraint).
+     */
+    public IsAllowedValue(pValue: string): boolean
+    {
+        if (!this.HasAllowedValues)
+            return true;
+        const list = this.AllowedValuesList;
+        for (const entry of list)
+            if (entry === pValue)
+                return true;
+        return false;
+    }
+
+    /**
+     * Replaces the allowed values list from an array.
+     * Duplicate and empty entries are removed before storing.
+     */
+    public SetAllowedValuesList(pValues: string[]): void
+    {
+        const seen = new Set<string>();
+        const clean: string[] = [];
+        for (const v of pValues)
+        {
+            const trimmed = v.trim();
+            if (trimmed && !seen.has(trimmed))
+            {
+                seen.add(trimmed);
+                clean.push(trimmed);
+            }
+        }
+        this.AllowedValues = clean.join(ALLOWED_VALUES_SEPARATOR);
     }
 
     /**

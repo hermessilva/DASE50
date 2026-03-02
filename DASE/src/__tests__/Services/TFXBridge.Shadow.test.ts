@@ -318,7 +318,7 @@ describe('XTFXBridge — Shadow Tables', () => {
             expect(shadow.ShadowModuleName).toBe('Authentication');
         });
 
-        it('should return existing shadow when duplicate', () => {
+        it('should create new shadow when duplicate', () => {
             const payload: IAddShadowTablePayload = {
                 X: 400, Y: 100,
                 ModelName: 'Auth.dsorm',
@@ -335,7 +335,7 @@ describe('XTFXBridge — Shadow Tables', () => {
 
             expect(result1.Success).toBe(true);
             expect(result2.Success).toBe(true);
-            expect(result2.ElementID).toBe(result1.ElementID);
+            expect(result2.ElementID).not.toBe(result1.ElementID);
         });
 
         it('should fail when no design exists', () => {

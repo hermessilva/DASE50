@@ -4,6 +4,7 @@ import { XRect, XPoint } from "../../Core/XGeometry.js";
 import { XProperty } from "../../Core/XProperty.js";
 import { XORMTable } from "./XORMTable.js";
 import { XORMReference } from "./XORMReference.js";
+import { XORMStateReference } from "./XORMStateReference.js";
 import { XORMField } from "./XORMField.js";
 import { XRouterShape, XRouterDirection } from "../../Design/XRouterTypes.js";
 
@@ -21,6 +22,17 @@ export interface XICreateReferenceOptions
     SourceFieldID: string;
     TargetTableID: string;
     Name?: string;
+}
+
+export interface XIEnableStateControlResult
+{
+    Success: boolean;
+    Message?: string;
+    StateFieldID?: string;
+    StateReferenceID?: string;
+    /** True if a shadow table was auto-created to represent the cross-model state table. */
+    ShadowTableCreated?: boolean;
+    ShadowTableID?: string;
 }
 
 /**
@@ -222,6 +234,120 @@ export class XORMDesign extends XDesign
 
         this.AppendChild(reference);
         return reference;
+    }
+
+    /**
+     * Enables the state-control pattern for the given table.
+     *
+     * Creates an XORMStateField and XORMStateReference linking the table to the design's
+     * StateControlTable. If the state table is not found in the current design a shadow
+     * table is automatically created.
+     *
+     * The operation is idempotent: calling it again when already enabled returns success
+     * with the existing field/reference IDs.
+     */
+    public EnableStateControl(pTable: XORMTable): XIEnableStateControlResult
+    {
+        if (pTable.ParentNode !== this)
+            return { Success: false, Message: "Table does not belong to this design." };
+
+        const stateTableName = this.StateControlTable.trim();
+        if (!stateTableName)
+            return { Success: false, Message: "StateControlTable is not set on the design." };
+
+        // Idempotency: already enabled and field exists
+        const existingField = pTable.GetStateField();
+        if (existingField && pTable.UseStateControl)
+        {
+            const existingRef = this.GetStateReferenceForTable(pTable.ID);
+            return {
+                Success: true,
+                StateFieldID: existingField.ID,
+                StateReferenceID: existingRef?.ID
+            };
+        }
+
+        // Locate or auto-create the state control table
+        let targetTable = this.GetTables().find(t => t.Name === stateTableName) ?? null;
+        let shadowCreated = false;
+        let shadowTableID: string | undefined;
+
+        if (targetTable === null)
+        {
+            // Not in current design → create a shadow placeholder
+            const shadowX = pTable.Bounds.X + pTable.Bounds.Width + 60;
+            const shadowY = pTable.Bounds.Y;
+            targetTable = this.CreateTable({ Name: stateTableName, X: shadowX, Y: shadowY });
+            targetTable.IsShadow = true;
+            targetTable.ShadowTableName = stateTableName;
+            shadowCreated = true;
+            shadowTableID = targetTable.ID;
+        }
+
+        // DataType inherits the target table's PKType (always non-empty — default is "Int32")
+        const fieldDataType = targetTable.PKType;
+        const stateField = pTable.CreateStateField(fieldDataType, `${stateTableName}ID`);
+
+        // Create the invisible XORMStateReference
+        const stateRef = new XORMStateReference();
+        stateRef.ID = XGuid.NewValue();
+        stateRef.Name = `FK_${pTable.Name}_${stateTableName}`;
+        stateRef.Source = stateField.ID;
+        stateRef.Target = targetTable.ID;
+        stateRef.Points = [
+            new XPoint(pTable.Bounds.Left + pTable.Bounds.Width, pTable.Bounds.Top + pTable.Bounds.Height / 2),
+            new XPoint(targetTable.Bounds.Left, targetTable.Bounds.Top + targetTable.Bounds.Height / 2)
+        ];
+        this.AppendChild(stateRef);
+
+        pTable.UseStateControl = true;
+
+        return {
+            Success: true,
+            StateFieldID: stateField.ID,
+            StateReferenceID: stateRef.ID,
+            ShadowTableCreated: shadowCreated,
+            ShadowTableID: shadowTableID
+        };
+    }
+
+    /**
+     * Disables the state-control pattern for the given table.
+     *
+     * Removes the XORMStateReference and the XORMStateField, then clears UseStateControl.
+     * The shadow table (if it was auto-created) is NOT removed automatically.
+     *
+     * @returns true on success; false if the table does not belong to this design.
+     */
+    public DisableStateControl(pTable: XORMTable): boolean
+    {
+        if (pTable.ParentNode !== this)
+            return false;
+
+        // Remove the state reference first
+        const stateRef = this.GetStateReferenceForTable(pTable.ID);
+        if (stateRef)
+            this.RemoveChild(stateRef);
+
+        // Remove the state field from the table
+        pTable.DeleteStateField();
+
+        pTable.UseStateControl = false;
+        return true;
+    }
+
+    /** Finds the XORMStateReference whose source field belongs to the given table. */
+    private GetStateReferenceForTable(pTableID: string): XORMStateReference | null
+    {
+        for (const child of this.ChildNodes)
+        {
+            if (!(child instanceof XORMStateReference))
+                continue;
+            const sourceField = this.FindFieldByID(child.Source);
+            if (sourceField?.ParentNode instanceof XORMTable && sourceField.ParentNode.ID === pTableID)
+                return child;
+        }
+        return null;
     }
 
     public DeleteTable(pTable: XORMTable): boolean

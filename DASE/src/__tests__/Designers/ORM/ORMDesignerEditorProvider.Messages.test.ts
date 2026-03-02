@@ -157,72 +157,72 @@ describe('XORMDesignerEditorProvider', () => {
         });
 
         it('should handle SelectElement with Clear', async () => {
-            await provider.HandleMessage(mockPanel, mockState, { 
-                Type: 'SelectElement', 
-                Payload: { Clear: true } 
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'SelectElement',
+                Payload: { Clear: true }
             });
 
             // Verified by no errors
         });
 
         it('should handle SelectElement with ElementID', async () => {
-            await provider.HandleMessage(mockPanel, mockState, { 
-                Type: 'SelectElement', 
-                Payload: { ElementID: 'elem-1' } 
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'SelectElement',
+                Payload: { ElementID: 'elem-1' }
             });
 
             // Verified by no errors
         });
 
         it('should handle SelectElement with Toggle', async () => {
-            await provider.HandleMessage(mockPanel, mockState, { 
-                Type: 'SelectElement', 
-                Payload: { Toggle: true, ElementID: 'elem-1' } 
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'SelectElement',
+                Payload: { Toggle: true, ElementID: 'elem-1' }
             });
 
             // Verified by no errors
         });
 
         it('should handle SelectElement with Add', async () => {
-            await provider.HandleMessage(mockPanel, mockState, { 
-                Type: 'SelectElement', 
-                Payload: { Add: true, ElementID: 'elem-1' } 
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'SelectElement',
+                Payload: { Add: true, ElementID: 'elem-1' }
             });
 
             // Verified by no errors
         });
 
         it('should handle SelectElement with Toggle but no ElementID', async () => {
-            await provider.HandleMessage(mockPanel, mockState, { 
-                Type: 'SelectElement', 
-                Payload: { Toggle: true } 
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'SelectElement',
+                Payload: { Toggle: true }
             });
 
             // Verified by no errors - should not call any selection method
         });
 
         it('should handle SelectElement with Add but no ElementID', async () => {
-            await provider.HandleMessage(mockPanel, mockState, { 
-                Type: 'SelectElement', 
-                Payload: { Add: true } 
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'SelectElement',
+                Payload: { Add: true }
             });
 
             // Verified by no errors - should not call any selection method
         });
 
         it('should handle AddTable message', async () => {
-            await provider.HandleMessage(mockPanel, mockState, { 
-                Type: 'AddTable', 
-                Payload: { X: 100, Y: 200, Name: 'NewTable' } 
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'AddTable',
+                Payload: { X: 100, Y: 200, Name: 'NewTable' }
             });
 
             expect(mockState.AddTable).toHaveBeenCalledWith(100, 200, 'NewTable');
         });
 
         it('should handle AddTable without name', async () => {
-            await provider.HandleMessage(mockPanel, mockState, { 
-                Type: 'AddTable', 
-                Payload: { X: 100, Y: 200 } 
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'AddTable',
+                Payload: { X: 100, Y: 200 }
             });
 
             expect(mockState.AddTable).toHaveBeenCalledWith(100, 200, 'NewTable');
@@ -232,18 +232,18 @@ describe('XORMDesignerEditorProvider', () => {
             mockState.AddTable = jest.fn().mockReturnValue({ Success: false });
             mockPanel.webview.postMessage.mockClear();
 
-            await provider.HandleMessage(mockPanel, mockState, { 
-                Type: 'AddTable', 
-                Payload: { X: 100, Y: 200, Name: 'NewTable' } 
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'AddTable',
+                Payload: { X: 100, Y: 200, Name: 'NewTable' }
             });
 
             expect(mockPanel.webview.postMessage).not.toHaveBeenCalled();
         });
 
         it('should handle MoveElement message', async () => {
-            await provider.HandleMessage(mockPanel, mockState, { 
-                Type: 'MoveElement', 
-                Payload: { ElementID: 'elem-1', X: 300, Y: 400 } 
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'MoveElement',
+                Payload: { ElementID: 'elem-1', X: 300, Y: 400 }
             });
 
             expect(mockState.MoveElement).toHaveBeenCalledWith('elem-1', 300, 400);
@@ -252,9 +252,9 @@ describe('XORMDesignerEditorProvider', () => {
         it('should not notify when MoveElement fails', async () => {
             mockState.MoveElement = jest.fn().mockReturnValue({ Success: false });
 
-            await provider.HandleMessage(mockPanel, mockState, { 
-                Type: 'MoveElement', 
-                Payload: { ElementID: 'elem-1', X: 300, Y: 400 } 
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'MoveElement',
+                Payload: { ElementID: 'elem-1', X: 300, Y: 400 }
             });
 
             expect(mockState.IsDirty).toBeFalsy();
@@ -264,9 +264,9 @@ describe('XORMDesignerEditorProvider', () => {
             mockState.ReorderField = jest.fn().mockReturnValue({ Success: true });
             mockState.AlignLines = jest.fn().mockReturnValue(true);
 
-            await provider.HandleMessage(mockPanel, mockState, { 
-                Type: 'ReorderField', 
-                Payload: { FieldID: 'field-1', NewIndex: 2 } 
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'ReorderField',
+                Payload: { FieldID: 'field-1', NewIndex: 2 }
             });
 
             expect(mockState.ReorderField).toHaveBeenCalledWith('field-1', 2);
@@ -276,9 +276,9 @@ describe('XORMDesignerEditorProvider', () => {
         it('should not notify when ReorderField fails', async () => {
             mockState.ReorderField = jest.fn().mockReturnValue({ Success: false });
 
-            await provider.HandleMessage(mockPanel, mockState, { 
-                Type: 'ReorderField', 
-                Payload: { FieldID: 'field-1', NewIndex: 2 } 
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'ReorderField',
+                Payload: { FieldID: 'field-1', NewIndex: 2 }
             });
 
             expect(mockState.IsDirty).toBeFalsy();
@@ -300,27 +300,27 @@ describe('XORMDesignerEditorProvider', () => {
         });
 
         it('should handle DragDropAddRelation message', async () => {
-            await provider.HandleMessage(mockPanel, mockState, { 
-                Type: 'DragDropAddRelation', 
-                Payload: { SourceID: 'table-1', TargetID: 'table-2', Name: 'FK_Test' } 
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'DragDropAddRelation',
+                Payload: { SourceID: 'table-1', TargetID: 'table-2', Name: 'FK_Test' }
             });
 
             expect(mockState.AddReference).toHaveBeenCalledWith('table-1', 'table-2', 'FK_Test', undefined);
         });
 
         it('should handle DragDropAddRelation without name', async () => {
-            await provider.HandleMessage(mockPanel, mockState, { 
-                Type: 'DragDropAddRelation', 
-                Payload: { SourceID: 'table-1', TargetID: 'table-2' } 
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'DragDropAddRelation',
+                Payload: { SourceID: 'table-1', TargetID: 'table-2' }
             });
 
             expect(mockState.AddReference).toHaveBeenCalledWith('table-1', 'table-2', '', undefined);
         });
 
         it('should handle DragDropAddRelation with IsOneToOne flag', async () => {
-            await provider.HandleMessage(mockPanel, mockState, { 
-                Type: 'DragDropAddRelation', 
-                Payload: { SourceID: 'table-1', TargetID: 'table-2', IsOneToOne: true } 
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'DragDropAddRelation',
+                Payload: { SourceID: 'table-1', TargetID: 'table-2', IsOneToOne: true }
             });
 
             expect(mockState.AddReference).toHaveBeenCalledWith('table-1', 'table-2', '', true);
@@ -330,18 +330,18 @@ describe('XORMDesignerEditorProvider', () => {
             mockState.AddReference = jest.fn().mockReturnValue({ Success: false });
             mockPanel.webview.postMessage.mockClear();
 
-            await provider.HandleMessage(mockPanel, mockState, { 
-                Type: 'DragDropAddRelation', 
-                Payload: { SourceID: 'table-1', TargetID: 'table-2', Name: 'FK_Test' } 
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'DragDropAddRelation',
+                Payload: { SourceID: 'table-1', TargetID: 'table-2', Name: 'FK_Test' }
             });
 
             expect(mockPanel.webview.postMessage).not.toHaveBeenCalled();
         });
 
         it('should handle UpdateProperty message', async () => {
-            await provider.HandleMessage(mockPanel, mockState, { 
-                Type: 'UpdateProperty', 
-                Payload: { ElementID: 'elem-1', PropertyKey: 'Name', Value: 'NewName' } 
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'UpdateProperty',
+                Payload: { ElementID: 'elem-1', PropertyKey: 'Name', Value: 'NewName' }
             });
 
             expect(mockState.UpdateProperty).toHaveBeenCalledWith('elem-1', 'Name', 'NewName');
@@ -351,12 +351,76 @@ describe('XORMDesignerEditorProvider', () => {
             mockState.UpdateProperty = jest.fn().mockReturnValue({ Success: false });
             mockPanel.webview.postMessage.mockClear();
 
-            await provider.HandleMessage(mockPanel, mockState, { 
-                Type: 'UpdateProperty', 
-                Payload: { ElementID: 'elem-1', PropertyKey: 'Name', Value: 'NewName' } 
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'UpdateProperty',
+                Payload: { ElementID: 'elem-1', PropertyKey: 'Name', Value: 'NewName' }
             });
 
             expect(mockPanel.webview.postMessage).not.toHaveBeenCalled();
+        });
+
+        it('should show confirmation dialog when UseStateControl is set to false', async () => {
+            (vscode.window.showWarningMessage as jest.Mock).mockResolvedValue('Remove');
+
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'UpdateProperty',
+                Payload: { ElementID: 'tbl-1', PropertyKey: 'UseStateControl', Value: false }
+            });
+
+            expect(vscode.window.showWarningMessage).toHaveBeenCalledWith(
+                expect.stringContaining('remove'),
+                expect.objectContaining({ modal: true }),
+                'Remove',
+                'Cancel'
+            );
+        });
+
+        it('should call UpdateProperty after user confirms state control disable', async () => {
+            (vscode.window.showWarningMessage as jest.Mock).mockResolvedValue('Remove');
+
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'UpdateProperty',
+                Payload: { ElementID: 'tbl-1', PropertyKey: 'UseStateControl', Value: false }
+            });
+
+            expect(mockState.UpdateProperty).toHaveBeenCalledWith('tbl-1', 'UseStateControl', false);
+        });
+
+        it('should NOT call UpdateProperty when user cancels state control disable', async () => {
+            (vscode.window.showWarningMessage as jest.Mock).mockResolvedValue('Cancel');
+
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'UpdateProperty',
+                Payload: { ElementID: 'tbl-1', PropertyKey: 'UseStateControl', Value: false }
+            });
+
+            expect(mockState.UpdateProperty).not.toHaveBeenCalled();
+        });
+
+        it('should refresh properties (reset checkbox) when user cancels state control disable', async () => {
+            (vscode.window.showWarningMessage as jest.Mock).mockResolvedValue(undefined);
+            mockPanel.webview.postMessage.mockClear();
+
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'UpdateProperty',
+                Payload: { ElementID: 'tbl-1', PropertyKey: 'UseStateControl', Value: false }
+            });
+
+            // Properties panel should be refreshed to reset the unchecked checkbox
+            expect(mockState.GetProperties).toHaveBeenCalledWith('tbl-1');
+            expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
+                expect.objectContaining({ Type: 'PropertiesChanged' })
+            );
+        });
+
+        it('should NOT show confirmation when UseStateControl is set to true', async () => {
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'UpdateProperty',
+                Payload: { ElementID: 'tbl-1', PropertyKey: 'UseStateControl', Value: true }
+            });
+
+            expect(vscode.window.showWarningMessage).not.toHaveBeenCalled();
+            expect(mockState.UpdateProperty).toHaveBeenCalledWith('tbl-1', 'UseStateControl', true);
         });
 
         it('should handle ValidateModel message', async () => {
@@ -406,9 +470,9 @@ describe('XORMDesignerEditorProvider', () => {
         });
 
         it('should handle RenameCompleted message', async () => {
-            await provider.HandleMessage(mockPanel, mockState, { 
-                Type: 'RenameCompleted', 
-                Payload: { NewName: 'RenamedElement' } 
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'RenameCompleted',
+                Payload: { NewName: 'RenamedElement' }
             });
 
             expect(mockState.RenameSelected).toHaveBeenCalledWith('RenamedElement');
@@ -418,9 +482,9 @@ describe('XORMDesignerEditorProvider', () => {
             mockState.RenameSelected = jest.fn().mockReturnValue({ Success: false });
             mockPanel.webview.postMessage.mockClear();
 
-            await provider.HandleMessage(mockPanel, mockState, { 
-                Type: 'RenameCompleted', 
-                Payload: { NewName: 'RenamedElement' } 
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'RenameCompleted',
+                Payload: { NewName: 'RenamedElement' }
             });
 
             expect(mockPanel.webview.postMessage).not.toHaveBeenCalled();
@@ -448,7 +512,7 @@ describe('XORMDesignerEditorProvider', () => {
             onMessageCallback = null;
             onSelectionChangedCallback = null;
             onIssuesChangedCallback = null;
-            
+
             mockPanel = {
                 webview: {
                     onDidReceiveMessage: jest.fn((cb) => {
@@ -458,7 +522,7 @@ describe('XORMDesignerEditorProvider', () => {
                     postMessage: jest.fn().mockResolvedValue(true)
                 }
             };
-            
+
             mockState = {
                 GetModelData: jest.fn().mockResolvedValue({ Tables: [], References: [] }),
                 GetProperties: jest.fn().mockResolvedValue([{ Key: 'Name', Value: 'Test' }]),
@@ -472,7 +536,7 @@ describe('XORMDesignerEditorProvider', () => {
                     SetIssues: jest.fn()
                 }
             };
-            
+
             // Override the mock SelectionService to capture the callback
             const { GetSelectionService } = require('../../../Services/SelectionService');
             (GetSelectionService as jest.Mock).mockReturnValue({
@@ -500,7 +564,7 @@ describe('XORMDesignerEditorProvider', () => {
             provider.SetupMessageHandling(mockPanel, mockState);
 
             expect(onMessageCallback).not.toBeNull();
-            
+
             // Execute the message callback
             if (onMessageCallback) {
                 await onMessageCallback({ Type: 'DesignerReady' });
@@ -514,7 +578,7 @@ describe('XORMDesignerEditorProvider', () => {
             provider.SetupMessageHandling(mockPanel, mockState);
 
             expect(onSelectionChangedCallback).not.toBeNull();
-            
+
             // Execute the selection changed callback with a PrimaryID
             if (onSelectionChangedCallback) {
                 await onSelectionChangedCallback({
@@ -531,7 +595,7 @@ describe('XORMDesignerEditorProvider', () => {
             provider.SetupMessageHandling(mockPanel, mockState);
 
             expect(onSelectionChangedCallback).not.toBeNull();
-            
+
             // Execute the selection changed callback without PrimaryID
             if (onSelectionChangedCallback) {
                 await onSelectionChangedCallback({
@@ -548,7 +612,7 @@ describe('XORMDesignerEditorProvider', () => {
             provider.SetupMessageHandling(mockPanel, mockState);
 
             expect(onIssuesChangedCallback).not.toBeNull();
-            
+
             // Execute the issues changed callback
             if (onIssuesChangedCallback) {
                 onIssuesChangedCallback([{ Message: 'Test issue', Severity: 1 }]);
@@ -617,18 +681,18 @@ describe('XORMDesignerEditorProvider', () => {
         });
 
         it('should use tableID from payload when provided', async () => {
-            await provider.HandleMessage(mockPanel, mockState, { 
-                Type: 'AddField', 
-                Payload: { TableID: 'table-from-payload', Name: 'TestField', DataType: 'String' } 
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'AddField',
+                Payload: { TableID: 'table-from-payload', Name: 'TestField', DataType: 'String' }
             });
 
             expect(mockState.AddField).toHaveBeenCalledWith('table-from-payload', 'TestField', 'String');
         });
 
         it('should not show input prompts when Name and DataType are provided', async () => {
-            await provider.HandleMessage(mockPanel, mockState, { 
-                Type: 'AddField', 
-                Payload: { TableID: 'table-1', Name: 'ProvidedName', DataType: 'Int32' } 
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'AddField',
+                Payload: { TableID: 'table-1', Name: 'ProvidedName', DataType: 'Int32' }
             });
 
             expect(vscode.window.showInputBox).not.toHaveBeenCalled();
@@ -667,8 +731,8 @@ describe('XORMDesignerEditorProvider', () => {
             // Create new provider with the updated mock
             const testProvider = new XORMDesignerEditorProvider(mockContext as any);
 
-            await testProvider.HandleMessage(mockPanel, mockState, { 
-                Type: 'AddField', 
+            await testProvider.HandleMessage(mockPanel, mockState, {
+                Type: 'AddField',
                 Payload: { Name: 'TestField', DataType: 'String' } // No TableID
             });
 
@@ -690,8 +754,8 @@ describe('XORMDesignerEditorProvider', () => {
 
             const testProvider = new XORMDesignerEditorProvider(mockContext as any);
 
-            await testProvider.HandleMessage(mockPanel, mockState, { 
-                Type: 'AddField', 
+            await testProvider.HandleMessage(mockPanel, mockState, {
+                Type: 'AddField',
                 Payload: { Name: 'TestField', DataType: 'String' } // No TableID
             });
 
@@ -711,8 +775,8 @@ describe('XORMDesignerEditorProvider', () => {
             (vscode.window.showInputBox as jest.Mock).mockResolvedValue('PromptedFieldName');
             (vscode.window.showQuickPick as jest.Mock).mockResolvedValue('DateTime');
 
-            await testProvider.HandleMessage(mockPanel, mockState, { 
-                Type: 'AddField', 
+            await testProvider.HandleMessage(mockPanel, mockState, {
+                Type: 'AddField',
                 Payload: { TableID: 'table-1' } // No Name or DataType
             });
 
@@ -724,8 +788,8 @@ describe('XORMDesignerEditorProvider', () => {
         it('should abort when field name prompt is cancelled', async () => {
             (vscode.window.showInputBox as jest.Mock).mockResolvedValue(undefined);
 
-            await provider.HandleMessage(mockPanel, mockState, { 
-                Type: 'AddField', 
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'AddField',
                 Payload: { TableID: 'table-1' } // No Name
             });
 
@@ -736,8 +800,8 @@ describe('XORMDesignerEditorProvider', () => {
             (vscode.window.showInputBox as jest.Mock).mockResolvedValue('TestField');
             (vscode.window.showQuickPick as jest.Mock).mockResolvedValue(undefined);
 
-            await provider.HandleMessage(mockPanel, mockState, { 
-                Type: 'AddField', 
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'AddField',
                 Payload: { TableID: 'table-1' } // No DataType
             });
 
@@ -748,8 +812,8 @@ describe('XORMDesignerEditorProvider', () => {
             mockState.AddField = jest.fn().mockReturnValue({ Success: false });
             mockPanel.webview.postMessage.mockClear();
 
-            await provider.HandleMessage(mockPanel, mockState, { 
-                Type: 'AddField', 
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'AddField',
                 Payload: { TableID: 'table-1', Name: 'TestField', DataType: 'String' }
             });
 
@@ -996,13 +1060,13 @@ describe('XORMDesignerEditorProvider', () => {
             );
         });
 
-        it('should do nothing when TableID is missing', async () => {
+        it('should call AddShadowTable even when TableID is missing', async () => {
             await provider.HandleMessage(mockPanel, mockState, {
                 Type: 'AddShadowTable',
                 Payload: { TableName: 'T' }
             });
 
-            expect(mockState.AddShadowTable).not.toHaveBeenCalled();
+            expect(mockState.AddShadowTable).toHaveBeenCalled();
         });
 
         it('should do nothing when TableName is missing', async () => {

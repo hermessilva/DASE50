@@ -834,4 +834,99 @@ describe("XORMValidator", () =>
             expect(errors.length).toBe(0);
         });
     });
+
+    describe("AllowedValues validation", () =>
+    {
+        it("should warn when DefaultValue is not in AllowedValues list", () =>
+        {
+            const doc = new XORMDocument();
+            doc.Design.Name = "Test";
+            const table = doc.Design.CreateTable({ Name: "Order" });
+            const field = table.CreateField({ Name: "Status" });
+            field.AllowedValues = "Open|Closed|Pending";
+            field.DefaultValue = "Unknown"; // not in list
+
+            const validator = new XORMValidator();
+            const issues = validator.Validate(doc);
+            const warning = issues.find(i => i.Message.includes("not in the AllowedValues list"));
+            expect(warning).toBeDefined();
+            expect(warning!.Severity).toBe(XDesignerErrorSeverity.Warning);
+        });
+
+        it("should not warn when DefaultValue is in the AllowedValues list", () =>
+        {
+            const doc = new XORMDocument();
+            doc.Design.Name = "Test";
+            const table = doc.Design.CreateTable({ Name: "Order" });
+            const field = table.CreateField({ Name: "Status" });
+            field.AllowedValues = "Open|Closed|Pending";
+            field.DefaultValue = "Open";
+
+            const validator = new XORMValidator();
+            const issues = validator.Validate(doc);
+            const warning = issues.find(i => i.Message.includes("not in the AllowedValues list"));
+            expect(warning).toBeUndefined();
+        });
+
+        it("should not warn when DefaultValue is empty even if AllowedValues is set", () =>
+        {
+            const doc = new XORMDocument();
+            doc.Design.Name = "Test";
+            const table = doc.Design.CreateTable({ Name: "Order" });
+            const field = table.CreateField({ Name: "Status" });
+            field.AllowedValues = "Open|Closed";
+            field.DefaultValue = ""; // empty — no constraint violation
+
+            const validator = new XORMValidator();
+            const issues = validator.Validate(doc);
+            const warning = issues.find(i => i.Message.includes("not in the AllowedValues list"));
+            expect(warning).toBeUndefined();
+        });
+
+        it("should warn when both AllowedValues and IsAutoIncrement are set", () =>
+        {
+            const doc = new XORMDocument();
+            doc.Design.Name = "Test";
+            const table = doc.Design.CreateTable({ Name: "T" });
+            const field = table.CreateField({ Name: "F", DataType: "Int32" });
+            field.AllowedValues = "1|2|3";
+            field.IsAutoIncrement = true;
+
+            const validator = new XORMValidator();
+            const issues = validator.Validate(doc);
+            const warning = issues.find(i => i.Message.includes("mutually exclusive"));
+            expect(warning).toBeDefined();
+            expect(warning!.Severity).toBe(XDesignerErrorSeverity.Warning);
+        });
+
+        it("should not warn when AllowedValues is empty even if IsAutoIncrement is set", () =>
+        {
+            const doc = new XORMDocument();
+            doc.Design.Name = "Test";
+            const table = doc.Design.CreateTable({ Name: "T" });
+            const field = table.CreateField({ Name: "F", DataType: "Int32" });
+            field.IsAutoIncrement = true;
+            // AllowedValues empty — no conflict
+
+            const validator = new XORMValidator();
+            const issues = validator.Validate(doc);
+            const warning = issues.find(i => i.Message.includes("mutually exclusive"));
+            expect(warning).toBeUndefined();
+        });
+
+        it("should issue no AllowedValues warnings for a clean field", () =>
+        {
+            const doc = new XORMDocument();
+            doc.Design.Name = "Test";
+            const table = doc.Design.CreateTable({ Name: "T" });
+            table.CreateField({ Name: "F" }); // no AllowedValues set
+
+            const validator = new XORMValidator();
+            const issues = validator.Validate(doc);
+            const avIssues = issues.filter(i =>
+                i.Message.includes("AllowedValues") || i.Message.includes("mutually exclusive")
+            );
+            expect(avIssues.length).toBe(0);
+        });
+    });
 });

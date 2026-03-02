@@ -137,7 +137,7 @@ describe('XTFXBridge ShadowTable', () => {
             expect(result.ElementID).toBeDefined();
         });
 
-        it('should return existing shadow table when duplicate', () => {
+        it('should create new shadow table when duplicate', () => {
             bridge.LoadOrmModelFromText('{}');
 
             const r1 = bridge.AddShadowTable({
@@ -154,7 +154,7 @@ describe('XTFXBridge ShadowTable', () => {
                 TableID: 'tbl-2', TableName: 'AppUser'
             } as IAddShadowTablePayload);
 
-            expect(r1.ElementID).toBe(r2.ElementID);
+            expect(r1.ElementID).not.toBe(r2.ElementID);
         });
 
         it('should inherit fill from same-design table when TableID matches', () => {

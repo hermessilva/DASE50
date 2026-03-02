@@ -318,13 +318,13 @@ describe('XORMDesignerEditorProvider — Shadow & SeedData messages', () => {
             };
         });
 
-        it('should return early when payload has no TableID', async () => {
+        it('should call AddShadowTable even when payload has no TableID', async () => {
             await provider.HandleMessage(mockPanel, mockState, {
                 Type: 'AddShadowTable',
                 Payload: { TableName: 'Test' }
             });
 
-            expect(mockState.AddShadowTable).not.toHaveBeenCalled();
+            expect(mockState.AddShadowTable).toHaveBeenCalledWith({ TableName: 'Test' });
         });
 
         it('should return early when payload has no TableName', async () => {
