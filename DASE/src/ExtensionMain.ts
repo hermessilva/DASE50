@@ -15,6 +15,7 @@ import { XIssuesViewProvider } from "./Views/IssuesViewProvider";
 import { XPropertiesViewProvider } from "./Views/PropertiesViewProvider";
 import { InitializeLogService, GetLogService } from "./Services/LogService";
 import { RegisterAgentIntegration } from "./AgentIntegration";
+import { RegisterClaudeCliProvider } from "./AgentIntegration/ClaudeCli";
 import { XOrganizeTablesCommand } from "./Designers/ORM/Commands/OrganizeTablesCommand";
 import { XCreateSQLScriptCommand } from "./Designers/ORM/Commands/CreateSQLScriptCommand";
 import { XGenerateORMCodeCommand } from "./Designers/ORM/Commands/GenerateORMCodeCommand";
@@ -46,6 +47,9 @@ export function activate(pContext: vscode.ExtensionContext): void {
 
         // Register AI Agent Integration (Chat Participant + Language Model Tools)
         RegisterAgentIntegration(pContext, designerProvider);
+
+        // Register Claude Code CLI as a Language Model provider (best-effort)
+        RegisterClaudeCliProvider(pContext);
 
         log.Info("DASE extension activated successfully");
     }

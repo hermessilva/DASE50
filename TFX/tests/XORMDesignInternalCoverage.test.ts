@@ -17,7 +17,7 @@ describe("XORMDesign internal coverage", () =>
         RegisterORMElements();
     });
 
-    it("SetupTableListeners should add a Bounds listener that re-routes", () =>
+    it("SetupTableListeners should add a Bounds listener that re-routes affected", () =>
     {
         const design = new XORMDesign();
 
@@ -29,7 +29,7 @@ describe("XORMDesign internal coverage", () =>
 
         design.AppendChild(table as any);
 
-        const spy = vi.spyOn(design, "RouteAllLines").mockImplementation(() => undefined);
+        const spy = vi.spyOn(design, "RouteReferencesOf").mockImplementation(() => undefined);
 
         (design as any).SetupTableListeners();
 
@@ -48,17 +48,17 @@ describe("XORMDesign internal coverage", () =>
 
         (design as any).SetupTableListeners();
 
-        const spy = vi.spyOn(design, "RouteAllLines").mockImplementation(() => undefined);
+        const spy = vi.spyOn(design, "RouteReferencesOf").mockImplementation(() => undefined);
         (design as any).SetupTableListeners();
 
         table.OnPropertyChanged.Invoke(table as any, { Name: "Bounds" } as any, null);
         expect(spy).toHaveBeenCalledTimes(1);
     });
 
-    it("CreateTable should add a Bounds listener that re-routes", () =>
+    it("CreateTable should add a Bounds listener that re-routes affected", () =>
     {
         const design = new XORMDesign();
-        const spy = vi.spyOn(design, "RouteAllLines").mockImplementation(() => undefined);
+        const spy = vi.spyOn(design, "RouteReferencesOf").mockImplementation(() => undefined);
 
         const table = design.CreateTable({ Name: "T", X: 10, Y: 20, Width: 200, Height: 150 });
         expect(table.Bounds.Left).toBe(10);
@@ -66,6 +66,92 @@ describe("XORMDesign internal coverage", () =>
 
         table.OnPropertyChanged.Invoke(table as any, { Name: "Bounds" } as any, null);
         expect(spy).toHaveBeenCalled();
+    });
+
+    it("SuspendRouting / ResumeRouting batches into single re-route", () =>
+    {
+        const design = new XORMDesign();
+        const table = design.CreateTable({ Name: "T", X: 0, Y: 0, Width: 100, Height: 100 });
+
+        const spy = vi.spyOn(design, "RouteAllLines");
+        spy.mockClear();
+
+        design.SuspendRouting();
+        expect(design.IsRoutingSuspended).toBe(true);
+        table.Bounds = new XRect(10, 10, 100, 100);
+        table.Bounds = new XRect(20, 20, 100, 100);
+        design.ResumeRouting();
+        expect(spy).toHaveBeenCalledTimes(1);
+    });
+
+    it("ResumeRouting with pRouteIfDirty=false skips flush", () =>
+    {
+        const design = new XORMDesign();
+        const table = design.CreateTable({ Name: "T", X: 0, Y: 0, Width: 100, Height: 100 });
+
+        design.SuspendRouting();
+        const spy = vi.spyOn(design, "RouteAllLines");
+        spy.mockClear();
+        table.Bounds = new XRect(10, 10, 100, 100);
+        design.ResumeRouting(false);
+        expect(spy).not.toHaveBeenCalled();
+    });
+
+    it("RouteAllLines short-circuits and marks dirty when suspended", () =>
+    {
+        const design = new XORMDesign();
+        design.CreateTable({ Name: "T", X: 0, Y: 0, Width: 100, Height: 100 });
+        design.SuspendRouting();
+        design.RouteAllLines();
+        const spy = vi.spyOn(design, "RouteAllLines");
+        design.ResumeRouting();
+        expect(spy).toHaveBeenCalledTimes(1);
+    });
+
+    it("ResumeRouting drops below zero is a no-op", () =>
+    {
+        const design = new XORMDesign();
+        design.ResumeRouting();
+        expect(design.IsRoutingSuspended).toBe(false);
+    });
+
+    it("ReferenceTouchesTable returns false for unrelated reference", () =>
+    {
+        const design = new XORMDesign();
+        const t1 = design.CreateTable({ Name: "T1", X: 0, Y: 0, Width: 100, Height: 100 });
+        const t2 = design.CreateTable({ Name: "T2", X: 200, Y: 0, Width: 100, Height: 100 });
+        const tUnrelated = design.CreateTable({ Name: "T3", X: 400, Y: 0, Width: 100, Height: 100 });
+        const f1 = t1.CreateField({ Name: "F1" });
+        const ref = new XORMReference();
+        ref.ID = XGuid.NewValue();
+        ref.Source = f1.ID;
+        ref.Target = t2.ID;
+        design.AppendChild(ref as any);
+        expect((design as any).ReferenceTouchesTable(ref, tUnrelated)).toBe(false);
+    });
+
+    it("RouteReferencesOf routes only touching refs, skips unrelated", () =>
+    {
+        const design = new XORMDesign();
+        const t1 = design.CreateTable({ Name: "T1", X: 0, Y: 0, Width: 100, Height: 100 });
+        const t2 = design.CreateTable({ Name: "T2", X: 200, Y: 0, Width: 100, Height: 100 });
+        const t3 = design.CreateTable({ Name: "T3", X: 400, Y: 0, Width: 100, Height: 100 });
+        const f1 = t1.CreateField({ Name: "F1" });
+        const f2 = t2.CreateField({ Name: "F2" });
+        const refTouching = new XORMReference();
+        refTouching.ID = XGuid.NewValue();
+        refTouching.Source = f1.ID;
+        refTouching.Target = t2.ID;
+        design.AppendChild(refTouching as any);
+        const refUnrelated = new XORMReference();
+        refUnrelated.ID = XGuid.NewValue();
+        refUnrelated.Source = f2.ID;
+        refUnrelated.Target = t3.ID;
+        design.AppendChild(refUnrelated as any);
+
+        const spy = vi.spyOn(design as any, "RouteReference");
+        design.RouteReferencesOf(t1);
+        expect(spy).toHaveBeenCalledTimes(1);
     });
 
     it("RouteReference should cover linked-element vs fallback resolution", () =>

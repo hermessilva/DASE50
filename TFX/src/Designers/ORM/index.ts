@@ -18,3 +18,5 @@ export * from "./XORMRegistry.js";
 export * from "./XORMFieldMetadataProvider.js";
 export * from "./XORMPKFieldMetadataProvider.js";
 export * from "./XORMTableMetadataProvider.js";
+export * from "./XORMMetrics.js";
+

@@ -317,3 +317,72 @@ export enum FileType {
 }
 
 export { EventEmitter as Event };
+
+export class LanguageModelTextPart {
+    public value: string;
+    constructor(value: string) {
+        this.value = value;
+    }
+}
+
+export class LanguageModelToolResultPart {
+    constructor(public callId: string, public content: unknown[]) {}
+}
+
+export class LanguageModelToolCallPart {
+    constructor(public callId: string, public name: string, public input: unknown) {}
+}
+
+export class LanguageModelDataPart {
+    constructor(public mimeType: string, public data: Uint8Array) {}
+}
+
+export enum LanguageModelChatMessageRole {
+    User = 1,
+    Assistant = 2,
+    System = 3
+}
+
+export class LanguageModelChatMessage {
+    public role: LanguageModelChatMessageRole;
+    public content: unknown[];
+    public name: string | undefined;
+    constructor(role: LanguageModelChatMessageRole, content: string | unknown[], name?: string) {
+        this.role = role;
+        this.content = typeof content === 'string' ? [new LanguageModelTextPart(content)] : content;
+        this.name = name;
+    }
+    static User(content: string | unknown[], name?: string): LanguageModelChatMessage {
+        return new LanguageModelChatMessage(LanguageModelChatMessageRole.User, content, name);
+    }
+    static Assistant(content: string | unknown[], name?: string): LanguageModelChatMessage {
+        return new LanguageModelChatMessage(LanguageModelChatMessageRole.Assistant, content, name);
+    }
+}
+
+export const lm = {
+    selectChatModels: jest.fn(() => Promise.resolve([])),
+    registerLanguageModelChatProvider: jest.fn((_vendor: string, _provider: unknown) => ({
+        dispose: () => { }
+    }))
+};
+
+export class CancellationTokenSource {
+    public token: { isCancellationRequested: boolean; onCancellationRequested: (cb: () => void) => { dispose: () => void } };
+    private _listeners: (() => void)[] = [];
+    constructor() {
+        this.token = {
+            isCancellationRequested: false,
+            onCancellationRequested: (cb: () => void) => {
+                this._listeners.push(cb);
+                return { dispose: () => { /* no-op */ } };
+            }
+        };
+    }
+    cancel(): void {
+        this.token.isCancellationRequested = true;
+        for (const l of this._listeners) l();
+    }
+    dispose(): void { this._listeners = []; }
+}
+

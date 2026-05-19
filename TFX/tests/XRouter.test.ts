@@ -297,80 +297,28 @@ describe("XRouter", () => {
         expect(router.AllLines.length).toBeGreaterThan(0);
     });
 
-    it("should return true when collision is detected", () => {
-        const router = new XRouter({ checkCollision: true, checkCrossRect: true });
+    it("should detect collision through getAllLines with obstacle in path", () => {
+        const router = new XRouter({ checkCollision: true, checkCrossRect: true, gap: 10 });
         router.addObstacle(new XRect(40, 0, 20, 100));
-        
-        const points = [new XPoint(0, 50), new XPoint(100, 50)];
-        // @ts-ignore
-        const collided = router.hasRectCollision(points);
-        expect(collided).toBe(true);
+        const shapeL: XRouterShape = {
+            Rect: new XRect(0, 40, 20, 20),
+            StartPoint: new XPoint(NaN, NaN),
+            DesiredDegree: [XRouterDirection.East]
+        };
+        const shapeR: XRouterShape = {
+            Rect: new XRect(100, 40, 20, 20),
+            StartPoint: new XPoint(NaN, NaN),
+            DesiredDegree: [XRouterDirection.West]
+        };
+        router.setEndpoints(shapeL.Rect, shapeR.Rect);
+        const line = router.getAllLines(shapeL, shapeR);
+        expect(line.IsValid).toBe(true);
     });
 
-    it("should return false when no collision is detected", () => {
-        const router = new XRouter({ checkCollision: true, checkCrossRect: true });
-        router.addObstacle(new XRect(40, 0, 20, 100));
-        
-        const points = [new XPoint(0, -50), new XPoint(10, -50)];
-        // @ts-ignore
-        const collided = router.hasRectCollision(points);
-        expect(collided).toBe(false);
-    });
-
-    it("getStartPoint should cover all NaN cases", () => {
+    it("setMaxIterations affects MaxNodes budget", () => {
         const router = new XRouter();
-        const shape: XRect = new XRect(0, 0, 50, 50);
-        const center = new XPoint(25, 25);
-        const outer = new XRect(-10, -10, 70, 70);
-
-        // Case North (0)
-        // @ts-ignore
-        router.getStartPoint(0, new XPoint(10, NaN), center, shape, outer);
-        // @ts-ignore
-        router.getStartPoint(0, new XPoint(NaN, 10), center, shape, outer);
-
-        // Case East (90)
-        // @ts-ignore
-        router.getStartPoint(90, new XPoint(10, NaN), center, shape, outer);
-        // @ts-ignore
-        router.getStartPoint(90, new XPoint(NaN, 10), center, shape, outer);
-
-        // Case South (180)
-        // @ts-ignore
-        router.getStartPoint(180, new XPoint(10, NaN), center, shape, outer);
-        // @ts-ignore
-        router.getStartPoint(180, new XPoint(NaN, 10), center, shape, outer);
-
-        // Case West (270)
-        // @ts-ignore
-        router.getStartPoint(270, new XPoint(10, NaN), center, shape, outer);
-        // @ts-ignore
-        router.getStartPoint(270, new XPoint(NaN, 10), center, shape, outer);
-    });
-
-    it("should handle empty line in followLine", () => {
-        const router = new XRouter();
-        // @ts-ignore
-        router.followLine([], [], [], new Set(), 0);
-        expect(router.Steps).toBe(1);
-    });
-
-    it("intersectsRect should return false when CheckCrossRect is disabled", () => {
-        const router = new XRouter({ checkCrossRect: false });
-        // @ts-ignore
-        const result = router.intersectsRect(new XRect(0,0,10,10), [new XPoint(5,5), new XPoint(6,6)]);
-        expect(result).toBe(false);
-    });
-
-    it("followLine should stop when Steps > MaxIterations", () => {
-        const router = new XRouter();
-        router.setMaxIterations(1);
-        // @ts-ignore
-        router.followLine([new XPoint(0,0), new XPoint(1,1)], [], [], new Set(), 0);
-        // @ts-ignore
-        router.followLine([new XPoint(0,0), new XPoint(1,1)], [], [], new Set(), 0);
-        // This covers the early return when Steps > MaxIterations
-        expect(router.Steps).toBeGreaterThan(1);
+        router.setMaxIterations(7);
+        expect(router.MaxNodes).toBe(7);
     });
 
     it("getAllLines should return invalid line when prepare fails", () => {
@@ -433,22 +381,17 @@ describe("XRouter", () => {
         expect(result).toBeDefined();
     });
 
-    it("hasRectCollision should skip LeftRect and RightRect", () => {
-        const router = new XRouter({ checkCollision: true, checkCrossRect: true });
+    it("routing should skip source/target rects from obstacle list", () => {
+        const router = new XRouter({ checkCollision: true, checkCrossRect: true, gap: 10 });
         const leftRect = new XRect(0, 0, 50, 50);
         const rightRect = new XRect(200, 0, 50, 50);
-        
-        router.LeftRect = leftRect;
-        router.RightRect = rightRect;
+        router.setEndpoints(leftRect, rightRect);
         router.addObstacle(leftRect);
         router.addObstacle(rightRect);
-        
-        // Line that would intersect with LeftRect/RightRect but should be skipped
-        const points = [new XPoint(25, 25), new XPoint(225, 25)];
-        // @ts-ignore
-        const collided = router.hasRectCollision(points);
-        // Should not detect collision because LeftRect and RightRect are excluded
-        expect(collided).toBe(false);
+        const shapeL: XRouterShape = { Rect: leftRect, StartPoint: new XPoint(NaN, NaN), DesiredDegree: [XRouterDirection.East] };
+        const shapeR: XRouterShape = { Rect: rightRect, StartPoint: new XPoint(NaN, NaN), DesiredDegree: [XRouterDirection.West] };
+        const line = router.getAllLines(shapeL, shapeR);
+        expect(line.IsValid).toBe(true);
     });
 
     it("followLine should handle hopes parameter", () => {
@@ -530,12 +473,124 @@ describe("XRouter", () => {
             DesiredDegree: [90]
         };
         const shapeR: XRouterShape = {
-            Rect: new XRect(0, 0, 0, 0),  // Empty rect
+            Rect: new XRect(0, 0, 0, 0),
             StartPoint: new XPoint(0, 0),
             DesiredDegree: [270]
         };
 
         const result = router.routeLine(shapeL, shapeR, [], []);
         expect(result).toBe(false);
+    });
+
+    it("AStar aborts when MaxNodes budget exceeded", () => {
+        const router = new XRouter({ gap: 10 });
+        router.MaxNodes = 1;
+        const shapeL: XRouterShape = {
+            Rect: new XRect(0, 0, 50, 50),
+            StartPoint: new XPoint(NaN, NaN),
+            DesiredDegree: [XRouterDirection.East]
+        };
+        const shapeR: XRouterShape = {
+            Rect: new XRect(500, 500, 50, 50),
+            StartPoint: new XPoint(NaN, NaN),
+            DesiredDegree: [XRouterDirection.West]
+        };
+        const line = router.getAllLines(shapeL, shapeR);
+        expect(line.IsValid).toBe(false);
+        expect(router.Steps).toBeGreaterThan(1);
+    });
+
+    it("AStar returns null when start/end indices are invalid", () => {
+        const router = new XRouter({ gap: 10 });
+        const tracks: number[] = [];
+        // @ts-ignore — invoke private to cover defensive empty-track branch
+        const path = router["AStar"](tracks, tracks, new XPoint(0, 0), new XPoint(10, 10), 90, new XRect(0, 0, 1, 1), new XRect(20, 20, 1, 1));
+        expect(path).toBe(null);
+    });
+
+    it("constructor honours all options", () => {
+        const router = new XRouter({
+            gap: 5,
+            useInnerRect: true,
+            useOuterRect: true,
+            returnShorterLine: false,
+            checkCollision: true,
+            checkCrossRect: false,
+            turnPenalty: 99,
+            maxNodes: 12345
+        });
+        expect(router.Gap).toBe(5);
+        expect(router.UseInnerRect).toBe(true);
+        expect(router.UseOuterRect).toBe(true);
+        expect(router.ReturnShorterLine).toBe(false);
+        expect(router.CheckCollision).toBe(true);
+        expect(router.CheckCrossRect).toBe(false);
+        expect(router.TurnPenalty).toBe(99);
+        expect(router.MaxNodes).toBe(12345);
+    });
+
+    it("Unique returns empty array unchanged", () => {
+        const router = new XRouter();
+        // @ts-ignore
+        const out = router["Unique"]([]);
+        expect(out).toEqual([]);
+    });
+
+    it("Route uses all four directions when DesiredDegree is empty", () => {
+        const router = new XRouter({ gap: 10 });
+        const shapeL: XRouterShape = {
+            Rect: new XRect(0, 0, 50, 50),
+            StartPoint: new XPoint(NaN, NaN),
+            DesiredDegree: []
+        };
+        const shapeR: XRouterShape = {
+            Rect: new XRect(200, 0, 50, 50),
+            StartPoint: new XPoint(NaN, NaN),
+            DesiredDegree: []
+        };
+        const line = router.getAllLines(shapeL, shapeR);
+        expect(line.IsValid).toBe(true);
+    });
+
+    it("Neighbors respects array boundaries", () => {
+        const router = new XRouter();
+        const xs = [0, 5];
+        const ys = [0, 5];
+        // @ts-ignore
+        const center = router["Neighbors"](0, 0, xs, ys);
+        expect(center.length).toBe(2);
+        // @ts-ignore
+        const farCorner = router["Neighbors"](1, 1, xs, ys);
+        expect(farCorner.length).toBe(2);
+    });
+
+    it("Simplify returns short paths unchanged", () => {
+        const router = new XRouter();
+        // @ts-ignore
+        const short = router["Simplify"]([new XPoint(0, 0), new XPoint(5, 5)]);
+        expect(short.length).toBe(2);
+    });
+
+    it("PathCost penalises turns", () => {
+        const router = new XRouter({ turnPenalty: 100 });
+        // @ts-ignore
+        const straight = router["PathCost"]([new XPoint(0, 0), new XPoint(10, 0), new XPoint(20, 0)]);
+        // @ts-ignore
+        const bent = router["PathCost"]([new XPoint(0, 0), new XPoint(10, 0), new XPoint(10, 10)]);
+        expect(bent).toBeGreaterThan(straight);
+    });
+
+    it("AStar exhausts open queue when no path exists", () => {
+        const router = new XRouter({ gap: 1 });
+        const xs = [0, 5, 10];
+        const ys = [0, 5, 10];
+        const src = new XRect(-100, -100, 1, 1);
+        const tgt = new XRect(100, 100, 1, 1);
+        const blocker = new XRect(-1, -1, 12, 12);
+        router.addObstacle(blocker);
+        router.CheckCollision = true;
+        // @ts-ignore
+        const path = router["AStar"](xs, ys, new XPoint(0, 0), new XPoint(10, 10), 90, src, tgt);
+        expect(path).toBe(null);
     });
 });

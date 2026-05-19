@@ -339,6 +339,32 @@ describe('XTFXBridge', () => {
         });
     });
 
+    describe('SuspendRouting / ResumeRouting', () => {
+        it('SuspendRouting delegates to design', async () => {
+            await bridge.LoadOrmModelFromText('{}');
+            const design = bridge.Controller!.Design as unknown as { SuspendRouting?: jest.Mock };
+            design.SuspendRouting = jest.fn();
+            bridge.SuspendRouting();
+            expect(design.SuspendRouting).toHaveBeenCalled();
+        });
+
+        it('ResumeRouting forwards pRouteIfDirty flag', async () => {
+            await bridge.LoadOrmModelFromText('{}');
+            const design = bridge.Controller!.Design as unknown as { ResumeRouting?: jest.Mock };
+            design.ResumeRouting = jest.fn();
+            bridge.ResumeRouting(false);
+            expect(design.ResumeRouting).toHaveBeenCalledWith(false);
+        });
+
+        it('SuspendRouting is a no-op when controller is null', () => {
+            expect(() => bridge.SuspendRouting()).not.toThrow();
+        });
+
+        it('ResumeRouting is a no-op when controller is null', () => {
+            expect(() => bridge.ResumeRouting()).not.toThrow();
+        });
+    });
+
     describe('DeleteElement fallback', () => {
         it('should return { Success: false } when Controller is null', () => {
             const result = bridge.DeleteElement('elem-1');
