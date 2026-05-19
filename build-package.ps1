@@ -164,28 +164,28 @@ try {
     Write-Host "  TFX copied successfully to node_modules"
     
     # Update package.json to use actual TFX version (not file: reference)
-    # This prevents npm from flagging it as "invalid" during vsce packaging
+    # Surgical text replace preserves formatting + BOM. Round-tripping via
+    # ConvertFrom-Json/ConvertTo-Json corrupts the file under PS 5.1.
     $PackageJsonPath = Join-Path $DaseDir "package.json"
-    $PackageJson = Get-Content $PackageJsonPath -Raw | ConvertFrom-Json
     $TfxPackageJson = Get-Content (Join-Path $TfxTarget "package.json") -Raw | ConvertFrom-Json
     $TfxVersion = $TfxPackageJson.version
-    $PackageJson.dependencies.'@tootega/tfx' = $TfxVersion
-    $PackageJson | ConvertTo-Json -Depth 10 | Set-Content $PackageJsonPath -Encoding UTF8
+    $pkgText = [System.IO.File]::ReadAllText($PackageJsonPath)
+    $pkgText = [regex]::Replace($pkgText, '("@tootega/tfx"\s*:\s*")[^"]*(")', "`${1}$TfxVersion`${2}")
+    [System.IO.File]::WriteAllText($PackageJsonPath, $pkgText)
     Write-Host "  Updated @tootega/tfx dependency to version $TfxVersion"
-    
+
     # Determine version
     if ([string]::IsNullOrEmpty($Version)) {
-        $PackageJson = Get-Content "package.json" | ConvertFrom-Json
-        $BaseVersion = $PackageJson.version
-        # Use timestamp as build number for local builds
+        $pkgRead = Get-Content $PackageJsonPath -Raw | ConvertFrom-Json
+        $BaseVersion = $pkgRead.version
         $Timestamp = [DateTimeOffset]::Now.ToUnixTimeSeconds()
         $BuildNumber = $Timestamp % 100000
         $VersionParts = $BaseVersion -split '\.'
         $Version = "$($VersionParts[0]).$($VersionParts[1]).$BuildNumber"
     }
-    
+
     Write-Host "  Version: $Version"
-    
+
     # Update package.json version
     npm version $Version --no-git-tag-version --allow-same-version 2>$null
     
@@ -253,18 +253,28 @@ try {
     $PackagingFailed = $false
     
     try {
-        vsce package --out $VsixFile --allow-missing-repository --allow-star-activation
-        
+        # Run vsce via cmd to prevent PowerShell from treating stderr warnings
+        # (e.g. file-count warning) as terminating NativeCommandError.
+        $prevPref = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            cmd /c "vsce package --out `"$VsixFile`" --allow-missing-repository --allow-star-activation 2>&1"
+        }
+        finally {
+            $ErrorActionPreference = $prevPref
+        }
+
         if ($LASTEXITCODE -ne 0) {
             $PackagingFailed = $true
         }
     }
     finally {
-        # Restore original file: reference in package.json (always, even on failure)
+        # Restore original file: reference in package.json (always, even on failure).
+        # Surgical text replace preserves formatting + BOM.
         $PackageJsonPath = Join-Path $DaseDir "package.json"
-        $PackageJson = Get-Content $PackageJsonPath -Raw | ConvertFrom-Json
-        $PackageJson.dependencies.'@tootega/tfx' = "file:../TFX"
-        $PackageJson | ConvertTo-Json -Depth 10 | Set-Content $PackageJsonPath -Encoding UTF8
+        $pkgText = [System.IO.File]::ReadAllText($PackageJsonPath)
+        $pkgText = [regex]::Replace($pkgText, '("@tootega/tfx"\s*:\s*")[^"]*(")', '${1}file:../TFX${2}')
+        [System.IO.File]::WriteAllText($PackageJsonPath, $pkgText)
         Write-Host "  Restored @tootega/tfx dependency to file:../TFX"
     }
     

@@ -657,23 +657,26 @@ export class XAgentBridge {
         try {
             let tablesOrganized = 0;
 
-            for (const group of pPlan.groups) {
-                const tfxColor = this.CssToTfxColor(group.color);
+            bridge.SuspendRouting?.();
+            try {
+                for (const group of pPlan.groups) {
+                    const tfxColor = this.CssToTfxColor(group.color);
 
-                for (const tablePlacement of group.tables) {
-                    // Move the table
-                    const moveResult = bridge.MoveElement(tablePlacement.id, tablePlacement.x, tablePlacement.y);
-                    if (!moveResult?.Success)
-                        continue;
+                    for (const tablePlacement of group.tables) {
+                        const moveResult = bridge.MoveElement(tablePlacement.id, tablePlacement.x, tablePlacement.y);
+                        if (!moveResult?.Success)
+                            continue;
 
-                    // Set the table color (TFX ARGB format)
-                    bridge.UpdateProperty(tablePlacement.id, "Fill", tfxColor);
+                        bridge.UpdateProperty(tablePlacement.id, "Fill", tfxColor);
 
-                    tablesOrganized++;
+                        tablesOrganized++;
+                    }
                 }
             }
+            finally {
+                bridge.ResumeRouting?.(false);
+            }
 
-            // Re-route all lines after batch repositioning
             bridge.AlignLines();
 
             // Refresh the webview via the provider

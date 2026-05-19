@@ -496,6 +496,14 @@ describe('XORMDesignerEditorProvider', () => {
             expect(executeMock).toHaveBeenCalledWith('Dase.OrganizeTablesAI');
         });
 
+        it('should log error when OrganizeTablesAI command rejects', async () => {
+            const executeMock = vscode.commands.executeCommand as jest.MockedFunction<typeof vscode.commands.executeCommand>;
+            executeMock.mockRejectedValueOnce(new Error('rejected'));
+            await provider.HandleMessage(mockPanel, mockState, { Type: 'OrganizeTablesAI' });
+            await new Promise(r => setImmediate(r));
+            expect(executeMock).toHaveBeenCalledWith('Dase.OrganizeTablesAI');
+        });
+
         it('should execute OrganizeTablesAIExecute command with model index on OrganizeTablesAIExecute message', async () => {
             const executeMock = vscode.commands.executeCommand as jest.MockedFunction<typeof vscode.commands.executeCommand>;
             await provider.HandleMessage(mockPanel, mockState, { Type: 'OrganizeTablesAIExecute', Payload: { ModelIndex: 2 } });

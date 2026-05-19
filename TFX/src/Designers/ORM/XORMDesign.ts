@@ -7,6 +7,7 @@ import { XORMReference } from "./XORMReference.js";
 import { XORMStateReference } from "./XORMStateReference.js";
 import { XORMField } from "./XORMField.js";
 import { XRouterShape, XRouterDirection } from "../../Design/XRouterTypes.js";
+import { XORMMetrics } from "./XORMMetrics.js";
 
 export interface XICreateTableOptions
 {
@@ -80,10 +81,33 @@ export class XORMDesign extends XDesign
     );
 
     private _TablesWithListeners: Set<string> = new Set<string>();
+    private _RoutingSuspendDepth: number = 0;
+    private _RoutingDirty: boolean = false;
 
     public constructor()
     {
         super();
+    }
+
+    public SuspendRouting(): void
+    {
+        this._RoutingSuspendDepth++;
+    }
+
+    public ResumeRouting(pRouteIfDirty: boolean = true): void
+    {
+        if (this._RoutingSuspendDepth > 0)
+            this._RoutingSuspendDepth--;
+        if (this._RoutingSuspendDepth === 0 && this._RoutingDirty && pRouteIfDirty)
+        {
+            this._RoutingDirty = false;
+            this.RouteAllLines();
+        }
+    }
+
+    public get IsRoutingSuspended(): boolean
+    {
+        return this._RoutingSuspendDepth > 0;
     }
 
     public get Schema(): string
@@ -142,17 +166,50 @@ export class XORMDesign extends XDesign
     {
         const tables = this.GetTables();
         for (const table of tables)
-        {
-            if (this._TablesWithListeners.has(table.ID))
-                continue;
+            this.AttachTableListener(table);
+    }
 
-            this._TablesWithListeners.add(table.ID);
-            table.OnPropertyChanged.Add((_pSender, pProperty, _pValue) =>
+    private AttachTableListener(pTable: XORMTable): void
+    {
+        if (this._TablesWithListeners.has(pTable.ID))
+            return;
+
+        this._TablesWithListeners.add(pTable.ID);
+        pTable.OnPropertyChanged.Add((pSender, pProperty, _pValue) =>
+        {
+            if (pProperty.Name !== "Bounds")
+                return;
+            if (this._RoutingSuspendDepth > 0)
             {
-                if (pProperty.Name === "Bounds")
-                    this.RouteAllLines();
-            });
+                this._RoutingDirty = true;
+                return;
+            }
+            const t = pSender as XORMTable;
+            this.RouteReferencesOf(t);
+        });
+    }
+
+    public RouteReferencesOf(pTable: XORMTable): void
+    {
+        const refs = this.GetReferences();
+        const tables = this.GetTables();
+        for (const ref of refs)
+        {
+            if (this.ReferenceTouchesTable(ref, pTable))
+                this.RouteReference(ref, tables);
         }
+    }
+
+    private ReferenceTouchesTable(pRef: XORMReference, pTable: XORMTable): boolean
+    {
+        if (pRef.Target === pTable.ID)
+            return true;
+        const srcField = this.FindFieldByID(pRef.Source);
+        if (srcField?.ParentNode instanceof XORMTable && srcField.ParentNode.ID === pTable.ID)
+            return true;
+        if (pRef.Source === pTable.ID)
+            return true;
+        return false;
     }
 
     public CreateTable(pOptions?: XICreateTableOptions): XORMTable
@@ -168,12 +225,7 @@ export class XORMDesign extends XDesign
             pOptions?.Height ?? headerHeight  // Empty table = header height only
         );
 
-        this._TablesWithListeners.add(table.ID);
-        table.OnPropertyChanged.Add((_pSender, pProperty, _pValue) =>
-        {
-            if (pProperty.Name === "Bounds")
-                this.RouteAllLines();
-        });
+        this.AttachTableListener(table);
 
         this.AppendChild(table);
         return table;
@@ -187,21 +239,7 @@ export class XORMDesign extends XDesign
      */
     private GetVisualBounds(pTable: XORMTable): XRect
     {
-        const headerHeight = 28;
-        const fieldHeight = 16;
-        const padding = 12;
-        
-        const fieldCount = pTable.GetFields().length;
-        const visualHeight = fieldCount > 0 
-            ? headerHeight + (fieldCount * fieldHeight) + padding
-            : headerHeight;
-        
-        return new XRect(
-            pTable.Bounds.Left,
-            pTable.Bounds.Top,
-            pTable.Bounds.Width,
-            visualHeight
-        );
+        return XORMMetrics.GetVisualBounds(pTable);
     }
 
     public CreateReference(pOptions: XICreateReferenceOptions): XORMReference
@@ -463,6 +501,11 @@ export class XORMDesign extends XDesign
      */
     public override RouteAllLines(_pOptions?: XRouteOptions): void
     {
+        if (this._RoutingSuspendDepth > 0)
+        {
+            this._RoutingDirty = true;
+            return;
+        }
         this.SetupTableListeners();
         const references = this.GetReferences();
         const tables = this.GetTables();
@@ -493,11 +536,7 @@ export class XORMDesign extends XDesign
 
             const fieldIndex = sourceTable.GetFields().findIndex(f => f.ID === sourceField!.ID);
             if (fieldIndex >= 0)
-            {
-                const headerHeight = 28;
-                const fieldHeight = 16;
-                fieldY = sourceTable.Bounds.Top + headerHeight + 12 + fieldIndex * fieldHeight;
-            }
+                fieldY = XORMMetrics.GetFieldRowY(sourceTable, fieldIndex);
         }
         else
         {
@@ -516,25 +555,32 @@ export class XORMDesign extends XDesign
         const sourceBounds = this.GetVisualBounds(sourceTable);
         const targetBounds = this.GetVisualBounds(targetTable);
 
-        const fieldHeight = 16;
         const fieldRect = isNaN(fieldY)
             ? sourceBounds
-            : new XRect(sourceBounds.Left, fieldY - fieldHeight / 2, sourceBounds.Width, fieldHeight);
+            : new XRect(
+                sourceBounds.Left,
+                fieldY - XORMMetrics.FieldRowHeight / 2,
+                sourceBounds.Width,
+                XORMMetrics.FieldRowHeight
+              );
+
+        const srcDirs = this.PickSourceDirections(sourceBounds, targetBounds);
+        const tgtDirs = this.PickTargetDirections(sourceBounds, targetBounds);
 
         const srcShape: XRouterShape = {
             Rect: fieldRect,
-            StartPoint: new XPoint(NaN, NaN),
-            DesiredDegree: [XRouterDirection.East, XRouterDirection.West]
+            StartPoint: isNaN(fieldY) ? new XPoint(NaN, NaN) : new XPoint(NaN, fieldY),
+            DesiredDegree: srcDirs
         };
 
         const tgtShape: XRouterShape = {
             Rect: targetBounds,
             StartPoint: new XPoint(NaN, NaN),
-            DesiredDegree: [XRouterDirection.West, XRouterDirection.East, XRouterDirection.North, XRouterDirection.South]
+            DesiredDegree: tgtDirs
         };
 
         const router = this.Router;
-        router.Gap = 20;
+        router.Gap = XORMMetrics.RouterGap;
         router.clearObstacles();
         router.setEndpoints(sourceBounds, targetBounds);
 
@@ -557,5 +603,34 @@ export class XORMDesign extends XDesign
 
         if (result.IsValid && result.Points.length > 0)
             pRef.Points = result.Points;
+    }
+
+    private PickSourceDirections(pSource: XRect, pTarget: XRect): XRouterDirection[]
+    {
+        if (pTarget.Left >= pSource.Right)
+            return [XRouterDirection.East, XRouterDirection.West];
+        if (pTarget.Right <= pSource.Left)
+            return [XRouterDirection.West, XRouterDirection.East];
+        return [XRouterDirection.East, XRouterDirection.West];
+    }
+
+    private PickTargetDirections(pSource: XRect, pTarget: XRect): XRouterDirection[]
+    {
+        const dirs: XRouterDirection[] = [];
+        if (pTarget.Left >= pSource.Right)
+            dirs.push(XRouterDirection.West);
+        else if (pTarget.Right <= pSource.Left)
+            dirs.push(XRouterDirection.East);
+
+        if (pTarget.Top >= pSource.Bottom)
+            dirs.push(XRouterDirection.North);
+        else if (pTarget.Bottom <= pSource.Top)
+            dirs.push(XRouterDirection.South);
+
+        if (dirs.indexOf(XRouterDirection.West) < 0) dirs.push(XRouterDirection.West);
+        if (dirs.indexOf(XRouterDirection.East) < 0) dirs.push(XRouterDirection.East);
+        if (dirs.indexOf(XRouterDirection.North) < 0) dirs.push(XRouterDirection.North);
+        if (dirs.indexOf(XRouterDirection.South) < 0) dirs.push(XRouterDirection.South);
+        return dirs;
     }
 }

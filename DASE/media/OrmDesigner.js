@@ -899,6 +899,7 @@
             elementStartX = pTable.X;
             elementStartY = pTable.Y;
 
+            let rafPending = false;
             const onMouseMove = function (e) {
                 if (!isDragging)
                     return;
@@ -911,6 +912,14 @@
                 pElement.setAttribute("transform", "translate(" + newX + "," + newY + ")");
                 pTable.X = newX;
                 pTable.Y = newY;
+
+                if (!rafPending) {
+                    rafPending = true;
+                    requestAnimationFrame(function () {
+                        rafPending = false;
+                        UpdateRelationsTouchingTable(pTable);
+                    });
+                }
             };
 
             const onMouseUp = function (e) {
@@ -1453,13 +1462,106 @@
         return cleaned;
     }
 
-    function RenderRelations() {
-        _RelationsLayer.innerHTML = "";
-
+    function UpdateRelationsTouchingTable(pTable) {
+        if (!pTable) return;
+        const fieldIDs = new Set((pTable.Fields || []).map(f => f.ID));
         for (const ref of _Model.References) {
-            const g = CreateRelationElement(ref);
-            if (g)
-                _RelationsLayer.appendChild(g);
+            const touches = ref.TargetTableID === pTable.ID
+                || ref.SourceFieldID === pTable.ID
+                || fieldIDs.has(ref.SourceFieldID);
+            if (!touches) continue;
+            const node = _RelationsLayer.querySelector('[data-id="' + ref.ID + '"]');
+            if (!node) continue;
+            const refLive = MakeLivePreviewRef(ref, pTable);
+            UpdateRelationElement(node, refLive);
+        }
+    }
+
+    function MakeLivePreviewRef(pRef, pMovingTable) {
+        let sourceTable = _Model.Tables.find(t =>
+            t.Fields && t.Fields.some(f => f.ID === pRef.SourceFieldID)
+        );
+        if (!sourceTable)
+            sourceTable = _Model.Tables.find(t => t.ID === pRef.SourceFieldID);
+        const targetTable = _Model.Tables.find(t => t.ID === pRef.TargetTableID);
+        if (!sourceTable || !targetTable) return pRef;
+
+        const points = (pRef.Points || []).map(p => ({ X: p.X, Y: p.Y }));
+        if (points.length < 2)
+            return Object.assign({}, pRef);
+
+        const srcMoved = sourceTable.ID === pMovingTable.ID;
+        const tgtMoved = targetTable.ID === pMovingTable.ID;
+
+        if (srcMoved) {
+            points[0] = { X: pMovingTable.X + (pMovingTable.Width || 200), Y: pMovingTable.Y + (pMovingTable.Height || 60) / 2 };
+        }
+        if (tgtMoved) {
+            points[points.length - 1] = { X: pMovingTable.X, Y: pMovingTable.Y + (pMovingTable.Height || 60) / 2 };
+        }
+        return Object.assign({}, pRef, { Points: points });
+    }
+
+    function RenderRelations() {
+        const keep = new Set();
+        for (const ref of _Model.References) {
+            keep.add(ref.ID);
+            const existing = _RelationsLayer.querySelector('[data-id="' + ref.ID + '"]');
+            if (existing) {
+                UpdateRelationElement(existing, ref);
+            }
+            else {
+                const g = CreateRelationElement(ref);
+                if (g) _RelationsLayer.appendChild(g);
+            }
+        }
+        const all = _RelationsLayer.querySelectorAll(".orm-reference");
+        all.forEach(function (node) {
+            const id = node.getAttribute("data-id");
+            if (!keep.has(id)) node.remove();
+        });
+    }
+
+    function UpdateRelationElement(pGroup, pRef) {
+        let sourceTable = _Model.Tables.find(t =>
+            t.Fields && t.Fields.some(f => f.ID === pRef.SourceFieldID)
+        );
+        if (!sourceTable)
+            sourceTable = _Model.Tables.find(t => t.ID === pRef.SourceFieldID);
+        const targetTable = _Model.Tables.find(t => t.ID === pRef.TargetTableID);
+        if (!sourceTable || !targetTable) return;
+
+        const pointsRaw = pRef.Points && pRef.Points.length >= 2 ? pRef.Points : [];
+        const points = SimplifyReferencePoints(pointsRaw, sourceTable, targetTable);
+        const lineColor = GetTableColor(pRef.TargetTableID);
+
+        const paths = pGroup.querySelectorAll("path");
+        const lines = pGroup.querySelectorAll("line");
+
+        if (points.length >= 2 && paths.length >= 2) {
+            const d = BuildPathFromPoints(points);
+            paths[0].setAttribute("d", d);
+            paths[1].setAttribute("d", d);
+            paths[1].setAttribute("stroke", lineColor);
+            return;
+        }
+        if (points.length < 2 && lines.length >= 2) {
+            const x1 = sourceTable.X + (sourceTable.Width || 200);
+            const y1 = sourceTable.Y + (sourceTable.Height || 150) / 2;
+            const x2 = targetTable.X;
+            const y2 = targetTable.Y + (targetTable.Height || 150) / 2;
+            for (const ln of lines) {
+                ln.setAttribute("x1", x1); ln.setAttribute("y1", y1);
+                ln.setAttribute("x2", x2); ln.setAttribute("y2", y2);
+            }
+            lines[1].setAttribute("stroke", lineColor);
+            return;
+        }
+
+        pGroup.innerHTML = "";
+        const fresh = CreateRelationElement(pRef);
+        if (fresh) {
+            while (fresh.firstChild) pGroup.appendChild(fresh.firstChild);
         }
     }
 

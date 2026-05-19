@@ -367,7 +367,11 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
             // AI Organization
             // ----------------------------------------------------
             case XDesignerMessageType.OrganizeTablesAI:
-                vscode.commands.executeCommand("Dase.OrganizeTablesAI");
+                GetLogService().Info("OrganizeTablesAI: message received from webview");
+                vscode.commands.executeCommand("Dase.OrganizeTablesAI").then(
+                    undefined,
+                    (err) => GetLogService().Error("Dase.OrganizeTablesAI command failed", err)
+                );
                 break;
 
             case XDesignerMessageType.OrganizeTablesAIExecute:

@@ -375,22 +375,59 @@ describe("XORMController", () => {
         const t2 = controller.AddTable({ X: 400, Y: 100, Name: "T2" });
         const f1 = controller.AddField({ TableID: t1.ElementID!, Name: "F1" });
         const ref = controller.AddReference({ SourceFieldID: f1.ElementID!, TargetTableID: t2.ElementID! });
-        
+
         const reference = controller.GetElementByID(ref.ElementID!) as XORMReference;
-        
-        // Mock RouteAllLines to prevent automatic re-routing when Bounds change
-        vi.spyOn(doc.Design, "RouteAllLines").mockImplementation(() => {});
-        
+
+        // Suspend routing so MoveElement falls back to UpdateReferencesForTable
+        doc.Design.SuspendRouting();
+
         // Set Source to table ID to trigger branch at 331
         reference.Source = t1.ElementID!;
         // Set Points to empty array - branch at 333 (points.length > 0) becomes false
         reference.Points = [];
-        
+
         // MoveElement should not crash when Points is empty
         const result = controller.MoveElement({ ElementID: t1.ElementID!, X: 300, Y: 300 });
         expect(result.Success).toBe(true);
         // Points should still be empty (no update occurred)
         expect(reference.Points.length).toBe(0);
+        doc.Design.ResumeRouting(false);
+    });
+
+    it("UpdateReferencesForTable updates source endpoint when source table moves under suspended routing", () => {
+        const t1 = controller.AddTable({ X: 100, Y: 100, Name: "T1" });
+        const t2 = controller.AddTable({ X: 400, Y: 100, Name: "T2" });
+        const f1 = controller.AddField({ TableID: t1.ElementID!, Name: "F1" });
+        const ref = controller.AddReference({ SourceFieldID: f1.ElementID!, TargetTableID: t2.ElementID! });
+        const reference = controller.GetElementByID(ref.ElementID!) as XORMReference;
+
+        doc.Design.SuspendRouting();
+        reference.Source = t1.ElementID!;
+        reference.Points = [new XPoint(0, 0), new XPoint(50, 0), new XPoint(50, 50)];
+
+        controller.MoveElement({ ElementID: t1.ElementID!, X: 300, Y: 300 });
+        const table = controller.GetTableByID(t1.ElementID!)!;
+        expect(reference.Points[0].X).toBe(table.Bounds.Left + table.Bounds.Width);
+        expect(reference.Points[0].Y).toBe(table.Bounds.Top + table.Bounds.Height / 2);
+        doc.Design.ResumeRouting(false);
+    });
+
+    it("UpdateReferencesForTable updates target endpoint when target table moves under suspended routing", () => {
+        const t1 = controller.AddTable({ X: 100, Y: 100, Name: "T1" });
+        const t2 = controller.AddTable({ X: 400, Y: 100, Name: "T2" });
+        const f1 = controller.AddField({ TableID: t1.ElementID!, Name: "F1" });
+        const ref = controller.AddReference({ SourceFieldID: f1.ElementID!, TargetTableID: t2.ElementID! });
+        const reference = controller.GetElementByID(ref.ElementID!) as XORMReference;
+
+        doc.Design.SuspendRouting();
+        reference.Points = [new XPoint(0, 0), new XPoint(50, 0), new XPoint(50, 50)];
+
+        controller.MoveElement({ ElementID: t2.ElementID!, X: 700, Y: 250 });
+        const table = controller.GetTableByID(t2.ElementID!)!;
+        const last = reference.Points[reference.Points.length - 1];
+        expect(last.X).toBe(table.Bounds.Left);
+        expect(last.Y).toBe(table.Bounds.Top + table.Bounds.Height / 2);
+        doc.Design.ResumeRouting(false);
     });
 
     it("should handle UpdateReferencesForTable with single Point for target (line 346 branch)", () => {
@@ -398,17 +435,17 @@ describe("XORMController", () => {
         const t2 = controller.AddTable({ X: 400, Y: 100, Name: "T2" });
         const f1 = controller.AddField({ TableID: t1.ElementID!, Name: "F1" });
         const ref = controller.AddReference({ SourceFieldID: f1.ElementID!, TargetTableID: t2.ElementID! });
-        
+
         const reference = controller.GetElementByID(ref.ElementID!) as XORMReference;
-        
-        // Mock RouteAllLines to prevent automatic re-routing when Bounds change
-        vi.spyOn(doc.Design, "RouteAllLines").mockImplementation(() => {});
-        
+
+        // Suspend routing so MoveElement falls back to UpdateReferencesForTable
+        doc.Design.SuspendRouting();
+
         // Move target table (t2) - this will trigger the ref.Target === pTable.ID branch
         // Before move, set Points to single element to skip the update (points.length > 1 is false)
         reference.Points = [new XPoint(100, 100)];
         const originalPoint = reference.Points[0];
-        
+
         const result = controller.MoveElement({ ElementID: t2.ElementID!, X: 600, Y: 200 });
         expect(result.Success).toBe(true);
         // Since points.length is 1, the condition "points.length > 1" is false

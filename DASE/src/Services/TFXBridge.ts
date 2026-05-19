@@ -889,6 +889,14 @@ export class XTFXBridge {
         return this._Controller?.RouteAllLines?.() ?? false;
     }
 
+    SuspendRouting(): void {
+        this._Controller?.Design?.SuspendRouting?.();
+    }
+
+    ResumeRouting(pRouteIfDirty: boolean = true): void {
+        this._Controller?.Design?.ResumeRouting?.(pRouteIfDirty);
+    }
+
     /**
      * Builds the tree of available tables for the shadow table picker.
      * Includes the current model's own tables (as the first group), 

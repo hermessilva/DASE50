@@ -5,6 +5,13 @@ import { XAgentBridge } from "../../../AgentIntegration/AgentBridge";
 import type { IOrganizationContext, IOrganizationTableInfo, IAIOrganizationPlan, IAITablePlacement } from "../../../AgentIntegration/AgentBridge";
 import { GetLogService } from "../../../Services/LogService";
 import { XDesignerMessageType } from "../ORMDesignerMessages";
+import {
+    XClaudeCliPromptCompressor,
+    ICompressionResult,
+    XClaudeCliRunner,
+    CLAUDE_CLI_MODELS,
+    IClaudeCliModelSpec
+} from "../../../AgentIntegration/ClaudeCli";
 
 /**
  * Organize Tables using AI � VS Code Language Model API.
@@ -32,15 +39,16 @@ const GROUP_COLORS: string[] = [
     "#CD853F"    // Peru
 ];
 
-// Layout constants
-const TABLE_H_GAP  = 40;   // horizontal gap between tables within a group
-const TABLE_V_GAP  = 40;   // vertical gap between tables within a group
-const GROUP_H_GAP  = 120;  // horizontal gap between group zones
-const GROUP_V_GAP  = 100;  // vertical gap between group zones
-const CANVAS_PAD   = 80;   // canvas padding top-left
-const DEFAULT_W    = 200;  // default table width when not known
-const DEFAULT_H_BASE = 60; // default table header height
-const DEFAULT_H_ROW  = 26; // height per field row
+// Layout constants — must mirror XORMMetrics on the TFX side.
+const TABLE_H_GAP   = 60;
+const TABLE_V_GAP   = 30;
+const GROUP_H_GAP   = 140;
+const GROUP_V_GAP   = 120;
+const CANVAS_PAD    = 80;
+const DEFAULT_W     = 200;
+const HEADER_HEIGHT = 28;
+const ROW_HEIGHT    = 16;
+const ROWS_PADDING  = 12;
 
 // --- Interfaces --------------------------------------------------------------
 
@@ -56,6 +64,8 @@ interface IAISimpleGrouping {
 
 export class XOrganizeTablesCommand {
     private static _PendingModels: vscode.LanguageModelChat[] = [];
+    private static _PendingClaudeModels: IClaudeCliModelSpec[] = [];
+    private static _ClaudeRunner: XClaudeCliRunner = new XClaudeCliRunner();
 
     static Register(pContext: vscode.ExtensionContext, pProvider: XORMDesignerEditorProvider): void {
         const cmd = vscode.commands.registerCommand("Dase.OrganizeTablesAI", async () => {
@@ -115,15 +125,20 @@ export class XOrganizeTablesCommand {
      * The actual AI execution starts only when the user clicks Execute in the modal.
      */
     private static async Execute(pProvider: XORMDesignerEditorProvider): Promise<void> {
+        const log = GetLogService();
+        log.Info("OrganizeTablesAI: Execute() entered");
+
         const bridge = XAgentBridge.GetInstance();
 
         if (!bridge.IsDesignerActive()) {
+            log.Warn("OrganizeTablesAI: no active designer");
             vscode.window.showWarningMessage("No ORM Designer is open. Open a .dsorm file first.");
             return;
         }
 
         const context = bridge.GetOrganizationContext();
         if (!context || context.tables.length === 0) {
+            log.Warn("OrganizeTablesAI: empty context");
             vscode.window.showInformationMessage("The model has no tables to organize.");
             return;
         }
@@ -131,16 +146,11 @@ export class XOrganizeTablesCommand {
         let allModels: vscode.LanguageModelChat[];
         try {
             allModels = await vscode.lm.selectChatModels();
+            log.Info(`OrganizeTablesAI: selectChatModels returned ${allModels.length} models`);
         }
-        catch {
+        catch (err) {
+            log.Error("OrganizeTablesAI: selectChatModels threw", err);
             allModels = [];
-        }
-
-        if (allModels.length === 0) {
-            vscode.window.showWarningMessage(
-                "No AI language model available. Please install GitHub Copilot or another LLM extension."
-            );
-            return;
         }
 
         const sortedModels = [...allModels].sort((a, b) => {
@@ -149,22 +159,51 @@ export class XOrganizeTablesCommand {
             return a.family.localeCompare(b.family);
         });
 
+        const claudeAvailable = await XOrganizeTablesCommand._ClaudeRunner.IsAvailable();
+        const claudeModels: IClaudeCliModelSpec[] = claudeAvailable ? CLAUDE_CLI_MODELS : [];
+        log.Info(`OrganizeTablesAI: Claude Code CLI available=${claudeAvailable !== null}, models=${claudeModels.length}`);
+
+        if (sortedModels.length === 0 && claudeModels.length === 0) {
+            log.Warn("OrganizeTablesAI: no LM models available");
+            vscode.window.showWarningMessage(
+                "No AI language model available. Install GitHub Copilot, Claude Code CLI (`claude login`), or another LLM extension."
+            );
+            return;
+        }
+
         XOrganizeTablesCommand._PendingModels = sortedModels;
+        XOrganizeTablesCommand._PendingClaudeModels = claudeModels;
 
         const panel = pProvider.GetActivePanel();
-        panel?.webview.postMessage({
+        if (!panel) {
+            log.Warn("OrganizeTablesAI: no active panel — cannot show picker");
+            vscode.window.showWarningMessage("Cannot show model picker: no active designer panel.");
+            return;
+        }
+        const lmEntries = sortedModels.map((m, i) => ({
+            index: i,
+            name: m.name,
+            vendor: m.vendor,
+            family: m.family,
+            maxInputTokens: m.maxInputTokens,
+            costLabel: XOrganizeTablesCommand.GetCostLabel(m)
+        }));
+        const claudeEntries = claudeModels.map((spec, j) => ({
+            index: sortedModels.length + j,
+            name: spec.Name,
+            vendor: "claude-code",
+            family: spec.Family,
+            maxInputTokens: spec.MaxInputTokens,
+            costLabel: spec.CostLabel
+        }));
+
+        log.Info(`OrganizeTablesAI: posting AIOrganizeShowPicker with ${lmEntries.length + claudeEntries.length} models`);
+        panel.webview.postMessage({
             Type: XDesignerMessageType.AIOrganizeShowPicker,
             Payload: {
                 tableCount: context.tables.length,
                 promptPreview: XOrganizeTablesCommand.BuildPromptPreview(context),
-                models: sortedModels.map((m, i) => ({
-                    index: i,
-                    name: m.name,
-                    vendor: m.vendor,
-                    family: m.family,
-                    maxInputTokens: m.maxInputTokens,
-                    costLabel: XOrganizeTablesCommand.GetCostLabel(m)
-                }))
+                models: [...lmEntries, ...claudeEntries]
             }
         });
     }
@@ -175,9 +214,11 @@ export class XOrganizeTablesCommand {
     private static async ExecuteWithModel(pModelIndex: number, pProvider: XORMDesignerEditorProvider): Promise<void> {
         const log = GetLogService();
         const bridge = XAgentBridge.GetInstance();
-        const models = XOrganizeTablesCommand._PendingModels;
+        const lmModels = XOrganizeTablesCommand._PendingModels;
+        const claudeModels = XOrganizeTablesCommand._PendingClaudeModels;
+        const total = lmModels.length + claudeModels.length;
 
-        if (pModelIndex < 0 || pModelIndex >= models.length) {
+        if (pModelIndex < 0 || pModelIndex >= total) {
             vscode.window.showWarningMessage("Invalid model selection.");
             return;
         }
@@ -193,7 +234,11 @@ export class XOrganizeTablesCommand {
             return;
         }
 
-        const model = models[pModelIndex];
+        const useClaude = pModelIndex >= lmModels.length;
+        const claudeSpec = useClaude ? claudeModels[pModelIndex - lmModels.length] : null;
+        const model: { name: string; vendor: string; family: string } = useClaude
+            ? { name: claudeSpec!.Name, vendor: "claude-code", family: claudeSpec!.Family }
+            : lmModels[pModelIndex];
         const panel = pProvider.GetActivePanel();
 
         panel?.webview.postMessage({
@@ -217,43 +262,67 @@ export class XOrganizeTablesCommand {
                 progress.report({ message: "Building model context…", increment: 5 });
                 sendProgress("Building model context…", 5, "context");
 
-                const prompt = XOrganizeTablesCommand.BuildGroupingPrompt(context);
+                const compression = XClaudeCliPromptCompressor.Compress(context.tables, context.references);
+                const systemPrompt = XOrganizeTablesCommand.BuildSystemPrompt();
+                const userPayload = XOrganizeTablesCommand.BuildUserPayload(compression);
 
                 progress.report({ message: `Sending to ${model.name}…`, increment: 10 });
                 sendProgress(`Sending model to ${model.name}…`, 15, "sending");
 
-                const messages = [vscode.LanguageModelChatMessage.User(prompt)];
-                const response = await model.sendRequest(messages, {}, token);
-
-                progress.report({ message: "AI is working…", increment: 15 });
-                sendProgress("AI is analyzing table relationships…", 30, "analyzing");
-
                 let fullText = "";
-                let charCount = 0;
-                for await (const fragment of response.text) {
-                    if (token.isCancellationRequested) {
-                        panel?.webview.postMessage({
-                            Type: XDesignerMessageType.AIOrganizeError,
-                            Payload: { message: "Cancelled." }
-                        });
-                        return;
-                    }
-                    fullText += fragment;
-                    charCount += fragment.length;
+                const onChunk = (delta: string) => {
+                    fullText += delta;
+                    const groups = XOrganizeTablesCommand.CountPartialGroups(fullText);
+                    const statusMsg = groups > 0
+                        ? `Grouping tables… ${groups} group${groups > 1 ? "s" : ""} found`
+                        : "AI is analyzing tables…";
+                    sendProgress(statusMsg, 30 + Math.min(fullText.length / 40, 35), "grouping");
+                };
 
-                    if (charCount % 60 < fragment.length) {
-                        const groups = XOrganizeTablesCommand.CountPartialGroups(fullText);
-                        const statusMsg = groups > 0
-                            ? `Grouping tables… ${groups} group${groups > 1 ? "s" : ""} found`
-                            : "AI is analyzing tables…";
-                        sendProgress(statusMsg, 30 + Math.min(charCount / 40, 35), "grouping");
+                if (useClaude) {
+                    log.Info(`OrganizeTablesAI: dispatching via Claude Code CLI runner (${claudeSpec!.Family})`);
+                    const result = await XOrganizeTablesCommand._ClaudeRunner.Run({
+                        Family: claudeSpec!.Family,
+                        SystemPrompt: systemPrompt,
+                        UserPayload: userPayload,
+                        OnChunk: onChunk,
+                        IsCancelled: () => token.isCancellationRequested,
+                        OnCancelHook: (abort) => token.onCancellationRequested(abort)
+                    });
+                    fullText = result.Text;
+                    log.Info(`Claude Code usage — in:${result.Usage.InputTokens} out:${result.Usage.OutputTokens} cacheRead:${result.Usage.CacheReadTokens} cacheWrite:${result.Usage.CacheCreationTokens}`);
+                }
+                else {
+                    const lmModel = lmModels[pModelIndex];
+                    const messages = [
+                        vscode.LanguageModelChatMessage.User(systemPrompt, "system"),
+                        vscode.LanguageModelChatMessage.User(userPayload)
+                    ];
+                    const response = await lmModel.sendRequest(messages, {}, token);
+
+                    progress.report({ message: "AI is working…", increment: 15 });
+                    sendProgress("AI is analyzing table relationships…", 30, "analyzing");
+
+                    let charCount = 0;
+                    for await (const fragment of response.text) {
+                        if (token.isCancellationRequested) {
+                            panel?.webview.postMessage({
+                                Type: XDesignerMessageType.AIOrganizeError,
+                                Payload: { message: "Cancelled." }
+                            });
+                            return;
+                        }
+                        fullText += fragment;
+                        charCount += fragment.length;
+                        if (charCount % 60 < fragment.length)
+                            onChunk("");
                     }
                 }
 
                 progress.report({ message: "Parsing AI response…", increment: 20 });
                 sendProgress("Parsing AI response…", 68, "parsing");
 
-                const grouping = XOrganizeTablesCommand.ParseGroupingResponse(fullText);
+                const grouping = XOrganizeTablesCommand.ParseGroupingResponse(fullText, compression);
                 if (!grouping) {
                     const errMsg = "The AI returned an unrecognised format. Please try again.";
                     log.Warn(`AI grouping parse failed:\n${fullText.substring(0, 600)}`);
@@ -278,7 +347,7 @@ export class XOrganizeTablesCommand {
                 progress.report({ message: "Computing layout…", increment: 12 });
                 sendProgress(`Computing layout for ${grouping.groups.length} groups…`, 82, "layout");
 
-                const plan = XOrganizeTablesCommand.ComputeLayout(grouping, context.tables);
+                const plan = XOrganizeTablesCommand.ComputeLayout(grouping, context.tables, context.references);
 
                 progress.report({ message: "Applying to model…", increment: 10 });
                 sendProgress("Applying positions and colors…", 93, "applying");
@@ -344,59 +413,44 @@ export class XOrganizeTablesCommand {
     // --- AI Grouping Prompt ---------------------------------------------------
 
     /**
-     * Concise grouping-only prompt.
-     * The AI's only job is to cluster tables by domain � we compute positions.
+     * Static system prompt — stable across runs so Anthropic prompt-cache can
+     * hit on repeat invocations within the cache TTL.
      */
-    private static BuildGroupingPrompt(pContext: IOrganizationContext): string {
+    private static BuildSystemPrompt(): string {
         const colorsJson = JSON.stringify(GROUP_COLORS);
+        return `You are an expert database architect. Group the ORM tables into functional domain clusters.
 
-        // Compact context payload � omit canvas dimensions (not needed for grouping)
-        const compactTables = pContext.tables.map(t => ({
-            id: t.id,
-            name: t.name,
-            fields: t.fields,
-            isShadow: t.isShadow
-        }));
-        const compactRefs = pContext.references.map(r => ({
-            from: r.sourceTable,
-            field: r.sourceField,
-            to: r.targetTable
-        }));
+Grouping rules:
+- Group tables that share a business domain or feature area.
+- Tables linked by FK should preferably belong to the same group.
+- Use name prefixes/suffixes as domain hints (SYS=System, USR/User=Security, ORD=Order, etc.).
+- Shadow tables stay with their main table.
+- Aim for 2-8 tables per group; split large domains.
 
-        const ctxJson = JSON.stringify({ tables: compactTables, references: compactRefs }, null, 2);
-
-        return `You are an expert database architect. Analyze the ORM model and group the tables into functional domain clusters.
-
-## Grouping rules
-- Group tables that belong to the same business domain or feature area
-- Tables linked by FK references should preferably be in the same group
-- Use name prefixes/suffixes as domain hints (e.g. SYS=System, USR/User=Security, ORD=Order)
-- Shadow tables should stay in the same group as their main table
-- Aim for 2�8 tables per group; split large domains into focused sub-groups
-
-## Colors (assign in order � first group gets first color)
+Colors (assign in order — first group gets first color):
 ${colorsJson}
 
-## ORM Model
-\`\`\`json
-${ctxJson}
-\`\`\`
-
-## Required response
-Respond with ONLY the JSON object below � no markdown, no extra text.
-
+Output:
+Respond with ONLY a JSON object (no markdown fences, no commentary):
 {
   "groups": [
-    { "name": "GroupName", "color": "#HEXCOLOR", "tableIds": ["exact-id"] }
+    { "name": "GroupName", "color": "#HEXCOLOR", "tableIds": ["T1", "T2"] }
   ]
 }
+Use the SHORT ids (T1, T2, ...) supplied in the payload. Each table id must appear in exactly one group.
+The payload includes "hints" — pre-computed FK-connected clusters. Treat them as a strong prior; refine, don't ignore.`;
+    }
 
-Every table ID must appear in exactly one group. Use the EXACT IDs from the input.`;
+    /**
+     * Per-invocation user payload — only the dynamic content varies.
+     */
+    private static BuildUserPayload(pCompression: ICompressionResult): string {
+        return JSON.stringify(pCompression.Payload, null, 2);
     }
 
     // --- Response Parser ------------------------------------------------------
 
-    private static ParseGroupingResponse(pText: string): IAISimpleGrouping | null {
+    private static ParseGroupingResponse(pText: string, pCompression?: ICompressionResult): IAISimpleGrouping | null {
         try {
             let jsonText = pText.trim();
 
@@ -425,6 +479,12 @@ Every table ID must appear in exactly one group. Use the EXACT IDs from the inpu
                         return null;
             }
 
+            if (pCompression) {
+                for (const group of parsed.groups) {
+                    group.tableIds = XClaudeCliPromptCompressor.Expand(group.tableIds, pCompression.ReverseMap);
+                }
+            }
+
             return parsed as IAISimpleGrouping;
         }
         catch {
@@ -438,7 +498,7 @@ Every table ID must appear in exactly one group. Use the EXACT IDs from the inpu
         return matches ? matches.length : 0;
     }
 
-    // --- Deterministic Layout Engine -----------------------------------------
+    // --- Sugiyama Layout Engine ----------------------------------------------
 
     /**
      * Overlap-free layout engine.
@@ -449,108 +509,250 @@ Every table ID must appear in exactly one group. Use the EXACT IDs from the inpu
      * This guarantees zero stacking and clear visual separation independent of
      * the number of tables or groups.
      */
+    private static GetTableSize(pTable: IOrganizationTableInfo | undefined): { w: number; h: number } {
+        if (!pTable)
+            return { w: DEFAULT_W, h: HEADER_HEIGHT };
+        const w = pTable.width || DEFAULT_W;
+        const h = pTable.height || (pTable.fieldCount > 0
+            ? HEADER_HEIGHT + pTable.fieldCount * ROW_HEIGHT + ROWS_PADDING
+            : HEADER_HEIGHT);
+        return { w, h };
+    }
+
     private static ComputeLayout(
         pGrouping: IAISimpleGrouping,
-        pTables: IOrganizationTableInfo[]
+        pTables: IOrganizationTableInfo[],
+        pReferences: { sourceTable: string; targetTable: string }[] = []
     ): IAIOrganizationPlan {
         const tableMap = new Map(pTables.map(t => [t.id, t]));
+        const nameToId = new Map<string, string>();
+        for (const t of pTables) nameToId.set(t.name, t.id);
 
-        const getSize = (pId: string) => {
-            const t = tableMap.get(pId);
-            if (!t) return { w: DEFAULT_W, h: DEFAULT_H_BASE };
-            return {
-                w: t.width || DEFAULT_W,
-                h: t.height || (DEFAULT_H_BASE + t.fieldCount * DEFAULT_H_ROW)
-            };
-        };
-
-        // Build per-group zone layout
-        interface IZone {
-            group: IAISimpleGroup;
-            tableIds: string[];
-            cols: number;
-            colWidths: number[];
-            rowHeights: number[];
-            zoneW: number;
-            zoneH: number;
+        const edges: Array<{ from: string; to: string }> = [];
+        for (const r of pReferences) {
+            const from = nameToId.get(r.sourceTable);
+            const to = nameToId.get(r.targetTable);
+            if (from && to && from !== to)
+                edges.push({ from, to });
         }
 
-        const zones: IZone[] = [];
-        for (const group of pGrouping.groups) {
+        const getSize = (pId: string) => XOrganizeTablesCommand.GetTableSize(tableMap.get(pId));
+
+        interface IZoneLayout {
+            group: IAISimpleGroup;
+            tableIds: string[];
+            placements: Map<string, { x: number; y: number }>;
+            width: number;
+            height: number;
+        }
+
+        const zones: IZoneLayout[] = [];
+        const groupOfTable = new Map<string, number>();
+
+        for (let gi = 0; gi < pGrouping.groups.length; gi++) {
+            const group = pGrouping.groups[gi];
             const ids = group.tableIds.filter(id => tableMap.has(id));
             if (ids.length === 0)
                 continue;
+            for (const id of ids) groupOfTable.set(id, gi);
 
-            const cols = Math.max(1, Math.ceil(Math.sqrt(ids.length)));
-            const rows = Math.ceil(ids.length / cols);
+            const intraEdges = edges.filter(e => ids.indexOf(e.from) >= 0 && ids.indexOf(e.to) >= 0);
+            const ranked = XOrganizeTablesCommand.ComputeRanks(ids, intraEdges);
+            const ordered = XOrganizeTablesCommand.OrderByBarycenter(ranked, intraEdges);
 
-            const colWidths = new Array<number>(cols).fill(0);
-            const rowHeights = new Array<number>(rows).fill(0);
-
-            for (let i = 0; i < ids.length; i++) {
-                const col = i % cols;
-                const row = Math.floor(i / cols);
-                const { w, h } = getSize(ids[i]);
-                if (w > colWidths[col]) colWidths[col] = w;
-                if (h > rowHeights[row]) rowHeights[row] = h;
+            const placements = new Map<string, { x: number; y: number }>();
+            let zoneH = 0;
+            let x = 0;
+            for (const col of ordered) {
+                let colMaxW = 0;
+                let y = 0;
+                for (const id of col) {
+                    const { w, h } = getSize(id);
+                    placements.set(id, { x, y });
+                    if (w > colMaxW) colMaxW = w;
+                    y += h + TABLE_V_GAP;
+                }
+                if (y - TABLE_V_GAP > zoneH) zoneH = y - TABLE_V_GAP;
+                x += colMaxW + TABLE_H_GAP;
             }
+            const zoneW = Math.max(0, x - TABLE_H_GAP);
 
-            const zoneW = colWidths.reduce((s, v) => s + v, 0) + Math.max(0, cols - 1) * TABLE_H_GAP;
-            const zoneH = rowHeights.reduce((s, v) => s + v, 0) + Math.max(0, rows - 1) * TABLE_V_GAP;
-
-            zones.push({ group, tableIds: ids, cols, colWidths, rowHeights, zoneW, zoneH });
+            zones.push({ group, tableIds: ids, placements, width: zoneW, height: zoneH });
         }
 
-        // Sort zones by area descending � larger groups placed first (top-left)
-        zones.sort((a, b) => (b.zoneW * b.zoneH) - (a.zoneW * a.zoneH));
+        const interEdges = new Map<string, number>();
+        const keyOf = (a: number, b: number) => a < b ? `${a}|${b}` : `${b}|${a}`;
+        for (const e of edges) {
+            const ga = groupOfTable.get(e.from);
+            const gb = groupOfTable.get(e.to);
+            if (ga === undefined || gb === undefined || ga === gb)
+                continue;
+            const k = keyOf(ga, gb);
+            interEdges.set(k, (interEdges.get(k) ?? 0) + 1);
+        }
 
-        // Tile zones in a macro-grid
-        const zoneCols = Math.max(1, Math.ceil(Math.sqrt(zones.length)));
-
-        let curX = CANVAS_PAD;
-        let curY = CANVAS_PAD;
-        let rowMaxH = 0;
-        let colInRow = 0;
+        const placedZones = XOrganizeTablesCommand.PackZones(zones, interEdges);
 
         const result: IAIOrganizationPlan = { groups: [] };
-
-        for (const zone of zones) {
-            if (colInRow >= zoneCols) {
-                curX = CANVAS_PAD;
-                curY += rowMaxH + GROUP_V_GAP;
-                rowMaxH = 0;
-                colInRow = 0;
-            }
-
-            // Prefix-sum X offsets per column
-            const colX: number[] = new Array(zone.cols).fill(0);
-            for (let c = 1; c < zone.cols; c++)
-                colX[c] = colX[c - 1] + zone.colWidths[c - 1] + TABLE_H_GAP;
-
-            // Prefix-sum Y offsets per row
-            const rows = zone.rowHeights.length;
-            const rowY: number[] = new Array(rows).fill(0);
-            for (let r = 1; r < rows; r++)
-                rowY[r] = rowY[r - 1] + zone.rowHeights[r - 1] + TABLE_V_GAP;
-
+        for (const pz of placedZones) {
             const placements: IAITablePlacement[] = [];
-            for (let i = 0; i < zone.tableIds.length; i++) {
-                const col = i % zone.cols;
-                const row = Math.floor(i / zone.cols);
+            for (const id of pz.zone.tableIds) {
+                const local = pz.zone.placements.get(id)!;
                 placements.push({
-                    id: zone.tableIds[i],
-                    x: Math.round(curX + colX[col]),
-                    y: Math.round(curY + rowY[row])
+                    id,
+                    x: Math.round(pz.x + local.x),
+                    y: Math.round(pz.y + local.y)
                 });
             }
-
-            result.groups.push({ name: zone.group.name, color: zone.group.color, tables: placements });
-
-            if (zone.zoneH > rowMaxH) rowMaxH = zone.zoneH;
-            curX += zone.zoneW + GROUP_H_GAP;
-            colInRow++;
+            result.groups.push({ name: pz.zone.group.name, color: pz.zone.group.color, tables: placements });
         }
 
         return result;
+    }
+
+    private static ComputeRanks(
+        pIds: string[],
+        pEdges: Array<{ from: string; to: string }>
+    ): string[][] {
+        const incoming = new Map<string, Set<string>>();
+        for (const id of pIds) incoming.set(id, new Set());
+        for (const e of pEdges) {
+            if (!incoming.has(e.from) || !incoming.has(e.to))
+                continue;
+            incoming.get(e.to)!.add(e.from);
+        }
+
+        const rank = new Map<string, number>();
+        const visiting = new Set<string>();
+
+        const dfs = (pId: string): number => {
+            if (rank.has(pId))
+                return rank.get(pId)!;
+            if (visiting.has(pId)) {
+                rank.set(pId, 0);
+                return 0;
+            }
+            visiting.add(pId);
+            let maxParent = -1;
+            for (const parent of incoming.get(pId)!) {
+                const r = dfs(parent);
+                if (r > maxParent) maxParent = r;
+            }
+            const r = maxParent + 1;
+            rank.set(pId, r);
+            visiting.delete(pId);
+            return r;
+        };
+
+        for (const id of pIds)
+            dfs(id);
+
+        const maxR = Math.max(0, ...Array.from(rank.values()));
+        const cols: string[][] = [];
+        for (let i = 0; i <= maxR; i++) cols.push([]);
+        for (const id of pIds)
+            cols[rank.get(id) ?? 0].push(id);
+
+        return cols.filter(c => c.length > 0);
+    }
+
+    private static OrderByBarycenter(
+        pCols: string[][],
+        pEdges: Array<{ from: string; to: string }>
+    ): string[][] {
+        if (pCols.length <= 1)
+            return pCols;
+
+        const ordered = pCols.map(c => [...c]);
+
+        for (let pass = 0; pass < 8; pass++) {
+            let changed = false;
+            for (let c = 1; c < ordered.length; c++) {
+                const prev = ordered[c - 1];
+                const idx = new Map(prev.map((id, i) => [id, i]));
+                const scored = ordered[c].map((id, i) => {
+                    let sum = 0;
+                    let cnt = 0;
+                    for (const e of pEdges) {
+                        if (e.to === id && idx.has(e.from)) { sum += idx.get(e.from)!; cnt++; }
+                    }
+                    return { id, score: cnt > 0 ? sum / cnt : i };
+                });
+                scored.sort((a, b) => a.score - b.score);
+                const newOrder = scored.map(s => s.id);
+                for (let i = 0; i < newOrder.length; i++) {
+                    if (newOrder[i] !== ordered[c][i]) {
+                        changed = true;
+                        break;
+                    }
+                }
+                ordered[c] = newOrder;
+            }
+            if (!changed) break;
+        }
+
+        return ordered;
+    }
+
+    private static PackZones(
+        pZones: Array<{ group: IAISimpleGroup; tableIds: string[]; placements: Map<string, { x: number; y: number }>; width: number; height: number }>,
+        pInter: Map<string, number>
+    ): Array<{ zone: typeof pZones[number]; x: number; y: number }> {
+        if (pZones.length === 0) return [];
+
+        const placedIdx = new Set<number>();
+        const order: number[] = [];
+
+        const startIdx = pZones
+            .map((z, i) => ({ i, area: z.width * z.height }))
+            .sort((a, b) => b.area - a.area)[0].i;
+        order.push(startIdx);
+        placedIdx.add(startIdx);
+
+        while (placedIdx.size < pZones.length) {
+            let bestNext = -1;
+            let bestScore = -1;
+            for (let i = 0; i < pZones.length; i++) {
+                if (placedIdx.has(i)) continue;
+                let score = 0;
+                for (const p of placedIdx) {
+                    const k = i < p ? `${i}|${p}` : `${p}|${i}`;
+                    score += pInter.get(k) ?? 0;
+                }
+                if (score > bestScore || (score === bestScore && bestNext === -1)) {
+                    bestScore = score;
+                    bestNext = i;
+                }
+            }
+            if (bestNext < 0)
+                bestNext = pZones.findIndex((_, i) => !placedIdx.has(i));
+            order.push(bestNext);
+            placedIdx.add(bestNext);
+        }
+
+        const totalArea = pZones.reduce((s, z) => s + z.width * z.height, 0);
+        const rowBudget = Math.max(
+            ...pZones.map(z => z.width),
+            Math.sqrt(totalArea) * 1.6
+        );
+
+        const placed: Array<{ zone: typeof pZones[number]; x: number; y: number }> = [];
+        let curX = CANVAS_PAD;
+        let curY = CANVAS_PAD;
+        let rowMaxH = 0;
+
+        for (const idx of order) {
+            const zone = pZones[idx];
+            if (curX > CANVAS_PAD && curX + zone.width > CANVAS_PAD + rowBudget) {
+                curX = CANVAS_PAD;
+                curY += rowMaxH + GROUP_V_GAP;
+                rowMaxH = 0;
+            }
+            placed.push({ zone, x: curX, y: curY });
+            if (zone.height > rowMaxH) rowMaxH = zone.height;
+            curX += zone.width + GROUP_H_GAP;
+        }
+
+        return placed;
     }
 }

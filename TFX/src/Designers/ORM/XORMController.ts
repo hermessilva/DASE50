@@ -279,7 +279,10 @@ export class XORMController
         {
             const bounds = element.Bounds;
             element.Bounds = new XRect(pData.X, pData.Y, bounds.Width, bounds.Height);
-            this.UpdateReferencesForTable(element);
+            if (this.Design !== null && !this.Design.IsRoutingSuspended)
+                this.Design.RouteReferencesOf(element);
+            else
+                this.UpdateReferencesForTable(element);
         }
 
         return { Success: true, ElementID: pData.ElementID };
