@@ -193,11 +193,15 @@ export class XORMDesign extends XDesign
     {
         const refs = this.GetReferences();
         const tables = this.GetTables();
-        for (const ref of refs)
-        {
-            if (this.ReferenceTouchesTable(ref, pTable))
-                this.RouteReference(ref, tables);
-        }
+        // Re-distribute anchors for ALL refs (incoming counts may have changed)
+        // so the touched table's incoming arrows redistribute, and references
+        // that connect to its FK fields keep proper field-row alignment.
+        const touching = refs.filter(r => this.ReferenceTouchesTable(r, pTable));
+        if (touching.length === 0)
+            return;
+        const anchors = this.ComputeAnchorDistribution(refs, tables);
+        for (const ref of touching)
+            this.RouteReference(ref, tables, anchors.get(ref.ID));
     }
 
     private ReferenceTouchesTable(pRef: XORMReference, pTable: XORMTable): boolean
@@ -509,8 +513,169 @@ export class XORMDesign extends XDesign
         this.SetupTableListeners();
         const references = this.GetReferences();
         const tables = this.GetTables();
+        const anchors = this.ComputeAnchorDistribution(references, tables);
         for (const ref of references)
-            this.RouteReference(ref, tables);
+            this.RouteReference(ref, tables, anchors.get(ref.ID));
+    }
+
+    /**
+     * For each reference, computes the exact entry point on the target side and
+     * the explicit exit point on the source side, distributing N parallel
+     * connections evenly along each side so arrows do not stack at one spot.
+     */
+    private ComputeAnchorDistribution(
+        pRefs: XORMReference[],
+        _pTables: XORMTable[]
+    ): Map<string, { TargetAnchor: XPoint; TargetSide: XRouterDirection; SourceAnchor: XPoint; SourceSide: XRouterDirection } | undefined>
+    {
+        interface IPlan {
+            Ref: XORMReference;
+            SourceTable: XORMTable;
+            TargetTable: XORMTable;
+            SourceBounds: XRect;
+            TargetBounds: XRect;
+            SourceFieldY: number;
+        }
+
+        const plans: IPlan[] = [];
+        for (const ref of pRefs)
+        {
+            let sourceField = ref.GetSourceElement<XORMField>();
+            if (!sourceField && ref.Source)
+                sourceField = this.FindFieldByID(ref.Source);
+
+            let sourceTable: XORMTable | null = null;
+            let fieldY = NaN;
+
+            if (sourceField)
+            {
+                sourceTable = sourceField.ParentNode as XORMTable;
+                if (!(sourceTable instanceof XORMTable))
+                    continue;
+                const idx = sourceTable.GetFields().findIndex(f => f.ID === sourceField!.ID);
+                if (idx >= 0)
+                    fieldY = XORMMetrics.GetFieldRowY(sourceTable, idx);
+            }
+            else
+            {
+                sourceTable = this.FindTableByID(ref.Source);
+                if (!sourceTable)
+                    continue;
+            }
+
+            let targetTable = ref.GetTargetElement<XORMTable>();
+            if (!targetTable && ref.Target)
+                targetTable = this.FindTableByID(ref.Target);
+            if (!targetTable)
+                continue;
+
+            plans.push({
+                Ref: ref,
+                SourceTable: sourceTable,
+                TargetTable: targetTable,
+                SourceBounds: this.GetVisualBounds(sourceTable),
+                TargetBounds: this.GetVisualBounds(targetTable),
+                SourceFieldY: fieldY
+            });
+        }
+
+        // Group by (target, target-side) for incoming distribution
+        const incomingBySide = new Map<string, IPlan[]>();
+        const planSides = new Map<IPlan, { TargetSide: XRouterDirection; SourceSide: XRouterDirection }>();
+        for (const plan of plans)
+        {
+            const tSide = this.PickEntrySide(plan.SourceBounds, plan.TargetBounds);
+            // The FK line MUST leave the source horizontally (East/West) at the
+            // field-row height — never from the top/bottom. Choose the side that
+            // faces the target.
+            const srcCx = plan.SourceBounds.Left + plan.SourceBounds.Width / 2;
+            const tgtCx = plan.TargetBounds.Left + plan.TargetBounds.Width / 2;
+            const sSide = tgtCx >= srcCx ? XRouterDirection.East : XRouterDirection.West;
+            planSides.set(plan, { TargetSide: tSide, SourceSide: sSide });
+            const key = `${plan.TargetTable.ID}|${tSide}`;
+            if (!incomingBySide.has(key)) incomingBySide.set(key, []);
+            incomingBySide.get(key)!.push(plan);
+        }
+
+        const result = new Map<string, { TargetAnchor: XPoint; TargetSide: XRouterDirection; SourceAnchor: XPoint; SourceSide: XRouterDirection } | undefined>();
+
+        for (const [, group] of incomingBySide)
+        {
+            const tSide = planSides.get(group[0])!.TargetSide;
+            const tBounds = group[0].TargetBounds;
+            // Sort by where each line LEAVES its source so arrival order matches
+            // departure order (prevents the connecting lines from crossing).
+            // For E/W target sides the relevant departure coordinate is the source
+            // FK field-row Y (falling back to the source center Y).
+            const srcKey = (p: IPlan): number =>
+            {
+                if (tSide === XRouterDirection.East || tSide === XRouterDirection.West)
+                    return isNaN(p.SourceFieldY)
+                        ? p.SourceBounds.Top + p.SourceBounds.Height / 2
+                        : p.SourceFieldY;
+                return p.SourceBounds.Left + p.SourceBounds.Width / 2;
+            };
+            group.sort((a, b) => srcKey(a) - srcKey(b));
+
+            const n = group.length;
+            for (let i = 0; i < n; i++)
+            {
+                const t = (i + 1) / (n + 1);
+                const tAnchor = this.AnchorOnSide(tBounds, tSide, t);
+                const plan = group[i];
+                const sides = planSides.get(plan)!;
+                const sAnchor = this.SourceAnchor(plan.SourceBounds, sides.SourceSide, plan.SourceFieldY);
+                result.set(plan.Ref.ID, {
+                    TargetAnchor: tAnchor,
+                    TargetSide: tSide,
+                    SourceAnchor: sAnchor,
+                    SourceSide: sides.SourceSide
+                });
+            }
+        }
+
+        return result;
+    }
+
+    private PickEntrySide(pFrom: XRect, pTo: XRect): XRouterDirection
+    {
+        const fromCx = pFrom.Left + pFrom.Width / 2;
+        const fromCy = pFrom.Top + pFrom.Height / 2;
+        const toCx = pTo.Left + pTo.Width / 2;
+        const toCy = pTo.Top + pTo.Height / 2;
+        const dx = fromCx - toCx;
+        const dy = fromCy - toCy;
+        if (Math.abs(dx) >= Math.abs(dy))
+            return dx >= 0 ? XRouterDirection.East : XRouterDirection.West;
+        return dy >= 0 ? XRouterDirection.South : XRouterDirection.North;
+    }
+
+    private AnchorOnSide(pRect: XRect, pSide: XRouterDirection, pT: number): XPoint
+    {
+        const margin = XORMMetrics.RouterGap / 2;
+        const inset = Math.min(margin, Math.min(pRect.Width, pRect.Height) / 4);
+        switch (pSide)
+        {
+            case XRouterDirection.East:
+                return new XPoint(pRect.Left + pRect.Width, pRect.Top + inset + (pRect.Height - 2 * inset) * pT);
+            case XRouterDirection.West:
+                return new XPoint(pRect.Left, pRect.Top + inset + (pRect.Height - 2 * inset) * pT);
+            case XRouterDirection.North:
+                return new XPoint(pRect.Left + inset + (pRect.Width - 2 * inset) * pT, pRect.Top);
+            default: // South
+                return new XPoint(pRect.Left + inset + (pRect.Width - 2 * inset) * pT, pRect.Top + pRect.Height);
+        }
+    }
+
+    private SourceAnchor(pBounds: XRect, pSide: XRouterDirection, pFieldY: number): XPoint
+    {
+        if (pSide === XRouterDirection.East)
+            return new XPoint(pBounds.Left + pBounds.Width, isNaN(pFieldY) ? pBounds.Top + pBounds.Height / 2 : pFieldY);
+        if (pSide === XRouterDirection.West)
+            return new XPoint(pBounds.Left, isNaN(pFieldY) ? pBounds.Top + pBounds.Height / 2 : pFieldY);
+        if (pSide === XRouterDirection.North)
+            return new XPoint(pBounds.Left + pBounds.Width / 2, pBounds.Top);
+        return new XPoint(pBounds.Left + pBounds.Width / 2, pBounds.Top + pBounds.Height);
     }
 
     /**
@@ -519,7 +684,11 @@ export class XORMDesign extends XDesign
      * Target may be entered from any side.
      * Mirrors the C# XDesigner.DoRoute two-pass approach.
      */
-    private RouteReference(pRef: XORMReference, pTables: XORMTable[]): void
+    private RouteReference(
+        pRef: XORMReference,
+        pTables: XORMTable[],
+        pAnchor?: { TargetAnchor: XPoint; TargetSide: XRouterDirection; SourceAnchor: XPoint; SourceSide: XRouterDirection }
+    ): void
     {
         let sourceField = pRef.GetSourceElement<XORMField>();
         if (!sourceField && pRef.Source)
@@ -564,18 +733,29 @@ export class XORMDesign extends XDesign
                 XORMMetrics.FieldRowHeight
               );
 
-        const srcDirs = this.PickSourceDirections(sourceBounds, targetBounds);
-        const tgtDirs = this.PickTargetDirections(sourceBounds, targetBounds);
+        const srcDirs = pAnchor
+            ? [pAnchor.SourceSide]
+            : this.PickSourceDirections(sourceBounds, targetBounds);
+        const tgtDirs = pAnchor
+            ? [pAnchor.TargetSide]
+            : this.PickTargetDirections(sourceBounds, targetBounds);
+
+        const srcStart = pAnchor
+            ? pAnchor.SourceAnchor
+            : (isNaN(fieldY) ? new XPoint(NaN, NaN) : new XPoint(NaN, fieldY));
+        const tgtStart = pAnchor
+            ? pAnchor.TargetAnchor
+            : new XPoint(NaN, NaN);
 
         const srcShape: XRouterShape = {
             Rect: fieldRect,
-            StartPoint: isNaN(fieldY) ? new XPoint(NaN, NaN) : new XPoint(NaN, fieldY),
+            StartPoint: srcStart,
             DesiredDegree: srcDirs
         };
 
         const tgtShape: XRouterShape = {
             Rect: targetBounds,
-            StartPoint: new XPoint(NaN, NaN),
+            StartPoint: tgtStart,
             DesiredDegree: tgtDirs
         };
 
@@ -584,10 +764,19 @@ export class XORMDesign extends XDesign
         router.clearObstacles();
         router.setEndpoints(sourceBounds, targetBounds);
 
+        const clearance = XORMMetrics.RouterGap / 2;
         for (const t of pTables)
         {
             if (t.ID !== sourceTable.ID && t.ID !== targetTable.ID)
-                router.addObstacle(this.GetVisualBounds(t));
+            {
+                const b = this.GetVisualBounds(t);
+                router.addObstacle(new XRect(
+                    b.Left - clearance,
+                    b.Top - clearance,
+                    b.Width + clearance * 2,
+                    b.Height + clearance * 2
+                ));
+            }
         }
 
         router.CheckCrossRect = true;
@@ -597,12 +786,26 @@ export class XORMDesign extends XDesign
         if (!result.IsValid || result.Points.length === 0)
         {
             router.CheckCrossRect = false;
+            router.clearObstacles();
             router.clear();
             result = router.getAllLines(srcShape, tgtShape);
         }
 
         if (result.IsValid && result.Points.length > 0)
+        {
             pRef.Points = result.Points;
+            return;
+        }
+
+        // Final guard: if no route was found, fall back to a direct two-point
+        // line between the chosen anchors so the reference always renders.
+        const srcPt = pAnchor
+            ? pAnchor.SourceAnchor
+            : new XPoint(sourceBounds.Left + sourceBounds.Width, sourceBounds.Top + sourceBounds.Height / 2);
+        const tgtPt = pAnchor
+            ? pAnchor.TargetAnchor
+            : new XPoint(targetBounds.Left, targetBounds.Top + targetBounds.Height / 2);
+        pRef.Points = [srcPt, tgtPt];
     }
 
     private PickSourceDirections(pSource: XRect, pTarget: XRect): XRouterDirection[]

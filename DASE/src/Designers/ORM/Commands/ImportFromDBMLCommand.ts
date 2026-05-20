@@ -6,6 +6,7 @@ import { Parser } from "@dbml/core";
 import { XGuid, XORMStateReference, XPoint } from "@tootega/tfx";
 import * as tfx from "@tootega/tfx";
 import { XTFXBridge, ITableData } from "../../../Services/TFXBridge";
+import { GetLogService } from "../../../Services/LogService";
 
 // ─── Color palette for table groups (ARGB hex strings for XColor) ───────────
 // Each group gets a distinct, visually appealing color.
@@ -151,7 +152,32 @@ export class XImportFromDBMLCommand {
         return command;
     }
 
+    /**
+     * Sanitize DBML text before handing it to @dbml/core.
+     * Removes attributes the parser rejects (delete:/update:) wherever they appear,
+     * including inside column-level [...] blocks. Also drops whole [...] blocks on
+     * Ref: lines because @dbml/core rejects empty [] and unknown ref attributes.
+     */
+    static SanitizeDbml(pText: string): string {
+        // 1. Strip [...] block entirely from Ref: lines (top-level only — these carry
+        //    only delete:/update: which the parser does not accept).
+        let text = pText.replace(/^(\s*Ref[^:]*:[^\[\n]+)\[[^\]]*\]/gm, "$1");
+
+        // 2. Inside any remaining [...] block, drop `delete: <value>` and
+        //    `update: <value>` keys (used by inline column refs).
+        text = text.replace(/\[([^\]]*)\]/g, (full, body) => {
+            let inner = body as string;
+            inner = inner.replace(/(?:^|,)\s*(?:delete|update)\s*:\s*[^,\]]+/gi, "");
+            inner = inner.replace(/^\s*,\s*/, "").replace(/\s*,\s*$/, "").trim();
+            return inner.length === 0 ? "" : `[${inner}]`;
+        });
+
+        return text.trimEnd();
+    }
+
     async Execute(pUri?: vscode.Uri): Promise<void> {
+        const log = GetLogService();
+        log.Info("===== ImportFromDBML: start =====");
         try {
             // ── 1. Resolve the DBML file ────────────────────────────────
             let uri = pUri;
@@ -162,21 +188,67 @@ export class XImportFromDBMLCommand {
                 });
                 if (results && results.length > 0)
                     uri = results[0];
-                else
+                else {
+                    log.Info("ImportFromDBML: user cancelled file picker");
                     return;
+                }
             }
 
+            log.Info(`ImportFromDBML: source file = ${uri.fsPath}`);
             let dbmlText = fs.readFileSync(uri.fsPath, "utf8");
+            log.Info(`ImportFromDBML: read ${dbmlText.length} chars, ${dbmlText.split(/\r?\n/).length} lines`);
 
-            // Strip the entire [...] constraint block from Ref lines.
-            // @dbml/core rejects empty [] or unknown keys like delete:/update:,
-            // and Ref lines only carry these two attributes — so removing the
-            // whole bracket is safe and produces clean Ref statements.
-            dbmlText = dbmlText.replace(/^(Ref:[^\[]+)\[[^\]]*\]/gm, "$1").trimEnd();
+            // Sanitize: drop Ref [...] blocks + column-level delete:/update: attrs.
+            const beforeStrip = dbmlText.length;
+            dbmlText = XImportFromDBMLCommand.SanitizeDbml(dbmlText);
+            log.Info(`ImportFromDBML: sanitized, ${beforeStrip - dbmlText.length} chars removed`);
+
+            // Pre-scan: log declared tables + Ref targets so case/typo mismatches are visible
+            const declaredTables: string[] = [];
+            const tblRegex = /^\s*Table\s+"?([^"\s{]+)"?/gm;
+            let tm: RegExpExecArray | null;
+            while ((tm = tblRegex.exec(dbmlText)) !== null)
+                declaredTables.push(tm[1]);
+            log.Info(`ImportFromDBML: declared Table count = ${declaredTables.length}`);
+            log.Info(`ImportFromDBML: declared Tables = [${declaredTables.join(", ")}]`);
+
+            const refTargets: string[] = [];
+            const refRegex = /^\s*Ref[^:]*:\s*([^\s]+)\s*([<>\-])\s*([^\s\[]+)/gm;
+            let rm: RegExpExecArray | null;
+            while ((rm = refRegex.exec(dbmlText)) !== null)
+                refTargets.push(`${rm[1]} ${rm[2]} ${rm[3]}`);
+            log.Info(`ImportFromDBML: top-level Ref lines = ${refTargets.length}`);
+            for (const r of refTargets)
+                log.Info(`  Ref: ${r}`);
+
+            const declaredLower = new Set(declaredTables.map(s => s.toLowerCase()));
+            for (const r of refTargets) {
+                const parts = r.split(/\s+[<>\-]\s+/);
+                for (const side of parts) {
+                    const tbl = side.split(".")[0].replace(/"/g, "");
+                    if (tbl && !declaredLower.has(tbl.toLowerCase()))
+                        log.Warn(`ImportFromDBML: Ref references undeclared table "${tbl}"`);
+                }
+            }
 
             // ── 2. Parse ────────────────────────────────────────────────
-            const database: any = Parser.parse(dbmlText, "dbml");
+            log.Info("ImportFromDBML: invoking @dbml/core Parser.parse(...)");
+            let database: any;
+            try {
+                database = Parser.parse(dbmlText, "dbml");
+            }
+            catch (parseErr: any) {
+                log.Error("ImportFromDBML: Parser.parse threw", parseErr);
+                if (parseErr && Array.isArray(parseErr.diags)) {
+                    log.Error(`ImportFromDBML: parser produced ${parseErr.diags.length} diagnostics:`);
+                    for (const d of parseErr.diags)
+                        log.Error(`  - ${d.message || JSON.stringify(d)}`);
+                }
+                throw parseErr;
+            }
             const modelName = database.project ? database.project.name || "ImportedModel" : "ImportedModel";
+            log.Info(`ImportFromDBML: parsed ok, modelName = ${modelName}`);
+            log.Info(`ImportFromDBML: schemas = ${database.schemas.length}, tables = ${database.schemas[0].tables.length}, refs = ${(database.schemas[0].refs || []).length}`);
 
             // ── 3. Collect raw tables & inline refs ─────────────────────
             interface IRawTable {
@@ -198,6 +270,7 @@ export class XImportFromDBMLCommand {
             const rawTables: IRawTable[] = [];
             const rawRefs: IRawRef[] = [];
 
+            log.Info("ImportFromDBML: collecting tables + fields");
             for (const table of database.schemas[0].tables) {
                 const fields: any[] = [];
                 for (const col of table.fields) {
@@ -253,7 +326,9 @@ export class XImportFromDBMLCommand {
                     seedHeaders,
                     seedTuples
                 });
+                log.Debug(`  table "${table.name}": ${fields.length} fields${seedTuples.length > 0 ? `, ${seedTuples.length} seed rows` : ""}`);
             }
+            log.Info(`ImportFromDBML: collected ${rawTables.length} tables`);
 
             // Collect refs from both schema-level Ref blocks AND inline ref: > on columns.
             //
@@ -263,6 +338,7 @@ export class XImportFromDBMLCommand {
             //   For ref: >  → ep0 is PK side ("1"), ep1 is FK side ("*")
             //   For ref: <  → ep0 is FK side ("*"), ep1 is PK side ("1")
             //   For ref: -  → both are "1" (one-to-one); use ep1 as FK source by convention
+            log.Info("ImportFromDBML: collecting refs");
             for (const ref of (database.schemas[0].refs || [])) {
                 const ep0 = ref.endpoints[0];
                 const ep1 = ref.endpoints[1];
@@ -281,7 +357,9 @@ export class XImportFromDBMLCommand {
                     name: ref.name || `FK_${pkEp.tableName}`,
                     isStateRef: false
                 });
+                log.Debug(`  ref: ${fkEp.tableName}.${fkEp.fieldNames[0]} -> ${pkEp.tableName}.${pkEp.fieldNames?.[0] || "ID"}`);
             }
+            log.Info(`ImportFromDBML: collected ${rawRefs.length} refs`);
 
             // ── 4. Detect state table ───────────────────────────────────
             let stateTableName: string | null = null;
@@ -291,6 +369,7 @@ export class XImportFromDBMLCommand {
                     break;
                 }
             }
+            log.Info(`ImportFromDBML: state table = ${stateTableName ?? "(none)"}`);
 
             // Mark refs that point to the state table
             if (stateTableName) {
@@ -317,6 +396,7 @@ export class XImportFromDBMLCommand {
             // ── 6. Topological layout ───────────────────────────────────
             const edges = rawRefs.map(r => ({ from: r.from, to: r.to }));
             const layers = topologicalLayers(rawTables.map(t => ({ name: t.name })), edges);
+            log.Info(`ImportFromDBML: topo layout = ${layers.length} layers, sizes [${layers.map(l => l.length).join(", ")}]`);
 
             // Position tables layer-by-layer (left → right), stacked vertically
             const tablePositions = new Map<string, { x: number; y: number; h: number }>();
@@ -362,10 +442,20 @@ export class XImportFromDBMLCommand {
             for (const r of rawRefs) {
                 const srcTable = tables.find(t => t.Name === r.from);
                 const tgtTable = tables.find(t => t.Name === r.to);
-                if (!srcTable || !tgtTable) continue;
+                if (!srcTable) {
+                    log.Warn(`ImportFromDBML: ref skipped — source table "${r.from}" not found`);
+                    continue;
+                }
+                if (!tgtTable) {
+                    log.Warn(`ImportFromDBML: ref skipped — target table "${r.to}" not found`);
+                    continue;
+                }
 
                 const srcField = srcTable.Fields.find(f => f.Name === r.fromField);
-                if (!srcField) continue;
+                if (!srcField) {
+                    log.Warn(`ImportFromDBML: ref skipped — source field "${r.from}.${r.fromField}" not found`);
+                    continue;
+                }
 
                 if (r.isStateRef) {
                     stateRefs.push({
@@ -384,7 +474,10 @@ export class XImportFromDBMLCommand {
                 }
             }
 
+            log.Info(`ImportFromDBML: regular refs = ${regularRefs.length}, state refs = ${stateRefs.length}`);
+
             // ── 9. Assemble TFX document via bridge ─────────────────────
+            log.Info("ImportFromDBML: assembling TFX document");
             const bridge = new XTFXBridge();
             bridge.Initialize();
 
@@ -500,7 +593,9 @@ export class XImportFromDBMLCommand {
             }
 
             // ── 12. Serialize & save ────────────────────────────────────
+            log.Info("ImportFromDBML: serializing to XML");
             const xmlRaw = bridge.SaveOrmModelToText();
+            log.Info(`ImportFromDBML: serialized ${xmlRaw.length} chars`);
 
             let destPath = uri.fsPath.replace(/\.dbml$/i, ".dsorm");
             if (fs.existsSync(destPath)) {
@@ -514,14 +609,16 @@ export class XImportFromDBMLCommand {
 
             const destUri = vscode.Uri.file(destPath);
             await vscode.workspace.fs.writeFile(destUri, Buffer.from(xmlRaw, "utf8"));
+            log.Info(`ImportFromDBML: wrote ${destPath}`);
 
             const tableCount = tables.length;
             const refCount = regularRefs.length + stateRefs.length;
-            vscode.window.showInformationMessage(
-                `✅ Imported ${tableCount} tables, ${refCount} references` +
+            const summary = `✅ Imported ${tableCount} tables, ${refCount} references` +
                 (stateTableName ? `, state table: ${stateTableName}` : "") +
-                ` → ${path.basename(destUri.fsPath)}`
-            );
+                ` → ${path.basename(destUri.fsPath)}`;
+            vscode.window.showInformationMessage(summary);
+            log.Info(`ImportFromDBML: ${summary}`);
+            log.Info("===== ImportFromDBML: done =====");
             await vscode.commands.executeCommand("vscode.openWith", destUri, "Dase.ORMDesigner");
 
         } catch (e: any) {
@@ -531,7 +628,10 @@ export class XImportFromDBMLCommand {
             } else if (!errorMsg) {
                 errorMsg = typeof e === "object" ? JSON.stringify(e) : String(e);
             }
-            vscode.window.showErrorMessage("Failed to import DBML: " + errorMsg);
+            log.Error("ImportFromDBML: failed", e);
+            log.Info(`ImportFromDBML: log file = ${log.GetLogFilePath()}`);
+            log.Show();
+            vscode.window.showErrorMessage("Failed to import DBML: " + errorMsg + " (see DASE output channel)");
             console.error(e);
         }
     }

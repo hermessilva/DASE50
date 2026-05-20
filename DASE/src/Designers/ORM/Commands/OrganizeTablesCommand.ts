@@ -12,6 +12,7 @@ import {
     CLAUDE_CLI_MODELS,
     IClaudeCliModelSpec
 } from "../../../AgentIntegration/ClaudeCli";
+import * as dagre from "dagre";
 
 /**
  * Organize Tables using AI � VS Code Language Model API.
@@ -40,10 +41,10 @@ const GROUP_COLORS: string[] = [
 ];
 
 // Layout constants — must mirror XORMMetrics on the TFX side.
-const TABLE_H_GAP   = 60;
-const TABLE_V_GAP   = 30;
-const GROUP_H_GAP   = 140;
-const GROUP_V_GAP   = 120;
+const TABLE_H_GAP   = 120;
+const TABLE_V_GAP   = 80;
+const GROUP_H_GAP   = 240;
+const GROUP_V_GAP   = 200;
 const CANVAS_PAD    = 80;
 const DEFAULT_W     = 200;
 const HEADER_HEIGHT = 28;
@@ -56,11 +57,27 @@ interface IAISimpleGroup {
     name: string;
     color: string;
     tableIds: string[];
+    /** Optional per-table absolute positions provided by the AI (UUID → {x,y}). */
+    positions?: Map<string, { x: number; y: number }>;
 }
 
 interface IAISimpleGrouping {
     groups: IAISimpleGroup[];
 }
+
+export interface ILayoutParams {
+    RankDir?: string;
+    Ranker?: string;
+    RankSep?: number;
+    NodeSep?: number;
+}
+
+const DEFAULT_LAYOUT: Required<ILayoutParams> = {
+    RankDir: "TB",
+    Ranker: "network-simplex",
+    RankSep: 180,
+    NodeSep: 55
+};
 
 export class XOrganizeTablesCommand {
     private static _PendingModels: vscode.LanguageModelChat[] = [];
@@ -71,8 +88,8 @@ export class XOrganizeTablesCommand {
         const cmd = vscode.commands.registerCommand("Dase.OrganizeTablesAI", async () => {
             await XOrganizeTablesCommand.Execute(pProvider);
         });
-        const cmdExec = vscode.commands.registerCommand("Dase.OrganizeTablesAIExecute", async (pModelIndex: number) => {
-            await XOrganizeTablesCommand.ExecuteWithModel(pModelIndex, pProvider);
+        const cmdExec = vscode.commands.registerCommand("Dase.OrganizeTablesAIExecute", async (pModelIndex: number, pLayout?: ILayoutParams) => {
+            await XOrganizeTablesCommand.ExecuteWithModel(pModelIndex, pProvider, pLayout);
         });
         const cmdRevert = vscode.commands.registerCommand("Dase.OrganizeTablesAIRevert", () => {
             XAgentBridge.GetInstance().RevertOrganization();
@@ -211,7 +228,7 @@ export class XOrganizeTablesCommand {
     /**
      * Phase 2: run AI with the model chosen by the user in the webview picker.
      */
-    private static async ExecuteWithModel(pModelIndex: number, pProvider: XORMDesignerEditorProvider): Promise<void> {
+    private static async ExecuteWithModel(pModelIndex: number, pProvider: XORMDesignerEditorProvider, pLayout?: ILayoutParams): Promise<void> {
         const log = GetLogService();
         const bridge = XAgentBridge.GetInstance();
         const lmModels = XOrganizeTablesCommand._PendingModels;
@@ -322,7 +339,28 @@ export class XOrganizeTablesCommand {
                 progress.report({ message: "Parsing AI response…", increment: 20 });
                 sendProgress("Parsing AI response…", 68, "parsing");
 
-                const grouping = XOrganizeTablesCommand.ParseGroupingResponse(fullText, compression);
+                let grouping = XOrganizeTablesCommand.ParseGroupingResponse(fullText, compression);
+
+                if (!grouping && useClaude) {
+                    log.Warn(`AI grouping parse failed on first attempt. Retrying with stricter prompt.\nRaw response start: ${fullText.substring(0, 400)}`);
+                    sendProgress("Retrying with stricter JSON-only prompt…", 70, "retry");
+                    const retrySystem = XOrganizeTablesCommand.BuildSystemPrompt()
+                        + "\n\nIMPORTANT: Your previous response was rejected because it contained text other than JSON. Respond with ONLY the JSON object this time.";
+                    const retryUser = XOrganizeTablesCommand.BuildUserPayload(compression);
+                    fullText = "";
+                    const retryResult = await XOrganizeTablesCommand._ClaudeRunner.Run({
+                        Family: claudeSpec!.Family,
+                        SystemPrompt: retrySystem,
+                        UserPayload: retryUser,
+                        OnChunk: onChunk,
+                        IsCancelled: () => token.isCancellationRequested,
+                        OnCancelHook: (abort) => token.onCancellationRequested(abort)
+                    });
+                    fullText = retryResult.Text;
+                    log.Info(`Retry usage — in:${retryResult.Usage.InputTokens} out:${retryResult.Usage.OutputTokens}`);
+                    grouping = XOrganizeTablesCommand.ParseGroupingResponse(fullText, compression);
+                }
+
                 if (!grouping) {
                     const errMsg = "The AI returned an unrecognised format. Please try again.";
                     log.Warn(`AI grouping parse failed:\n${fullText.substring(0, 600)}`);
@@ -347,7 +385,7 @@ export class XOrganizeTablesCommand {
                 progress.report({ message: "Computing layout…", increment: 12 });
                 sendProgress(`Computing layout for ${grouping.groups.length} groups…`, 82, "layout");
 
-                const plan = XOrganizeTablesCommand.ComputeLayout(grouping, context.tables, context.references);
+                const plan = XOrganizeTablesCommand.ComputeLayout(grouping, context.tables, context.references, pLayout);
 
                 progress.report({ message: "Applying to model…", increment: 10 });
                 sendProgress("Applying positions and colors…", 93, "applying");
@@ -418,34 +456,51 @@ export class XOrganizeTablesCommand {
      */
     private static BuildSystemPrompt(): string {
         const colorsJson = JSON.stringify(GROUP_COLORS);
-        return `You are an expert database architect. Group the ORM tables into functional domain clusters.
+        return `You are a JSON-only data classifier. Your single task: cluster ORM tables into functional groups and assign one color per group.
 
-Grouping rules:
-- Group tables that share a business domain or feature area.
-- Tables linked by FK should preferably belong to the same group.
-- Use name prefixes/suffixes as domain hints (SYS=System, USR/User=Security, ORD=Order, etc.).
-- Shadow tables stay with their main table.
-- Aim for 2-8 tables per group; split large domains.
+You DO NOT compute positions or coordinates. Coordinates are computed by the host application.
 
-Colors (assign in order — first group gets first color):
-${colorsJson}
+You MUST NOT echo, restate, or copy the input back. You MUST output a NEW JSON object whose top-level key is "groups".
 
-Output:
-Respond with ONLY a JSON object (no markdown fences, no commentary):
+Algorithm:
+1. Read the input "tables" and "references" arrays.
+2. Cluster tables by functional domain. Use FK references + name prefixes (SYS, USR, ORD, INV, FIN, ...).
+3. Treat input "hints" as a strong prior of FK-connected clusters — refine, don't ignore.
+4. Shadow tables stay with their main table.
+5. Aim for 2-8 tables per group; split very large domains.
+6. Assign colors IN ORDER from this palette: ${colorsJson}
+
+OUTPUT SCHEMA — non-negotiable:
 {
   "groups": [
-    { "name": "GroupName", "color": "#HEXCOLOR", "tableIds": ["T1", "T2"] }
+    { "name": "GroupName", "color": "#RRGGBB", "tableIds": ["T1","T2"] }
   ]
 }
-Use the SHORT ids (T1, T2, ...) supplied in the payload. Each table id must appear in exactly one group.
-The payload includes "hints" — pre-computed FK-connected clusters. Treat them as a strong prior; refine, don't ignore.`;
+
+CONTRACT:
+- Top-level key is exactly "groups" (plural).
+- Each group has exactly THREE keys: "name" (string), "color" (#RRGGBB), "tableIds" (array of string).
+- NO other top-level keys (no "tables", no "clusters", no "domains").
+- NO other group keys (no "id", no "description", no "members" — only "name", "color", "tableIds").
+- Every table id from input appears in exactly ONE group.
+- Use SHORT ids (T1, T2, ...) — never full table names.
+- Response starts with "{" and ends with "}". No markdown. No prose.
+
+Bad example: {"groups":[{"name":"X","color":"#000","tables":[{"id":"T1","x":0,"y":0}]}]}  — coordinates are forbidden.
+Bad example: {"tables":[...]}  — that is the INPUT shape; you must emit "groups".`;
     }
 
     /**
-     * Per-invocation user payload — only the dynamic content varies.
+     * Per-invocation user payload — minimal nudge plus input.
      */
     private static BuildUserPayload(pCompression: ICompressionResult): string {
-        return JSON.stringify(pCompression.Payload, null, 2);
+        const payload = JSON.stringify(pCompression.Payload);
+        return `Below is the INPUT. Produce a CLUSTERING (group names + colors + tableIds). Do NOT output coordinates.
+
+INPUT:
+${payload}
+
+Output the clustering JSON now.`;
     }
 
     // --- Response Parser ------------------------------------------------------
@@ -459,33 +514,88 @@ The payload includes "hints" — pre-computed FK-connected clusters. Treat them 
             if (fenceMatch)
                 jsonText = fenceMatch[1].trim();
 
-            // Extract first {} block in case there is leading/trailing prose
-            const braceStart = jsonText.indexOf("{");
-            const braceEnd = jsonText.lastIndexOf("}");
-            if (braceStart !== -1 && braceEnd > braceStart)
-                jsonText = jsonText.slice(braceStart, braceEnd + 1);
+            // Extract first balanced {...} block in case there is leading/trailing prose
+            const balanced = XOrganizeTablesCommand.ExtractFirstJsonObject(jsonText);
+            if (balanced)
+                jsonText = balanced;
 
             const parsed = JSON.parse(jsonText);
-            if (!parsed || !Array.isArray(parsed.groups))
+            if (!parsed)
                 return null;
 
-            for (const group of parsed.groups) {
-                if (typeof group.name !== "string" || typeof group.color !== "string")
+            // Accept the canonical shape OR common AI deviations.
+            // Top-level: "groups" preferred, fall back to "clusters" / "domains" / "categories".
+            const rawGroups: unknown[] = Array.isArray(parsed.groups) ? parsed.groups
+                : Array.isArray(parsed.clusters) ? parsed.clusters
+                : Array.isArray(parsed.domains) ? parsed.domains
+                : Array.isArray(parsed.categories) ? parsed.categories
+                : [];
+            if (rawGroups.length === 0)
+                return null;
+
+            const normalized: IAISimpleGroup[] = [];
+            for (let i = 0; i < rawGroups.length; i++) {
+                const g = rawGroups[i] as Record<string, unknown>;
+                if (!g || typeof g !== "object")
                     return null;
-                if (!Array.isArray(group.tableIds))
+                const name = typeof g.name === "string" ? g.name
+                    : typeof g.label === "string" ? g.label
+                    : typeof g.title === "string" ? g.title
+                    : `Group${i + 1}`;
+                const color = typeof g.color === "string" ? g.color
+                    : typeof g.fill === "string" ? g.fill
+                    : GROUP_COLORS[i % GROUP_COLORS.length];
+                const idsRaw = Array.isArray(g.tableIds) ? g.tableIds
+                    : Array.isArray(g.members) ? g.members
+                    : Array.isArray(g.tables) ? g.tables
+                    : Array.isArray(g.items) ? g.items
+                    : Array.isArray(g.ids) ? g.ids
+                    : null;
+                if (!idsRaw)
                     return null;
-                for (const id of group.tableIds)
-                    if (typeof id !== "string")
+                const tableIds: string[] = [];
+                const shortPositions = new Map<string, { x: number; y: number }>();
+                for (const entry of idsRaw) {
+                    if (typeof entry === "string") {
+                        tableIds.push(entry);
+                        continue;
+                    }
+                    if (!entry || typeof entry !== "object")
                         return null;
+                    const rec = entry as Record<string, unknown>;
+                    const id = typeof rec.id === "string" ? rec.id : null;
+                    if (!id)
+                        return null;
+                    tableIds.push(id);
+                    if (typeof rec.x === "number" && typeof rec.y === "number") {
+                        shortPositions.set(id, { x: rec.x, y: rec.y });
+                    }
+                }
+                normalized.push({
+                    name,
+                    color,
+                    tableIds,
+                    positions: shortPositions.size > 0 ? shortPositions : undefined
+                });
             }
 
             if (pCompression) {
-                for (const group of parsed.groups) {
+                for (const group of normalized) {
+                    const newPositions = group.positions
+                        ? new Map<string, { x: number; y: number }>()
+                        : undefined;
+                    if (group.positions && newPositions) {
+                        for (const [shortId, pos] of group.positions) {
+                            const realId = pCompression.ReverseMap.get(shortId);
+                            if (realId) newPositions.set(realId, pos);
+                        }
+                    }
                     group.tableIds = XClaudeCliPromptCompressor.Expand(group.tableIds, pCompression.ReverseMap);
+                    group.positions = newPositions;
                 }
             }
 
-            return parsed as IAISimpleGrouping;
+            return { groups: normalized };
         }
         catch {
             return null;
@@ -496,6 +606,28 @@ The payload includes "hints" — pre-computed FK-connected clusters. Treat them 
     private static CountPartialGroups(pPartialText: string): number {
         const matches = pPartialText.match(/"name"\s*:/g);
         return matches ? matches.length : 0;
+    }
+
+    /** Extract the first balanced {...} JSON object from a string that may contain prose. */
+    private static ExtractFirstJsonObject(pText: string): string | null {
+        const start = pText.indexOf("{");
+        if (start < 0) return null;
+        let depth = 0;
+        let inStr = false;
+        let escape = false;
+        for (let i = start; i < pText.length; i++) {
+            const ch = pText[i];
+            if (escape) { escape = false; continue; }
+            if (ch === "\\" && inStr) { escape = true; continue; }
+            if (ch === "\"") { inStr = !inStr; continue; }
+            if (inStr) continue;
+            if (ch === "{") depth++;
+            else if (ch === "}") {
+                depth--;
+                if (depth === 0) return pText.slice(start, i + 1);
+            }
+        }
+        return null;
     }
 
     // --- Sugiyama Layout Engine ----------------------------------------------
@@ -513,102 +645,126 @@ The payload includes "hints" — pre-computed FK-connected clusters. Treat them 
         if (!pTable)
             return { w: DEFAULT_W, h: HEADER_HEIGHT };
         const w = pTable.width || DEFAULT_W;
-        const h = pTable.height || (pTable.fieldCount > 0
+        // Always compute visual height from fieldCount — the stored t.height is often
+        // just the header-only bounds and does not reflect actual rendered height.
+        const h = pTable.fieldCount > 0
             ? HEADER_HEIGHT + pTable.fieldCount * ROW_HEIGHT + ROWS_PADDING
-            : HEADER_HEIGHT);
+            : HEADER_HEIGHT;
         return { w, h };
     }
 
+    /**
+     * Layout via dagre — production-grade Sugiyama implementation.
+     *
+     * dagre handles: cycle break, longest-path/network-simplex ranking,
+     * crossing minimization (24-pass median+barycenter), and Brandes-Köpf
+     * coordinate assignment. Produces elegant left-to-right ORM diagrams.
+     */
     private static ComputeLayout(
         pGrouping: IAISimpleGrouping,
         pTables: IOrganizationTableInfo[],
-        pReferences: { sourceTable: string; targetTable: string }[] = []
+        pReferences: { sourceTable: string; targetTable: string }[] = [],
+        pLayout?: ILayoutParams
     ): IAIOrganizationPlan {
         const tableMap = new Map(pTables.map(t => [t.id, t]));
         const nameToId = new Map<string, string>();
         for (const t of pTables) nameToId.set(t.name, t.id);
 
-        const edges: Array<{ from: string; to: string }> = [];
+        const sizeOf = (id: string) => XOrganizeTablesCommand.GetTableSize(tableMap.get(id));
+
+        const lp = {
+            rankdir: pLayout?.RankDir ?? DEFAULT_LAYOUT.RankDir,
+            ranker: pLayout?.Ranker ?? DEFAULT_LAYOUT.Ranker,
+            ranksep: pLayout?.RankSep ?? DEFAULT_LAYOUT.RankSep,
+            nodesep: pLayout?.NodeSep ?? DEFAULT_LAYOUT.NodeSep
+        };
+
+        const g = new dagre.graphlib.Graph({ directed: true, multigraph: false, compound: false });
+        g.setGraph({
+            rankdir: lp.rankdir,
+            ranker: lp.ranker,
+            nodesep: lp.nodesep,
+            edgesep: 20,
+            ranksep: lp.ranksep,
+            marginx: CANVAS_PAD,
+            marginy: CANVAS_PAD,
+            acyclicer: "greedy"
+        });
+        g.setDefaultEdgeLabel(() => ({}));
+
+        for (const t of pTables) {
+            const sz = sizeOf(t.id);
+            g.setNode(t.id, { width: sz.w, height: sz.h });
+        }
+
         for (const r of pReferences) {
             const from = nameToId.get(r.sourceTable);
             const to = nameToId.get(r.targetTable);
-            if (from && to && from !== to)
-                edges.push({ from, to });
+            if (from && to && from !== to && g.hasNode(from) && g.hasNode(to))
+                g.setEdge(from, to);
         }
 
-        const getSize = (pId: string) => XOrganizeTablesCommand.GetTableSize(tableMap.get(pId));
+        dagre.layout(g);
 
-        interface IZoneLayout {
-            group: IAISimpleGroup;
-            tableIds: string[];
-            placements: Map<string, { x: number; y: number }>;
-            width: number;
-            height: number;
-        }
-
-        const zones: IZoneLayout[] = [];
-        const groupOfTable = new Map<string, number>();
-
-        for (let gi = 0; gi < pGrouping.groups.length; gi++) {
-            const group = pGrouping.groups[gi];
-            const ids = group.tableIds.filter(id => tableMap.has(id));
-            if (ids.length === 0)
+        const positions = new Map<string, { x: number; y: number }>();
+        for (const t of pTables) {
+            const node = g.node(t.id) as { x: number; y: number; width: number; height: number } | undefined;
+            if (!node) {
+                positions.set(t.id, { x: CANVAS_PAD, y: CANVAS_PAD });
                 continue;
-            for (const id of ids) groupOfTable.set(id, gi);
-
-            const intraEdges = edges.filter(e => ids.indexOf(e.from) >= 0 && ids.indexOf(e.to) >= 0);
-            const ranked = XOrganizeTablesCommand.ComputeRanks(ids, intraEdges);
-            const ordered = XOrganizeTablesCommand.OrderByBarycenter(ranked, intraEdges);
-
-            const placements = new Map<string, { x: number; y: number }>();
-            let zoneH = 0;
-            let x = 0;
-            for (const col of ordered) {
-                let colMaxW = 0;
-                let y = 0;
-                for (const id of col) {
-                    const { w, h } = getSize(id);
-                    placements.set(id, { x, y });
-                    if (w > colMaxW) colMaxW = w;
-                    y += h + TABLE_V_GAP;
-                }
-                if (y - TABLE_V_GAP > zoneH) zoneH = y - TABLE_V_GAP;
-                x += colMaxW + TABLE_H_GAP;
             }
-            const zoneW = Math.max(0, x - TABLE_H_GAP);
-
-            zones.push({ group, tableIds: ids, placements, width: zoneW, height: zoneH });
+            // dagre returns CENTER coordinates; convert to top-left
+            positions.set(t.id, { x: Math.round(node.x - node.width / 2), y: Math.round(node.y - node.height / 2) });
         }
 
-        const interEdges = new Map<string, number>();
-        const keyOf = (a: number, b: number) => a < b ? `${a}|${b}` : `${b}|${a}`;
-        for (const e of edges) {
-            const ga = groupOfTable.get(e.from);
-            const gb = groupOfTable.get(e.to);
-            if (ga === undefined || gb === undefined || ga === gb)
-                continue;
-            const k = keyOf(ga, gb);
-            interEdges.set(k, (interEdges.get(k) ?? 0) + 1);
+        // Snap to grid 20
+        const gridStep = 20;
+        for (const t of pTables) {
+            const p = positions.get(t.id)!;
+            p.x = Math.round(p.x / gridStep) * gridStep;
+            p.y = Math.round(p.y / gridStep) * gridStep;
         }
 
-        const placedZones = XOrganizeTablesCommand.PackZones(zones, interEdges);
+        const ids = pTables.map(t => t.id);
+        // Offset so layout starts at CANVAS_PAD
+        let minX = Infinity;
+        let minY = Infinity;
+        for (const id of ids) {
+            const p = positions.get(id)!;
+            if (p.x < minX) minX = p.x;
+            if (p.y < minY) minY = p.y;
+        }
+        const dx = CANVAS_PAD - minX;
+        const dy = CANVAS_PAD - minY;
+        for (const id of ids) {
+            const p = positions.get(id)!;
+            p.x += dx;
+            p.y += dy;
+        }
+
+        const groupOfTable = new Map<string, { name: string; color: string }>();
+        for (const g of pGrouping.groups) {
+            for (const id of g.tableIds) {
+                if (!tableMap.has(id)) continue;
+                groupOfTable.set(id, { name: g.name, color: g.color });
+            }
+        }
+        const fallbackColor = GROUP_COLORS[GROUP_COLORS.length - 1];
+        const byGroup = new Map<string, { color: string; tables: IAITablePlacement[] }>();
+        for (const id of ids) {
+            const meta = groupOfTable.get(id) ?? { name: "Other", color: fallbackColor };
+            if (!byGroup.has(meta.name))
+                byGroup.set(meta.name, { color: meta.color, tables: [] });
+            const p = positions.get(id)!;
+            byGroup.get(meta.name)!.tables.push({ id, x: Math.round(p.x), y: Math.round(p.y) });
+        }
 
         const result: IAIOrganizationPlan = { groups: [] };
-        for (const pz of placedZones) {
-            const placements: IAITablePlacement[] = [];
-            for (const id of pz.zone.tableIds) {
-                const local = pz.zone.placements.get(id)!;
-                placements.push({
-                    id,
-                    x: Math.round(pz.x + local.x),
-                    y: Math.round(pz.y + local.y)
-                });
-            }
-            result.groups.push({ name: pz.zone.group.name, color: pz.zone.group.color, tables: placements });
-        }
-
+        for (const [name, grp] of byGroup)
+            result.groups.push({ name, color: grp.color, tables: grp.tables });
         return result;
     }
+
 
     private static ComputeRanks(
         pIds: string[],
@@ -694,65 +850,4 @@ The payload includes "hints" — pre-computed FK-connected clusters. Treat them 
         return ordered;
     }
 
-    private static PackZones(
-        pZones: Array<{ group: IAISimpleGroup; tableIds: string[]; placements: Map<string, { x: number; y: number }>; width: number; height: number }>,
-        pInter: Map<string, number>
-    ): Array<{ zone: typeof pZones[number]; x: number; y: number }> {
-        if (pZones.length === 0) return [];
-
-        const placedIdx = new Set<number>();
-        const order: number[] = [];
-
-        const startIdx = pZones
-            .map((z, i) => ({ i, area: z.width * z.height }))
-            .sort((a, b) => b.area - a.area)[0].i;
-        order.push(startIdx);
-        placedIdx.add(startIdx);
-
-        while (placedIdx.size < pZones.length) {
-            let bestNext = -1;
-            let bestScore = -1;
-            for (let i = 0; i < pZones.length; i++) {
-                if (placedIdx.has(i)) continue;
-                let score = 0;
-                for (const p of placedIdx) {
-                    const k = i < p ? `${i}|${p}` : `${p}|${i}`;
-                    score += pInter.get(k) ?? 0;
-                }
-                if (score > bestScore || (score === bestScore && bestNext === -1)) {
-                    bestScore = score;
-                    bestNext = i;
-                }
-            }
-            if (bestNext < 0)
-                bestNext = pZones.findIndex((_, i) => !placedIdx.has(i));
-            order.push(bestNext);
-            placedIdx.add(bestNext);
-        }
-
-        const totalArea = pZones.reduce((s, z) => s + z.width * z.height, 0);
-        const rowBudget = Math.max(
-            ...pZones.map(z => z.width),
-            Math.sqrt(totalArea) * 1.6
-        );
-
-        const placed: Array<{ zone: typeof pZones[number]; x: number; y: number }> = [];
-        let curX = CANVAS_PAD;
-        let curY = CANVAS_PAD;
-        let rowMaxH = 0;
-
-        for (const idx of order) {
-            const zone = pZones[idx];
-            if (curX > CANVAS_PAD && curX + zone.width > CANVAS_PAD + rowBudget) {
-                curX = CANVAS_PAD;
-                curY += rowMaxH + GROUP_V_GAP;
-                rowMaxH = 0;
-            }
-            placed.push({ zone, x: curX, y: curY });
-            if (zone.height > rowMaxH) rowMaxH = zone.height;
-            curX += zone.width + GROUP_H_GAP;
-        }
-
-        return placed;
-    }
 }

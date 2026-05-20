@@ -102,10 +102,17 @@ if (-not $SkipTFX) {
 # ============================================
 if (-not $SkipTests -and -not $SkipTFX) {
     Write-Info "[2/5] Testing TFX..."
-    
+
     Push-Location $TfxDir
     try {
-        npm run test
+        $prevPref = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            cmd /c "npm run test 2>&1"
+        }
+        finally {
+            $ErrorActionPreference = $prevPref
+        }
         if ($LASTEXITCODE -ne 0) {
             Write-Err "TFX tests failed!"
             exit 1
@@ -207,10 +214,19 @@ finally {
 # ============================================
 if (-not $SkipTests) {
     Write-Info "[4/5] Testing DASE..."
-    
+
     Push-Location $DaseDir
     try {
-        npm test
+        # Run npm test via cmd /c to prevent PowerShell 5.1 from treating
+        # stderr warnings (e.g. ts-jest WARN) as terminating NativeCommandError.
+        $prevPref = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            cmd /c "npm test 2>&1"
+        }
+        finally {
+            $ErrorActionPreference = $prevPref
+        }
         if ($LASTEXITCODE -ne 0) {
             Write-Err "DASE tests failed!"
             exit 1

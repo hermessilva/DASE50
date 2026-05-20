@@ -1,7 +1,29 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { spawn } from "child_process";
+import { spawn, SpawnOptions, ChildProcess } from "child_process";
+import { GetLogService } from "../../Services/LogService";
+
+export function SpawnCliSafe(pBinary: string, pArgs: string[], pOptions: SpawnOptions): ChildProcess
+{
+    const lower = pBinary.toLowerCase();
+    const isWinCmd = process.platform === "win32" && (lower.endsWith(".cmd") || lower.endsWith(".bat"));
+    if (!isWinCmd)
+        return spawn(pBinary, pArgs, pOptions);
+
+    const quote = (a: string): string =>
+    {
+        if (a.length === 0)
+            return "\"\"";
+        if (!/[\s"&|<>^()%!]/.test(a))
+            return a;
+        return "\"" + a.replace(/(\\*)"/g, "$1$1\\\"").replace(/(\\+)$/, "$1$1") + "\"";
+    };
+    // cmd.exe /S strips ONE outer pair of quotes from the /C argument.
+    // Wrap the full command line in extra quotes so the binary path's quotes survive.
+    const cmdLine = "\"\"" + pBinary + "\" " + pArgs.map(quote).join(" ") + "\"";
+    return spawn("cmd.exe", ["/d", "/s", "/c", cmdLine], { ...pOptions, windowsVerbatimArguments: true });
+}
 
 export interface IClaudeCliInfo {
     BinaryPath: string;
@@ -18,7 +40,6 @@ interface ICachedInfo {
 }
 
 const VERSION_TIMEOUT_MS = 3000;
-const AUTH_CHECK_TIMEOUT_MS = 8000;
 const AUTH_TTL_MS = 60 * 60 * 1000;
 
 export class XClaudeCliDiscovery {
@@ -35,6 +56,7 @@ export class XClaudeCliDiscovery {
     }
 
     static async Resolve(): Promise<IClaudeCliInfo | null> {
+        const log = GetLogService();
         const cached = XClaudeCliDiscovery._Cache;
         if (cached && XClaudeCliDiscovery.IsCacheFresh(cached)) {
             return {
@@ -45,14 +67,22 @@ export class XClaudeCliDiscovery {
         }
 
         const binary = XClaudeCliDiscovery._OverridePath ?? XClaudeCliDiscovery.FindBinary();
-        if (!binary)
+        if (!binary) {
+            log.Warn("Claude Code Discovery: binary NOT found on PATH or any known install location.");
             return null;
+        }
+        log.Info(`Claude Code Discovery: candidate binary = ${binary}`);
 
         const version = await XClaudeCliDiscovery.GetVersion(binary);
-        if (!version)
+        if (!version) {
+            log.Warn(`Claude Code Discovery: '${binary} --version' failed or unparseable. Assuming unavailable.`);
             return null;
+        }
+        log.Info(`Claude Code Discovery: version = ${version}`);
 
-        const auth = await XClaudeCliDiscovery.CheckAuth(binary);
+        // Skip an active auth probe (it would burn tokens and take ~8s).
+        // Assume authenticated; real auth errors surface during actual Run().
+        const auth = true;
         const stat = XClaudeCliDiscovery.SafeStat(binary);
 
         XClaudeCliDiscovery._Cache = {
@@ -140,27 +170,13 @@ export class XClaudeCliDiscovery {
     private static GetVersion(pBinary: string): Promise<string | null> {
         return XClaudeCliDiscovery.RunCli(pBinary, ["--version"], VERSION_TIMEOUT_MS)
             .then(result => {
+                const log = GetLogService();
+                log.Info(`Claude Code Discovery: version probe Ok=${result.Ok} stdout=${JSON.stringify(result.Stdout.slice(0, 200))} stderr=${JSON.stringify(result.Stderr.slice(0, 200))}`);
                 if (!result.Ok)
                     return null;
                 const match = /\b(\d+\.\d+\.\d+)/.exec(result.Stdout);
                 return match ? match[1] : null;
             });
-    }
-
-    private static CheckAuth(pBinary: string): Promise<boolean> {
-        return XClaudeCliDiscovery.RunCli(
-            pBinary,
-            ["--print", "--output-format", "json", "--max-turns", "1", "ping"],
-            AUTH_CHECK_TIMEOUT_MS,
-            "ping"
-        ).then(result => {
-            if (!result.Ok)
-                return false;
-            const lower = (result.Stdout + result.Stderr).toLowerCase();
-            if (lower.includes("not authenticated") || lower.includes("please run") || lower.includes("login"))
-                return false;
-            return true;
-        });
     }
 
     private static RunCli(
@@ -172,7 +188,7 @@ export class XClaudeCliDiscovery {
         return new Promise((resolve) => {
             let stdout = "";
             let stderr = "";
-            const child = spawn(pBinary, pArgs, { windowsHide: true });
+            const child = SpawnCliSafe(pBinary, pArgs, { windowsHide: true });
 
             const timer = setTimeout(() => {
                 try { child.kill("SIGKILL"); } catch { /* ignore */ }

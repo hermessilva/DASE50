@@ -1298,6 +1298,42 @@ body {
     overflow: hidden;
 }
 
+/* Layout params block */
+.ai-layout-params {
+    border: 1px solid var(--vscode-panel-border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ai-layout-params-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    opacity: 0.7;
+    letter-spacing: 0.04em;
+}
+
+.ai-layout-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+}
+
+.ai-layout-row label {
+    flex: 0 0 130px;
+    opacity: 0.85;
+}
+
+.ai-layout-row select,
+.ai-layout-row input[type="range"] {
+    flex: 1;
+    min-width: 0;
+}
+
 /* Model selector row */
 .ai-model-selector-row {
     display: flex;

@@ -153,14 +153,17 @@ describe("XORMController", () => {
         const t2 = controller.AddTable({ X: 500, Y: 100, Name: "T2" });
         const f1 = controller.AddField({ TableID: t1.ElementID!, Name: "F1" });
         const ref = controller.AddReference({ SourceFieldID: f1.ElementID!, TargetTableID: t2.ElementID! });
-        
+
         const reference = controller.GetElementByID(ref.ElementID!) as XORMReference;
         // Set Source to be the table ID to trigger the branch
         reference.Source = t1.ElementID!;
         reference.Points = [new XPoint(0, 0), new XPoint(0, 0)];
 
+        // Force the legacy UpdateReferencesForTable fallback by suspending routing
+        doc.Design.SuspendRouting();
         controller.MoveElement({ ElementID: t1.ElementID!, X: 300, Y: 300 });
-        
+        doc.Design.ResumeRouting(false);
+
         // After move, the first point should be updated
         const table = controller.GetTableByID(t1.ElementID!);
         expect(reference.Points[0].X).toBe(table!.Bounds.Left + table!.Bounds.Width);
@@ -171,12 +174,15 @@ describe("XORMController", () => {
         const t2 = controller.AddTable({ X: 500, Y: 100, Name: "T2" });
         const f1 = controller.AddField({ TableID: t1.ElementID!, Name: "F1" });
         const ref = controller.AddReference({ SourceFieldID: f1.ElementID!, TargetTableID: t2.ElementID! });
-        
+
         const reference = controller.GetElementByID(ref.ElementID!) as XORMReference;
         // Ensure points are set with at least 2 points
         reference.Points = [new XPoint(0, 0), new XPoint(0, 0)];
 
+        // Force the legacy UpdateReferencesForTable fallback by suspending routing
+        doc.Design.SuspendRouting();
         controller.MoveElement({ ElementID: t2.ElementID!, X: 600, Y: 200 });
+        doc.Design.ResumeRouting(false);
         // Target is t2, so last index of points should be updated.
         // t2 is at (600, 200), left side is at 600.
         expect(reference.Points[reference.Points.length - 1].X).toBe(600);

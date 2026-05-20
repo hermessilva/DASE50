@@ -31,6 +31,8 @@ node_modules/**
 !node_modules/luxon/**
 !node_modules/parsimmon/**
 !node_modules/pluralize/**
+!node_modules/dagre/**
+!node_modules/graphlib/**
 
 # ESM files not needed (we use CommonJS)
 node_modules/**/*.mjs

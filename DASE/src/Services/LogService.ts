@@ -1,13 +1,31 @@
 import * as vscode from "vscode";
+import * as fs from "fs";
+import * as path from "path";
+import * as os from "os";
 
 class XLogService
 {
     private static _Instance: XLogService | null = null;
     private _OutputChannel: vscode.OutputChannel;
+    private _LogFilePath: string;
 
     private constructor()
     {
         this._OutputChannel = vscode.window.createOutputChannel("DASE");
+        this._LogFilePath = "";
+        try
+        {
+            const tmp = os.tmpdir();
+            if (typeof tmp === "string" && tmp.length > 0)
+            {
+                this._LogFilePath = path.join(tmp, "dase.log");
+                fs.writeFileSync(this._LogFilePath, `=== DASE session started ${new Date().toISOString()} ===\n`, { flag: "a" });
+            }
+        }
+        catch
+        {
+            this._LogFilePath = "";
+        }
     }
 
     static Get(): XLogService
@@ -57,7 +75,19 @@ class XLogService
         const timestamp = new Date().toISOString();
         const formattedMessage = `[${timestamp}] [${pLevel}] ${pMessage}`;
         this._OutputChannel.appendLine(formattedMessage);
-        
+
+        if (this._LogFilePath.length > 0)
+        {
+            try
+            {
+                fs.writeFileSync(this._LogFilePath, formattedMessage + "\n", { flag: "a" });
+            }
+            catch
+            {
+                /* swallow file-write failures */
+            }
+        }
+
         // Also log to console for debugging
         if (pLevel === "ERROR")
             console.error(formattedMessage);
@@ -65,6 +95,11 @@ class XLogService
             console.warn(formattedMessage);
         else
             console.log(formattedMessage);
+    }
+
+    GetLogFilePath(): string
+    {
+        return this._LogFilePath;
     }
 
     Show(): void

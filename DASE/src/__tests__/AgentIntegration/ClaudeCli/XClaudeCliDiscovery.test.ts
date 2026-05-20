@@ -8,7 +8,7 @@ jest.mock('child_process');
 import * as fs from 'fs';
 import * as os from 'os';
 import * as child_process from 'child_process';
-import { XClaudeCliDiscovery } from '../../../AgentIntegration/ClaudeCli/XClaudeCliDiscovery';
+import { XClaudeCliDiscovery, SpawnCliSafe } from '../../../AgentIntegration/ClaudeCli/XClaudeCliDiscovery';
 
 const mockFs = fs as jest.Mocked<typeof fs>;
 const mockOs = os as jest.Mocked<typeof os>;
@@ -39,7 +39,9 @@ function makeChildEmitter(opts: { stdout?: string; stderr?: string; exitCode?: n
 
 describe('XClaudeCliDiscovery', () => {
     beforeEach(() => {
-        jest.resetAllMocks();
+        mockSpawn.mockReset();
+        mockFs.statSync.mockReset();
+        mockOs.homedir.mockReset();
         XClaudeCliDiscovery.ResetCache();
         XClaudeCliDiscovery.SetOverridePath(null);
         process.env.PATH = '/usr/bin:/usr/local/bin';
@@ -47,6 +49,45 @@ describe('XClaudeCliDiscovery', () => {
         delete process.env.APPDATA;
         mockOs.homedir.mockReturnValue('/home/user');
         Object.defineProperty(process, 'platform', { value: 'linux', configurable: true });
+    });
+
+    it('SpawnCliSafe uses direct spawn for non-Windows .cmd binary', () => {
+        Object.defineProperty(process, 'platform', { value: 'linux', configurable: true });
+        const fake: any = { on: jest.fn(), kill: jest.fn() };
+        mockSpawn.mockReturnValue(fake);
+        const out = SpawnCliSafe('/usr/local/bin/claude', ['--version'], { windowsHide: true });
+        expect(out).toBe(fake);
+        expect(mockSpawn).toHaveBeenCalledWith('/usr/local/bin/claude', ['--version'], { windowsHide: true });
+    });
+
+    it('SpawnCliSafe wraps .cmd via cmd.exe on Windows with quoted args', () => {
+        Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
+        const fake: any = { on: jest.fn(), kill: jest.fn() };
+        mockSpawn.mockReturnValue(fake);
+        SpawnCliSafe('C:\\bin\\claude.cmd', ['--print', 'hello world', '', '--system-prompt', 'a"b\\'], { windowsHide: true });
+        expect(mockSpawn).toHaveBeenCalledTimes(1);
+        const call = mockSpawn.mock.calls[0];
+        expect(call[0]).toBe('cmd.exe');
+        const args = call[1];
+        expect(args[0]).toBe('/d');
+        expect(args[1]).toBe('/s');
+        expect(args[2]).toBe('/c');
+        expect(typeof args[3]).toBe('string');
+        expect(args[3]).toContain('"C:\\bin\\claude.cmd"');
+        expect(args[3]).toContain('--print');
+        expect(args[3]).toContain('"hello world"');
+        expect(args[3]).toContain('""');
+        expect(args[3].startsWith('""')).toBe(true);
+        expect(args[3].endsWith('"')).toBe(true);
+        expect(call[2].windowsVerbatimArguments).toBe(true);
+    });
+
+    it('SpawnCliSafe uses direct spawn for .exe on Windows', () => {
+        Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
+        const fake: any = { on: jest.fn() };
+        mockSpawn.mockReturnValue(fake);
+        SpawnCliSafe('C:\\bin\\claude.exe', ['--version'], { windowsHide: true });
+        expect(mockSpawn).toHaveBeenCalledWith('C:\\bin\\claude.exe', ['--version'], { windowsHide: true });
     });
 
     it('Resolve returns null when no binary found', async () => {
@@ -86,24 +127,12 @@ describe('XClaudeCliDiscovery', () => {
         expect(await XClaudeCliDiscovery.Resolve()).toBeNull();
     });
 
-    it('reports unauthenticated when auth probe says so', async () => {
+    it('Authenticated defaults to true (real auth surfaces during Run)', async () => {
         mockFs.statSync.mockReturnValue({ mtimeMs: 1, isFile: () => true } as any);
         XClaudeCliDiscovery.SetOverridePath('/x/claude');
-        mockSpawn
-            .mockImplementationOnce(() => makeChildEmitter({ stdout: '1.0.0', exitCode: 0 }))
-            .mockImplementationOnce(() => makeChildEmitter({ stderr: 'Please run `claude login`', exitCode: 1 }));
+        mockSpawn.mockImplementationOnce(() => makeChildEmitter({ stdout: '1.0.0', exitCode: 0 }));
         const info = await XClaudeCliDiscovery.Resolve();
-        expect(info?.Authenticated).toBe(false);
-    });
-
-    it('reports unauthenticated when auth probe stdout contains login keyword with ok exit', async () => {
-        mockFs.statSync.mockReturnValue({ mtimeMs: 1, isFile: () => true } as any);
-        XClaudeCliDiscovery.SetOverridePath('/x/claude');
-        mockSpawn
-            .mockImplementationOnce(() => makeChildEmitter({ stdout: '1.0.0', exitCode: 0 }))
-            .mockImplementationOnce(() => makeChildEmitter({ stdout: 'You need to login first', exitCode: 0 }));
-        const info = await XClaudeCliDiscovery.Resolve();
-        expect(info?.Authenticated).toBe(false);
+        expect(info?.Authenticated).toBe(true);
     });
 
     it('caches Resolve result based on mtime + TTL', async () => {
@@ -122,31 +151,23 @@ describe('XClaudeCliDiscovery', () => {
     it('invalidates cache when binary mtime changes', async () => {
         mockFs.statSync.mockReturnValueOnce({ mtimeMs: 1 } as any);
         XClaudeCliDiscovery.SetOverridePath('/x/claude');
-        mockSpawn
-            .mockImplementationOnce(() => makeChildEmitter({ stdout: '1.0.0' }))
-            .mockImplementationOnce(() => makeChildEmitter({ stdout: '{"ok":true}' }));
+        mockSpawn.mockImplementationOnce(() => makeChildEmitter({ stdout: '1.0.0' }));
         await XClaudeCliDiscovery.Resolve();
 
         mockFs.statSync.mockReturnValue({ mtimeMs: 999 } as any);
-        mockSpawn
-            .mockImplementationOnce(() => makeChildEmitter({ stdout: '1.0.0' }))
-            .mockImplementationOnce(() => makeChildEmitter({ stdout: '{"ok":true}' }));
+        mockSpawn.mockImplementationOnce(() => makeChildEmitter({ stdout: '1.0.0' }));
         await XClaudeCliDiscovery.Resolve();
-        expect(mockSpawn).toHaveBeenCalledTimes(4);
+        expect(mockSpawn).toHaveBeenCalledTimes(2);
     });
 
     it('invalidates cache when binary stat fails on re-check', async () => {
         mockFs.statSync.mockReturnValueOnce({ mtimeMs: 1 } as any);
         XClaudeCliDiscovery.SetOverridePath('/x/claude');
-        mockSpawn
-            .mockImplementationOnce(() => makeChildEmitter({ stdout: '1.0.0' }))
-            .mockImplementationOnce(() => makeChildEmitter({ stdout: '{}' }));
+        mockSpawn.mockImplementationOnce(() => makeChildEmitter({ stdout: '1.0.0' }));
         await XClaudeCliDiscovery.Resolve();
 
         mockFs.statSync.mockImplementation(() => { throw new Error('gone'); });
-        mockSpawn
-            .mockImplementationOnce(() => makeChildEmitter({ stdout: '1.0.0' }))
-            .mockImplementationOnce(() => makeChildEmitter({ stdout: '{}' }));
+        mockSpawn.mockImplementationOnce(() => makeChildEmitter({ stdout: '1.0.0' }));
         const result = await XClaudeCliDiscovery.Resolve();
         expect(result).not.toBeNull();
     });
@@ -154,18 +175,14 @@ describe('XClaudeCliDiscovery', () => {
     it('invalidates cache when auth TTL elapsed', async () => {
         mockFs.statSync.mockReturnValue({ mtimeMs: 7 } as any);
         XClaudeCliDiscovery.SetOverridePath('/x/claude');
-        mockSpawn
-            .mockImplementationOnce(() => makeChildEmitter({ stdout: '1.0.0' }))
-            .mockImplementationOnce(() => makeChildEmitter({ stdout: '{}' }));
+        mockSpawn.mockImplementationOnce(() => makeChildEmitter({ stdout: '1.0.0' }));
         const first = await XClaudeCliDiscovery.Resolve();
         const spy = jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 60 * 60 * 1000 + 5000);
-        mockSpawn
-            .mockImplementationOnce(() => makeChildEmitter({ stdout: '1.0.0' }))
-            .mockImplementationOnce(() => makeChildEmitter({ stdout: '{}' }));
+        mockSpawn.mockImplementationOnce(() => makeChildEmitter({ stdout: '1.0.0' }));
         await XClaudeCliDiscovery.Resolve();
         spy.mockRestore();
         expect(first).toBeDefined();
-        expect(mockSpawn).toHaveBeenCalledTimes(4);
+        expect(mockSpawn).toHaveBeenCalledTimes(2);
     });
 
     it('FindBinary checks Windows candidate paths when override unset', async () => {

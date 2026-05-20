@@ -429,15 +429,17 @@ describe('XClaudeCliProvider', () => {
     });
 
     it('default ResolveInfo invokes XClaudeCliDiscovery.Resolve when no override given', async () => {
-        const mod = jest.requireMock('../../../AgentIntegration/ClaudeCli/XClaudeCliDiscovery');
-        const real = jest.requireActual('../../../AgentIntegration/ClaudeCli/XClaudeCliDiscovery');
-        const provider = new XClaudeCliProvider();
-        const spy = jest.spyOn(real.XClaudeCliDiscovery, 'Resolve').mockResolvedValue(null);
-        const out = await provider.provideLanguageModelChatInformation({ silent: true }, cancelToken());
-        expect(out).toEqual([]);
-        expect(spy).toHaveBeenCalled();
-        spy.mockRestore();
-        expect(mod).toBeDefined();
+        const discMod = require('../../../AgentIntegration/ClaudeCli/XClaudeCliDiscovery');
+        const spy = jest.spyOn(discMod.XClaudeCliDiscovery, 'Resolve').mockResolvedValue(null);
+        try {
+            const provider = new XClaudeCliProvider();
+            const out = await provider.provideLanguageModelChatInformation({ silent: true }, cancelToken());
+            expect(out).toEqual([]);
+            expect(spy).toHaveBeenCalled();
+        }
+        finally {
+            spy.mockRestore();
+        }
     });
 
     it('RegisterClaudeCliProvider returns disposable when vscode.lm available', () => {

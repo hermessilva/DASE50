@@ -2,7 +2,7 @@
     "name": "dase",
     "displayName": "DASE - Design-Aided Software Engineering",
     "description": "Visual design environment for multi-tier, multi-platform web applications",
-    "version": "1.0.68524",
+    "version": "1.0.41855",
     "publisher": "tootega",
     "repository": {
         "type": "git",
@@ -562,7 +562,9 @@
     },
     "dependencies": {
         "@dbml/core": "^6.4.0",
-        "@tootega/tfx": "file:../TFX"
+        "@tootega/tfx": "file:../TFX",
+        "@types/dagre": "^0.7.54",
+        "dagre": "^0.8.5"
     },
     "bundledDependencies": [
         "@tootega/tfx",
@@ -575,5 +577,9 @@
         "jest": "^30.2.0",
         "ts-jest": "^29.4.6",
         "typescript": "^5.3.0"
-    }
+    },
+    "bundleDependencies": [
+        "@tootega/tfx",
+        "@dbml/core"
+    ]
 }

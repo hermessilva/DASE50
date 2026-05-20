@@ -85,6 +85,12 @@ interface IAddShadowTablePayload {
 
 interface IOrganizeTablesAIExecutePayload {
     ModelIndex: number;
+    Layout?: {
+        RankDir?: string;
+        Ranker?: string;
+        RankSep?: number;
+        NodeSep?: number;
+    };
 }
 
 interface ICreateSQLScriptExecutePayload {
@@ -377,7 +383,8 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
             case XDesignerMessageType.OrganizeTablesAIExecute:
                 vscode.commands.executeCommand(
                     "Dase.OrganizeTablesAIExecute",
-                    (payload as IOrganizeTablesAIExecutePayload).ModelIndex ?? 0
+                    (payload as IOrganizeTablesAIExecutePayload).ModelIndex ?? 0,
+                    (payload as IOrganizeTablesAIExecutePayload).Layout
                 );
                 break;
 
@@ -1276,6 +1283,34 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
                             <span class="ai-model-selector-chevron">▾</span>
                         </button>
                         <div id="ai-model-dropdown" class="ai-model-dropdown" style="display:none"></div>
+                    </div>
+                </div>
+                <div class="ai-layout-params" id="ai-layout-params">
+                    <div class="ai-layout-params-title">Layout</div>
+                    <div class="ai-layout-row">
+                        <label for="ai-lp-rankdir">Flow</label>
+                        <select id="ai-lp-rankdir">
+                            <option value="TB" selected>Wide — flow top → bottom</option>
+                            <option value="BT">Wide — flow bottom → top</option>
+                            <option value="LR">Tall — flow left → right</option>
+                            <option value="RL">Tall — flow right → left</option>
+                        </select>
+                    </div>
+                    <div class="ai-layout-row">
+                        <label for="ai-lp-ranker">Ranking</label>
+                        <select id="ai-lp-ranker">
+                            <option value="network-simplex" selected>Compact (network-simplex)</option>
+                            <option value="tight-tree">Balanced (tight-tree)</option>
+                            <option value="longest-path">Spread (longest-path)</option>
+                        </select>
+                    </div>
+                    <div class="ai-layout-row">
+                        <label for="ai-lp-ranksep">Rank gap <span id="ai-lp-ranksep-val">180</span>px</label>
+                        <input type="range" id="ai-lp-ranksep" min="80" max="400" step="20" value="180">
+                    </div>
+                    <div class="ai-layout-row">
+                        <label for="ai-lp-nodesep">Node gap <span id="ai-lp-nodesep-val">55</span>px</label>
+                        <input type="range" id="ai-lp-nodesep" min="20" max="160" step="5" value="55">
                     </div>
                 </div>
             </div>

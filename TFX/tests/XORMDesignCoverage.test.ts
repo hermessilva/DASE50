@@ -1147,9 +1147,9 @@ describe("XORMDesign Coverage Tests", () => {
             
             ref.Points = [];
             design.RouteAllLines();
-            
-            // Should have at least 4 points for C-route (start, corner1, corner2, end)
-            expect(ref.Points.length).toBeGreaterThanOrEqual(3);
+
+            // Vertical-aligned tables get a direct vertical route (≥2 points) with anchor distribution
+            expect(ref.Points.length).toBeGreaterThanOrEqual(2);
             // All orthogonal
             for (let i = 1; i < ref.Points.length; i++) {
                 const prev = ref.Points[i - 1];
@@ -1160,19 +1160,17 @@ describe("XORMDesign Coverage Tests", () => {
             }
         });
 
-        it("should use C-route when tables vertically aligned - exits left (line 457)", () => {
+        it("should route when tables vertically aligned - source on the right", () => {
             const design = new XORMDesign();
-            // Tables vertically aligned with source to the right
-            // More space on left so should exit left
             const table1 = design.CreateTable({ X: 500, Y: 100, Width: 150, Height: 100, Name: "Table1" });
             const table2 = design.CreateTable({ X: 500, Y: 350, Width: 150, Height: 100, Name: "Table2" });
             const field = table1.CreateField({ Name: "FK_Field" });
             const ref = design.CreateReference({ SourceFieldID: field.ID, TargetTableID: table2.ID, Name: "FK_Test" });
-            
+
             ref.Points = [];
             design.RouteAllLines();
-            
-            expect(ref.Points.length).toBeGreaterThanOrEqual(3);
+
+            expect(ref.Points.length).toBeGreaterThanOrEqual(2);
         });
 
         it("should use S-route with target Top entry (line 443-479)", () => {

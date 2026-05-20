@@ -625,6 +625,25 @@
         RenderRelations();
         RenderTables();
         UpdateSelectionVisuals();
+        AutoSizeCanvas();
+    }
+
+    function AutoSizeCanvas() {
+        if (!_Model.Tables || _Model.Tables.length === 0) return;
+        let maxX = 0;
+        let maxY = 0;
+        for (const t of _Model.Tables) {
+            const w = t.Width || 200;
+            const fieldCount = (t.Fields || []).length;
+            const h = fieldCount > 0 ? 28 + fieldCount * 16 + 12 : 28;
+            if (t.X + w > maxX) maxX = t.X + w;
+            if (t.Y + h > maxY) maxY = t.Y + h;
+        }
+        const pad = 200;
+        const targetW = Math.max(1600, Math.ceil((maxX + pad) / 100) * 100);
+        const targetH = Math.max(1000, Math.ceil((maxY + pad) / 100) * 100);
+        _Canvas.style.width = targetW + "px";
+        _Canvas.style.height = targetH + "px";
     }
 
     function RenderTables() {
@@ -2729,6 +2748,19 @@
         if (sel) setTimeout(function () { sel.scrollIntoView({ block: "nearest" }); }, 0);
     }
 
+    function _AIReadLayoutParams() {
+        const rankdirEl = document.getElementById("ai-lp-rankdir");
+        const rankerEl = document.getElementById("ai-lp-ranker");
+        const rankSepEl = document.getElementById("ai-lp-ranksep");
+        const nodeSepEl = document.getElementById("ai-lp-nodesep");
+        return {
+            RankDir: rankdirEl ? rankdirEl.value : "TB",
+            Ranker: rankerEl ? rankerEl.value : "network-simplex",
+            RankSep: rankSepEl ? parseInt(rankSepEl.value, 10) : 180,
+            NodeSep: nodeSepEl ? parseInt(nodeSepEl.value, 10) : 55
+        };
+    }
+
     function OpenAIPickerOverlay(pPayload) {
         const overlay = document.getElementById("ai-organize-overlay");
         if (!overlay) return;
@@ -2796,9 +2828,22 @@
             '<button id="ai-cancel-btn" class="seed-btn seed-btn-secondary">Cancel</button>' +
             '<button id="ai-execute-btn" class="seed-btn seed-btn-primary">Execute</button>';
 
+        // Wire layout-param live labels
+        const rankSep = document.getElementById("ai-lp-ranksep");
+        const nodeSep = document.getElementById("ai-lp-nodesep");
+        const rankSepVal = document.getElementById("ai-lp-ranksep-val");
+        const nodeSepVal = document.getElementById("ai-lp-nodesep-val");
+        if (rankSep && rankSepVal)
+            rankSep.oninput = function () { rankSepVal.textContent = rankSep.value; };
+        if (nodeSep && nodeSepVal)
+            nodeSep.oninput = function () { nodeSepVal.textContent = nodeSep.value; };
+
         document.getElementById("ai-cancel-btn").onclick = CloseAIOrganizeOverlay;
         document.getElementById("ai-execute-btn").onclick = function () {
-            SendMessage(XMessageType.OrganizeTablesAIExecute, { ModelIndex: _AISelectedModelIndex });
+            SendMessage(XMessageType.OrganizeTablesAIExecute, {
+                ModelIndex: _AISelectedModelIndex,
+                Layout: _AIReadLayoutParams()
+            });
         };
 
         overlay.style.display = "flex";

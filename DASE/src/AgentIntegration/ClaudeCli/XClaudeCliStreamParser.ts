@@ -16,7 +16,7 @@ interface IRawEvent {
     type?: string;
     subtype?: string;
     message?: {
-        content?: Array<{ type?: string; text?: string }>;
+        content?: Array<{ type?: string; text?: string; thinking?: string }>;
         stop_reason?: string;
         usage?: {
             input_tokens?: number;
@@ -37,6 +37,7 @@ interface IRawEvent {
 }
 
 export type IClaudeTextChunkHandler = (pChunk: string) => void;
+export type IClaudeRawLineHandler = (pLine: string) => void;
 
 export class XClaudeCliStreamParser {
     private _Buffer: string = "";
@@ -50,10 +51,15 @@ export class XClaudeCliStreamParser {
     private _StopReason: string | null = null;
     private _Error: string | null = null;
     private readonly _OnTextChunk: IClaudeTextChunkHandler | null;
+    private _OnRawLine: IClaudeRawLineHandler | null = null;
     private _EmittedLength: number = 0;
 
     constructor(pOnTextChunk?: IClaudeTextChunkHandler) {
         this._OnTextChunk = pOnTextChunk ?? null;
+    }
+
+    SetRawLineHandler(pHandler: IClaudeRawLineHandler | null): void {
+        this._OnRawLine = pHandler;
     }
 
     Feed(pChunk: string): void {
@@ -82,6 +88,7 @@ export class XClaudeCliStreamParser {
     }
 
     private ConsumeLine(pLine: string): void {
+        this._OnRawLine?.(pLine);
         let event: IRawEvent;
         try {
             event = JSON.parse(pLine) as IRawEvent;
@@ -91,14 +98,18 @@ export class XClaudeCliStreamParser {
         }
 
         if (event.type === "assistant" && event.message?.content) {
+            // Collect ALL text parts within this event (Claude may emit multiple text blocks per turn).
+            const textParts: string[] = [];
             for (const part of event.message.content) {
-                if (part.type === "text" && typeof part.text === "string") {
-                    this._Text = part.text;
-                    if (this._OnTextChunk && this._Text.length > this._EmittedLength) {
-                        const delta = this._Text.slice(this._EmittedLength);
-                        this._EmittedLength = this._Text.length;
-                        this._OnTextChunk(delta);
-                    }
+                if (part.type === "text" && typeof part.text === "string")
+                    textParts.push(part.text);
+            }
+            if (textParts.length > 0) {
+                this._Text = textParts.join("");
+                if (this._OnTextChunk && this._Text.length > this._EmittedLength) {
+                    const delta = this._Text.slice(this._EmittedLength);
+                    this._EmittedLength = this._Text.length;
+                    this._OnTextChunk(delta);
                 }
             }
             if (event.message.usage)

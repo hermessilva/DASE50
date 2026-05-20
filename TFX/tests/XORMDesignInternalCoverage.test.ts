@@ -283,7 +283,7 @@ describe("XORMDesign internal coverage", () =>
         expect(ref.Points.length).toBeGreaterThan(0);
     });
 
-    it("RouteReference assigns no points when both router passes return invalid", () =>
+    it("RouteReference falls back to a direct two-point line when both router passes return invalid", () =>
     {
         const design = new XORMDesign();
         const sourceTable = design.CreateTable({ Name: "Src", X: 0, Y: 0, Width: 200, Height: 120 });
@@ -304,6 +304,7 @@ describe("XORMDesign internal coverage", () =>
 
         (design as any).RouteReference(ref, [sourceTable, targetTable]);
 
-        expect(ref.Points.length).toBe(0);
+        // Direct fallback line: exactly two points (source anchor → target anchor)
+        expect(ref.Points.length).toBe(2);
     });
 });

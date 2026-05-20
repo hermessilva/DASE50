@@ -7,7 +7,7 @@ export class XORMMetrics
     public static readonly FieldRowHeight: number = 16;
     public static readonly FieldsPadding: number = 12;
     public static readonly DefaultTableWidth: number = 200;
-    public static readonly RouterGap: number = 20;
+    public static readonly RouterGap: number = 40;
 
     public static GetTableHeight(pFieldCount: number): number
     {

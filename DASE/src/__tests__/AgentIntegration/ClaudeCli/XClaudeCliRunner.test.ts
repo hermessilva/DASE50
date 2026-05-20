@@ -248,4 +248,18 @@ describe('XClaudeCliRunner', () => {
         const runner = new XClaudeCliRunner();
         expect(runner).toBeDefined();
     });
+
+    it('default ResolveInfo invokes XClaudeCliDiscovery.Resolve', async () => {
+        const discMod = require('../../../AgentIntegration/ClaudeCli/XClaudeCliDiscovery');
+        const spy = jest.spyOn(discMod.XClaudeCliDiscovery, 'Resolve').mockResolvedValue(null);
+        try {
+            const runner = new XClaudeCliRunner();
+            const info = await runner.IsAvailable();
+            expect(info).toBeNull();
+            expect(spy).toHaveBeenCalled();
+        }
+        finally {
+            spy.mockRestore();
+        }
+    });
 });

@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { spawn, ChildProcess } from "child_process";
-import { XClaudeCliDiscovery, IClaudeCliInfo } from "./XClaudeCliDiscovery";
+import { XClaudeCliDiscovery, IClaudeCliInfo, SpawnCliSafe } from "./XClaudeCliDiscovery";
 import { XClaudeCliStreamParser } from "./XClaudeCliStreamParser";
 import { GetLogService } from "../../Services/LogService";
 
@@ -53,8 +53,12 @@ export class XClaudeCliProvider implements vscode.LanguageModelChatProvider {
         ResolveInfo?: () => Promise<IClaudeCliInfo | null>;
         Spawn?: typeof spawn;
     }) {
-        this._ResolveInfo = pOptions?.ResolveInfo ?? (() => XClaudeCliDiscovery.Resolve());
-        this._Spawn = pOptions?.Spawn ?? spawn;
+        this._ResolveInfo = pOptions?.ResolveInfo ?? XClaudeCliProvider.DefaultResolveInfo;
+        this._Spawn = pOptions?.Spawn ?? (SpawnCliSafe as unknown as typeof spawn);
+    }
+
+    private static DefaultResolveInfo(): Promise<IClaudeCliInfo | null> {
+        return XClaudeCliDiscovery.Resolve();
     }
 
     async provideLanguageModelChatInformation(

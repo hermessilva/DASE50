@@ -1,6 +1,7 @@
 import { spawn, ChildProcess } from "child_process";
-import { XClaudeCliDiscovery, IClaudeCliInfo } from "./XClaudeCliDiscovery";
+import { XClaudeCliDiscovery, IClaudeCliInfo, SpawnCliSafe } from "./XClaudeCliDiscovery";
 import { XClaudeCliStreamParser, IClaudeStreamUsage } from "./XClaudeCliStreamParser";
+import { GetLogService } from "../../Services/LogService";
 
 export interface IClaudeRunRequest {
     Family: string;
@@ -29,8 +30,12 @@ export class XClaudeCliRunner {
     private readonly _Spawn: typeof spawn;
 
     constructor(pOptions?: IClaudeCliRunnerOptions) {
-        this._ResolveInfo = pOptions?.ResolveInfo ?? (() => XClaudeCliDiscovery.Resolve());
-        this._Spawn = pOptions?.Spawn ?? spawn;
+        this._ResolveInfo = pOptions?.ResolveInfo ?? XClaudeCliRunner.DefaultResolveInfo;
+        this._Spawn = pOptions?.Spawn ?? (SpawnCliSafe as unknown as typeof spawn);
+    }
+
+    private static DefaultResolveInfo(): Promise<IClaudeCliInfo | null> {
+        return XClaudeCliDiscovery.Resolve();
     }
 
     async IsAvailable(): Promise<IClaudeCliInfo | null> {
@@ -51,7 +56,6 @@ export class XClaudeCliRunner {
             "--print",
             "--output-format", "stream-json",
             "--verbose",
-            "--max-turns", "1",
             "--model", pRequest.Family
         ];
         if (pRequest.SystemPrompt.length > 0) {
@@ -59,10 +63,18 @@ export class XClaudeCliRunner {
             args.push(pRequest.SystemPrompt);
         }
 
+        const log = GetLogService();
         const parser = new XClaudeCliStreamParser(pRequest.OnChunk);
+        let rawLineCount = 0;
+        parser.SetRawLineHandler((line: string) => {
+            rawLineCount++;
+            if (rawLineCount <= 8)
+                log.Info(`Claude raw line #${rawLineCount}: ${line.slice(0, 400)}`);
+        });
 
         await this.RunStreaming(info.BinaryPath, args, pRequest.UserPayload, parser, pRequest);
         const final = parser.Finish();
+        log.Info(`Claude run: raw lines=${rawLineCount} textLen=${final.Text.length} stopReason=${final.StopReason ?? "?"} error=${final.Error ?? "none"}`);
         if (final.Error)
             throw new Error(`Claude Code CLI error: ${final.Error}`);
         return final;

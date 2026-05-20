@@ -506,14 +506,15 @@ describe('XORMDesignerEditorProvider', () => {
 
         it('should execute OrganizeTablesAIExecute command with model index on OrganizeTablesAIExecute message', async () => {
             const executeMock = vscode.commands.executeCommand as jest.MockedFunction<typeof vscode.commands.executeCommand>;
-            await provider.HandleMessage(mockPanel, mockState, { Type: 'OrganizeTablesAIExecute', Payload: { ModelIndex: 2 } });
-            expect(executeMock).toHaveBeenCalledWith('Dase.OrganizeTablesAIExecute', 2);
+            const layout = { RankDir: 'LR', Ranker: 'network-simplex', RankSep: 180, NodeSep: 55 };
+            await provider.HandleMessage(mockPanel, mockState, { Type: 'OrganizeTablesAIExecute', Payload: { ModelIndex: 2, Layout: layout } });
+            expect(executeMock).toHaveBeenCalledWith('Dase.OrganizeTablesAIExecute', 2, layout);
         });
 
         it('should default to model index 0 when ModelIndex is missing in OrganizeTablesAIExecute message', async () => {
             const executeMock = vscode.commands.executeCommand as jest.MockedFunction<typeof vscode.commands.executeCommand>;
             await provider.HandleMessage(mockPanel, mockState, { Type: 'OrganizeTablesAIExecute', Payload: {} });
-            expect(executeMock).toHaveBeenCalledWith('Dase.OrganizeTablesAIExecute', 0);
+            expect(executeMock).toHaveBeenCalledWith('Dase.OrganizeTablesAIExecute', 0, undefined);
         });
 
         it('should execute OrganizeTablesAIRevert command on AIOrganizeRevert message', async () => {

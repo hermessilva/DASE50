@@ -5,6 +5,8 @@ export interface ICompressedTable {
     name: string;
     fields: string[];
     isShadow: boolean;
+    w: number;
+    h: number;
 }
 
 export interface ICompressedReference {
@@ -18,7 +20,14 @@ export interface ICompressedHint {
     members: string[];
 }
 
+export interface ICompressedCanvas {
+    width: number;
+    height: number;
+    gridStep: number;
+}
+
 export interface ICompressedPayload {
+    canvas: ICompressedCanvas;
     tables: ICompressedTable[];
     references: ICompressedReference[];
     hints: ICompressedHint[];
@@ -32,6 +41,11 @@ export interface ICompressionResult {
 
 const MAX_FIELDS_PER_TABLE = 4;
 const DOMAIN_PREFIXES = ["SYS", "USR", "USER", "AUTH", "ORD", "ORDER", "PROD", "PRODUCT", "INV", "INVENTORY", "FIN", "FINANCE", "LOG", "AUDIT", "CFG", "CONFIG"];
+const HEADER_HEIGHT = 28;
+const ROW_HEIGHT = 16;
+const ROWS_PADDING = 12;
+const DEFAULT_W = 200;
+const GRID_STEP = 20;
 
 export class XClaudeCliPromptCompressor {
     static Compress(
@@ -47,12 +61,20 @@ export class XClaudeCliPromptCompressor {
             reverseMap.set(shortId, pTables[i].id);
         }
 
-        const compressedTables: ICompressedTable[] = pTables.map(t => ({
-            id: idMap.get(t.id)!,
-            name: t.name,
-            fields: XClaudeCliPromptCompressor.TrimFields(t.fields, t.name),
-            isShadow: t.isShadow
-        }));
+        const compressedTables: ICompressedTable[] = pTables.map(t => {
+            const w = t.width || DEFAULT_W;
+            const visualH = t.fieldCount > 0
+                ? HEADER_HEIGHT + t.fieldCount * ROW_HEIGHT + ROWS_PADDING
+                : HEADER_HEIGHT;
+            return {
+                id: idMap.get(t.id)!,
+                name: t.name,
+                fields: XClaudeCliPromptCompressor.TrimFields(t.fields, t.name),
+                isShadow: t.isShadow,
+                w,
+                h: visualH
+            };
+        });
 
         const nameToShort = new Map<string, string>();
         for (const t of pTables)
@@ -69,8 +91,16 @@ export class XClaudeCliPromptCompressor {
 
         const hints = XClaudeCliPromptCompressor.BuildHints(pTables, pReferences, nameToShort);
 
+        const totalArea = compressedTables.reduce((s, t) => s + t.w * t.h, 0);
+        const sideEstimate = Math.ceil(Math.sqrt(totalArea * 3));
+        const canvas: ICompressedCanvas = {
+            width: Math.max(1600, Math.round(sideEstimate / GRID_STEP) * GRID_STEP),
+            height: Math.max(1000, Math.round(sideEstimate * 0.75 / GRID_STEP) * GRID_STEP),
+            gridStep: GRID_STEP
+        };
+
         return {
-            Payload: { tables: compressedTables, references: compressedRefs, hints },
+            Payload: { canvas, tables: compressedTables, references: compressedRefs, hints },
             IdMap: idMap,
             ReverseMap: reverseMap
         };
