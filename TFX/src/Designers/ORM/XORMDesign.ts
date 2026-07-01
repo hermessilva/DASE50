@@ -516,6 +516,100 @@ export class XORMDesign extends XDesign
         const anchors = this.ComputeAnchorDistribution(references, tables);
         for (const ref of references)
             this.RouteReference(ref, tables, anchors.get(ref.ID));
+
+        this.DeOverlapSegments(references);
+    }
+
+    /**
+     * Pulls apart collinear, overlapping interior segments of different
+     * references into distinct parallel "lanes" so lines no longer stack on
+     * top of each other. Only interior segments (those with a corner on both
+     * ends) are shifted — the first/last stubs stay glued to their table
+     * anchors. Endpoints of the shifted segment slide along their perpendicular
+     * neighbours, so orthogonality is preserved.
+     *
+     * Runs only from a full re-route (AlignLines); a single-table move never
+     * calls this, so untouched references keep their positions.
+     */
+    private DeOverlapSegments(pRefs: XORMReference[]): void
+    {
+        const laneGap = XORMMetrics.RouterGap / 2;
+        const tol = 1.5;
+
+        interface ISeg {
+            Ref: XORMReference;
+            I: number;          // points[I] -> points[I+1]
+            Vertical: boolean;
+            Fixed: number;      // shared coordinate (X for vertical, Y for horizontal)
+            Lo: number;
+            Hi: number;
+        }
+
+        const segs: ISeg[] = [];
+        for (const ref of pRefs)
+        {
+            const pts = ref.Points;
+            if (!pts || pts.length < 4)
+                continue;
+            // Interior segments only: skip the first (i=0) and last (i=len-2) stubs.
+            for (let i = 1; i < pts.length - 2; i++)
+            {
+                const a = pts[i];
+                const b = pts[i + 1];
+                const vertical = Math.abs(a.X - b.X) < tol;
+                const horizontal = Math.abs(a.Y - b.Y) < tol;
+                if (vertical === horizontal)
+                    continue; // diagonal or zero-length — leave untouched
+                if (vertical)
+                    segs.push({ Ref: ref, I: i, Vertical: true, Fixed: a.X, Lo: Math.min(a.Y, b.Y), Hi: Math.max(a.Y, b.Y) });
+                else
+                    segs.push({ Ref: ref, I: i, Vertical: false, Fixed: a.Y, Lo: Math.min(a.X, b.X), Hi: Math.max(a.X, b.X) });
+            }
+        }
+
+        const shiftSeg = (pSeg: ISeg, pDelta: number): void =>
+        {
+            const pts = pSeg.Ref.Points;
+            const a = pts[pSeg.I];
+            const b = pts[pSeg.I + 1];
+            if (pSeg.Vertical) { a.X += pDelta; b.X += pDelta; }
+            else { a.Y += pDelta; b.Y += pDelta; }
+        };
+
+        const process = (pGroup: ISeg[]): void =>
+        {
+            // Bucket by shared coordinate.
+            pGroup.sort((a, b) => a.Fixed - b.Fixed);
+            let i = 0;
+            while (i < pGroup.length)
+            {
+                let j = i + 1;
+                while (j < pGroup.length && Math.abs(pGroup[j].Fixed - pGroup[i].Fixed) <= tol)
+                    j++;
+                const bucket = pGroup.slice(i, j);
+                i = j;
+                if (bucket.length < 2)
+                    continue;
+                // Within a coincident bucket keep only those whose spans overlap;
+                // spread them symmetrically around the shared coordinate.
+                bucket.sort((a, b) => a.Lo - b.Lo);
+                const overlapping: ISeg[] = [];
+                for (const seg of bucket)
+                {
+                    const hits = overlapping.some(o => seg.Lo < o.Hi - tol && seg.Hi > o.Lo + tol);
+                    if (overlapping.length === 0 || hits)
+                        overlapping.push(seg);
+                }
+                if (overlapping.length < 2)
+                    continue;
+                const k = overlapping.length;
+                for (let m = 0; m < k; m++)
+                    shiftSeg(overlapping[m], (m - (k - 1) / 2) * laneGap);
+            }
+        };
+
+        process(segs.filter(s => s.Vertical));
+        process(segs.filter(s => !s.Vertical));
     }
 
     /**

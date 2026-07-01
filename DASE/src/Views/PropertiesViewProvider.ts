@@ -3,6 +3,7 @@ import { GetSelectionService } from "../Services/SelectionService";
 import { XPropertyItem } from "../Models/PropertyItem";
 import { XORMDesignerEditorProvider } from "../Designers/ORM/ORMDesignerEditorProvider";
 import { XDesignerSelection } from "../Models/DesignerSelection";
+import { GetLogService } from "../Services/LogService";
 
 export class XPropertiesViewProvider implements vscode.WebviewViewProvider {
     // Context kept for future features (theming, storage)
@@ -22,6 +23,7 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider {
         // Register selection listener immediately, not when webview resolves
         const selectionService = GetSelectionService();
         selectionService.OnSelectionChanged(async (pSelection: XDesignerSelection) => {
+            GetLogService().Info(`Properties: selection changed → ${pSelection.PrimaryID ?? "none"}`);
             this._ElementID = pSelection.PrimaryID;
 
             if (pSelection.PrimaryID) {
@@ -68,6 +70,8 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider {
     }
 
     resolveWebviewView(pWebviewView: vscode.WebviewView, _pContext: vscode.WebviewViewResolveContext, _pToken: vscode.CancellationToken): void {
+        const log = GetLogService();
+        log.Info("Properties: resolveWebviewView start");
         this._View = pWebviewView;
 
         pWebviewView.webview.options = {
@@ -75,8 +79,16 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider {
         };
 
         // Always set fresh HTML content
-        const htmlContent = this.GetHtmlContent();
-        pWebviewView.webview.html = htmlContent;
+        let htmlContent: string;
+        try {
+            htmlContent = this.GetHtmlContent();
+            pWebviewView.webview.html = htmlContent;
+            log.Info(`Properties: empty HTML set (${htmlContent.length} chars)`);
+        }
+        catch (err) {
+            log.Error("Properties: GetHtmlContent failed", err);
+            pWebviewView.webview.html = "<html><body style='font-family:sans-serif;padding:8px'>DASE Properties failed to render. See the DASE output log.</body></html>";
+        }
 
         // Handle view disposal
         pWebviewView.onDidDispose(() => {
@@ -91,11 +103,238 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider {
 
         // Update view with current properties (in case selection happened before resolve)
         this.UpdateView();
+        log.Info("Properties: resolveWebviewView done");
 
-        pWebviewView.webview.onDidReceiveMessage((pMsg: { Type: string; PropertyKey?: string; Value?: unknown }) => {
-            if (pMsg.Type === "UpdateProperty" && pMsg.PropertyKey !== undefined)
-                this.OnPropertyChanged(pMsg.PropertyKey, pMsg.Value);
+        pWebviewView.webview.onDidReceiveMessage((pMsg: { Type: string; PropertyKey?: string; Value?: unknown; Uri?: string; Message?: string; Source?: string; Line?: number }) => {
+            if (pMsg.Type === "WebviewError") {
+                GetLogService().Error(`Properties WEBVIEW ERROR: ${pMsg.Message} (${pMsg.Source ?? ""}:${pMsg.Line ?? 0})`);
+                return;
+            }
+            GetLogService().Info(`Properties: message received → ${pMsg.Type}`);
+            switch (pMsg.Type) {
+                case "WebviewReady":
+                    break;
+                case "UpdateProperty":
+                    if (pMsg.PropertyKey !== undefined)
+                        this.OnPropertyChanged(pMsg.PropertyKey, pMsg.Value);
+                    break;
+                case "OpenSettings":
+                    void vscode.commands.executeCommand("workbench.action.openSettings", "dase");
+                    break;
+                case "RequestModelFiles":
+                    void this.SendModelFiles();
+                    break;
+                case "OpenModel":
+                    if (pMsg.Uri)
+                        void this.OpenModelFile(pMsg.Uri);
+                    break;
+            }
         });
+    }
+
+    /** Find all .dsorm models in the workspace and push them to the explorer tab. */
+    private async SendModelFiles(): Promise<void> {
+        if (!this._View)
+            return;
+        try {
+            const uris = await vscode.workspace.findFiles("**/*.dsorm", "**/node_modules/**", 500);
+            uris.sort((a, b) => a.fsPath.localeCompare(b.fsPath));
+            const folders = vscode.workspace.workspaceFolders ?? [];
+            const files = uris.map(u => {
+                const folder = folders.find(f => u.fsPath.startsWith(f.uri.fsPath));
+                const rel = folder ? vscode.workspace.asRelativePath(u, false) : u.fsPath;
+                const name = rel.replace(/\\/g, "/");
+                return { name, uri: u.toString() };
+            });
+            this._View.webview.postMessage({ Type: "ModelFiles", Files: files });
+        }
+        catch {
+            this._View.webview.postMessage({ Type: "ModelFiles", Files: [] });
+        }
+    }
+
+    /** Open a .dsorm file in the ORM Designer custom editor. */
+    private async OpenModelFile(pUri: string): Promise<void> {
+        try {
+            const uri = vscode.Uri.parse(pUri);
+            await vscode.commands.executeCommand("vscode.openWith", uri, "Dase.ORMDesigner");
+        }
+        catch (err) {
+            void vscode.window.showErrorMessage(`Could not open model: ${err}`);
+        }
+    }
+
+    // ─── HubView chrome (toolbar + tabs + explorer) ─────────────────────────
+    // Shared markup/styles/scripts injected into BOTH HTML templates so the
+    // toolbar, tab control, and the .dsorm explorer are identical regardless of
+    // whether a design element is currently selected.
+
+    /** CSS for the toolbar, tab control, and explorer. Injected before </style>. */
+    private ChromeCss(): string {
+        return `
+        .dase-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 6px;
+            border-bottom: 1px solid var(--vscode-panel-border);
+            background: var(--vscode-sideBarSectionHeader-background, var(--vscode-panel-background));
+        }
+        .dase-tool-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            color: var(--vscode-foreground);
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            padding: 2px 8px;
+            cursor: pointer;
+        }
+        .dase-tool-btn:hover {
+            background: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2));
+            border-color: var(--vscode-panel-border);
+        }
+        .dase-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--vscode-panel-border);
+        }
+        .dase-tab {
+            font-size: 11px;
+            color: var(--vscode-foreground);
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid transparent;
+            padding: 5px 12px;
+            cursor: pointer;
+            opacity: 0.7;
+        }
+        .dase-tab:hover { opacity: 1; }
+        .dase-tab-active {
+            opacity: 1;
+            border-bottom-color: var(--vscode-activityBar-activeBorder, #007acc);
+        }
+        .dase-pane { display: none; }
+        .dase-pane-active { display: block; }
+        .dase-explorer-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 8px;
+            border-bottom: 1px solid var(--vscode-panel-border);
+        }
+        .dase-explorer-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            opacity: 0.8;
+        }
+        .dase-explorer-list { padding: 4px 0; }
+        .dase-explorer-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            cursor: pointer;
+            font-size: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .dase-explorer-item:hover { background: var(--vscode-list-hoverBackground); }
+        .dase-explorer-icon { opacity: 0.7; flex-shrink: 0; }
+        .dase-explorer-name { overflow: hidden; text-overflow: ellipsis; }
+        .dase-explorer-empty {
+            padding: 10px 12px;
+            font-size: 12px;
+            opacity: 0.6;
+        }`;
+    }
+
+    /** Toolbar + tab headers. Injected right after <body>. */
+    private ChromeTopHtml(): string {
+        return `    <div class="dase-toolbar">
+        <button class="dase-tool-btn" id="dase-btn-config" title="Open DASE settings">&#9881; Config</button>
+    </div>
+    <div class="dase-tabs">
+        <button class="dase-tab dase-tab-active" data-tab="properties">Properties</button>
+        <button class="dase-tab" data-tab="explorer">Explorer</button>
+    </div>`;
+    }
+
+    /** Explorer tab pane. Injected after the properties pane. */
+    private ExplorerPaneHtml(): string {
+        return `    <div id="dase-pane-explorer" class="dase-pane">
+        <div class="dase-explorer-toolbar">
+            <span class="dase-explorer-title">ORM Models (*.dsorm)</span>
+            <button class="dase-tool-btn" id="dase-btn-refresh" title="Refresh">&#8635;</button>
+        </div>
+        <div id="dase-explorer-list" class="dase-explorer-list">
+            <div class="dase-explorer-empty">Loading&hellip;</div>
+        </div>
+    </div>`;
+    }
+
+    /** Tab-switching, config-button, and explorer scripts. Injected before </script>. */
+    private ChromeJs(): string {
+        return `
+        window.addEventListener('error', function(ev) {
+            try { vscode.postMessage({ Type: 'WebviewError', Message: (ev && ev.message) ? ev.message : String(ev), Source: (ev && ev.filename) || '', Line: (ev && ev.lineno) || 0 }); } catch (e) {}
+        });
+        window.addEventListener('unhandledrejection', function(ev) {
+            try { vscode.postMessage({ Type: 'WebviewError', Message: 'unhandledrejection: ' + ((ev && ev.reason) ? String(ev.reason) : '') }); } catch (e) {}
+        });
+        try { vscode.postMessage({ Type: 'WebviewReady' }); } catch (e) {}
+        (function() {
+            function activateTab(pName) {
+                document.querySelectorAll('.dase-tab').forEach(function(t) {
+                    t.classList.toggle('dase-tab-active', t.getAttribute('data-tab') === pName);
+                });
+                document.querySelectorAll('.dase-pane').forEach(function(p) {
+                    p.classList.toggle('dase-pane-active', p.id === 'dase-pane-' + pName);
+                });
+                if (pName === 'explorer') requestModelFiles();
+            }
+            document.querySelectorAll('.dase-tab').forEach(function(t) {
+                t.addEventListener('click', function() { activateTab(t.getAttribute('data-tab')); });
+            });
+            var cfg = document.getElementById('dase-btn-config');
+            if (cfg) cfg.addEventListener('click', function() { vscode.postMessage({ Type: 'OpenSettings' }); });
+            var rf = document.getElementById('dase-btn-refresh');
+            if (rf) rf.addEventListener('click', requestModelFiles);
+            function requestModelFiles() { vscode.postMessage({ Type: 'RequestModelFiles' }); }
+            function renderModelFiles(pFiles) {
+                var list = document.getElementById('dase-explorer-list');
+                if (!list) return;
+                if (!pFiles || pFiles.length === 0) {
+                    list.innerHTML = '<div class="dase-explorer-empty">No .dsorm models found in the workspace.</div>';
+                    return;
+                }
+                list.innerHTML = '';
+                pFiles.forEach(function(f) {
+                    var item = document.createElement('div');
+                    item.className = 'dase-explorer-item';
+                    item.title = f.uri;
+                    var icon = document.createElement('span');
+                    icon.className = 'dase-explorer-icon';
+                    icon.textContent = '▦';
+                    var name = document.createElement('span');
+                    name.className = 'dase-explorer-name';
+                    name.textContent = f.name;
+                    item.appendChild(icon);
+                    item.appendChild(name);
+                    item.addEventListener('click', function() {
+                        vscode.postMessage({ Type: 'OpenModel', Uri: f.uri });
+                    });
+                    list.appendChild(item);
+                });
+            }
+            window.addEventListener('message', function(e) {
+                var m = e.data;
+                if (m && m.Type === 'ModelFiles') renderModelFiles(m.Files);
+            });
+        })();`;
     }
 
     async OnPropertyChanged(pPropertyKey: string, pValue: unknown): Promise<void> {
@@ -205,6 +444,7 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider {
 
     UpdateView(): void {
         if (this._View) {
+            GetLogService().Info(`Properties: UpdateView (element=${this._ElementID ?? "none"}, props=${this._Properties.length})`);
             // Serialize properties to plain objects for webview transfer
             const serializedProperties = this._Properties.map(p => ({
                 Key: p.Key,
@@ -621,11 +861,16 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider {
             min-height: 13px;
             padding: 1px 4px 0;
         }
+${this.ChromeCss()}
     </style>
 </head>
 <body>
+${this.ChromeTopHtml()}
+    <div id="dase-pane-properties" class="dase-pane dase-pane-active">
     <div class="properties-container" id="properties-container">
     </div>
+    </div>
+${this.ExplorerPaneHtml()}
     <script>
         const vscode = acquireVsCodeApi();
         let currentElementID = ${elementId};
@@ -816,7 +1061,7 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider {
             
             if (!pProperties || pProperties.length === 0)
             {
-                container.innerHTML = '<div class="no-selection">No element selected</div>';
+                container.innerHTML = '';
                 return;
             }
 
@@ -1260,6 +1505,7 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider {
             div.textContent = String(pText);
             return div.innerHTML;
         }
+${this.ChromeJs()}
     </script>
 </body>
 </html>`;
@@ -1570,12 +1816,16 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider {
             min-height: 13px;
             padding: 1px 4px 0;
         }
+${this.ChromeCss()}
     </style>
 </head>
 <body>
+${this.ChromeTopHtml()}
+    <div id="dase-pane-properties" class="dase-pane dase-pane-active">
     <div class="properties-container" id="properties-container">
-        <div class="no-selection">No element selected</div>
     </div>
+    </div>
+${this.ExplorerPaneHtml()}
     <script>
         const vscode = acquireVsCodeApi();
         let currentElementID = null;
@@ -1762,7 +2012,7 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider {
             
             if (!pProperties || pProperties.length === 0)
             {
-                container.innerHTML = '<div class="no-selection">No element selected</div>';
+                container.innerHTML = '';
                 return;
             }
 
@@ -2196,6 +2446,7 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider {
             div.textContent = String(pText);
             return div.innerHTML;
         }
+${this.ChromeJs()}
     </script>
 </body>
 </html>`;

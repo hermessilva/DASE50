@@ -64,14 +64,14 @@ describe('XORMDesignerEditorProvider', () => {
                 Document: { uri: Uri.file('/test/model.dsorm') },
                 IssueService: { SetIssues: jest.fn(), OnIssuesChanged: jest.fn() },
                 SelectionService: { HasSelection: false, PrimaryID: null },
-                Bridge: { LastSyncMutated: false }
+                Bridge: { LastSyncMutated: false, AlignLines: jest.fn().mockReturnValue(true) }
             };
         });
 
         it('should handle DesignerReady message', async () => {
             await provider.HandleMessage(mockPanel, mockState, { Type: 'DesignerReady' });
 
-            expect(mockState.AlignLines).toHaveBeenCalled();
+            expect(mockState.Bridge.AlignLines).toHaveBeenCalled();
             expect(mockState.GetModelData).toHaveBeenCalled();
             expect(mockPanel.webview.postMessage).toHaveBeenCalled();
         });
@@ -86,7 +86,7 @@ describe('XORMDesignerEditorProvider', () => {
 
             await provider.HandleMessage(mockPanel, mockState, { Type: 'DesignerReady' });
 
-            expect(mockState.AlignLines).toHaveBeenCalled();
+            expect(mockState.Bridge.AlignLines).toHaveBeenCalled();
             expect(mockState.GetModelData).toHaveBeenCalled();
             expect(mockPanel.webview.postMessage).toHaveBeenCalled();
         });
@@ -98,7 +98,7 @@ describe('XORMDesignerEditorProvider', () => {
 
             await provider.HandleMessage(mockPanel, mockState, { Type: 'DesignerReady' });
 
-            expect(mockState.AlignLines).toHaveBeenCalled();
+            expect(mockState.Bridge.AlignLines).toHaveBeenCalled();
             expect(mockState.GetModelData).toHaveBeenCalled();
             expect(mockPanel.webview.postMessage).toHaveBeenCalled();
         });
@@ -111,7 +111,7 @@ describe('XORMDesignerEditorProvider', () => {
 
             await provider.HandleMessage(mockPanel, mockState, { Type: 'DesignerReady' });
 
-            expect(mockState.AlignLines).toHaveBeenCalled();
+            expect(mockState.Bridge.AlignLines).toHaveBeenCalled();
             expect(mockState.GetModelData).toHaveBeenCalled();
             expect(mockPanel.webview.postMessage).toHaveBeenCalled();
         });
@@ -127,7 +127,7 @@ describe('XORMDesignerEditorProvider', () => {
 
             await provider.HandleMessage(mockPanel, mockState, { Type: 'DesignerReady' });
 
-            expect(mockState.AlignLines).toHaveBeenCalled();
+            expect(mockState.Bridge.AlignLines).toHaveBeenCalled();
             expect(mockState.GetModelData).toHaveBeenCalled();
             expect(mockPanel.webview.postMessage).toHaveBeenCalled();
         });
@@ -567,6 +567,7 @@ describe('XORMDesignerEditorProvider', () => {
                 GetProperties: jest.fn().mockResolvedValue([{ Key: 'Name', Value: 'Test' }]),
                 Validate: jest.fn().mockResolvedValue([]),
                 AlignLines: jest.fn().mockReturnValue({ Success: true }),
+                Bridge: { LastSyncMutated: false, AlignLines: jest.fn().mockReturnValue(true) },
                 IssueService: {
                     OnIssuesChanged: jest.fn((cb) => {
                         onIssuesChangedCallback = cb;
@@ -609,7 +610,7 @@ describe('XORMDesignerEditorProvider', () => {
                 await onMessageCallback({ Type: 'DesignerReady' });
             }
 
-            expect(mockState.AlignLines).toHaveBeenCalled();
+            expect(mockState.Bridge.AlignLines).toHaveBeenCalled();
             expect(mockState.GetModelData).toHaveBeenCalled();
         });
 

@@ -33,12 +33,79 @@ export interface XRouterResult
 interface IGridNode
 {
     Key: string;
+    Ix: number;
+    Iy: number;
     X: number;
     Y: number;
     Dir: number;
     G: number;
     F: number;
     Parent: IGridNode | null;
+}
+
+/**
+ * Binary min-heap keyed on node F cost. Replaces a per-iteration Array.sort of
+ * the whole open set (which made A* O(n² log n) and froze the extension host on
+ * large diagrams). Push/pop are O(log n).
+ */
+class XNodeHeap
+{
+    private _Items: IGridNode[] = [];
+
+    public get Size(): number
+    {
+        return this._Items.length;
+    }
+
+    public Push(pNode: IGridNode): void
+    {
+        const items = this._Items;
+        items.push(pNode);
+        let i = items.length - 1;
+        while (i > 0)
+        {
+            const parent = (i - 1) >> 1;
+            if (items[parent].F <= items[i].F)
+                break;
+            const tmp = items[parent];
+            items[parent] = items[i];
+            items[i] = tmp;
+            i = parent;
+        }
+    }
+
+    public Pop(): IGridNode | undefined
+    {
+        const items = this._Items;
+        const n = items.length;
+        if (n === 0)
+            return undefined;
+        const top = items[0];
+        const last = items.pop()!;
+        if (n > 1)
+        {
+            items[0] = last;
+            let i = 0;
+            const size = items.length;
+            for (;;)
+            {
+                const left = 2 * i + 1;
+                const right = left + 1;
+                let smallest = i;
+                if (left < size && items[left].F < items[smallest].F)
+                    smallest = left;
+                if (right < size && items[right].F < items[smallest].F)
+                    smallest = right;
+                if (smallest === i)
+                    break;
+                const tmp = items[smallest];
+                items[smallest] = items[i];
+                items[i] = tmp;
+                i = smallest;
+            }
+        }
+        return top;
+    }
 }
 
 const EPS = 0.5;
@@ -366,11 +433,13 @@ export class XRouter
         const ex = pXs[endIx];
         const ey = pYs[endIy];
 
-        const open: IGridNode[] = [];
+        const open = new XNodeHeap();
         const closed = new Map<string, number>();
 
         const startNode: IGridNode = {
             Key: this.NodeKey(startIx, startIy, pStartDir),
+            Ix: startIx,
+            Iy: startIy,
             X: pXs[startIx],
             Y: pYs[startIy],
             Dir: pStartDir,
@@ -378,18 +447,17 @@ export class XRouter
             F: this.Heuristic(pXs[startIx], pYs[startIy], ex, ey),
             Parent: null
         };
-        open.push(startNode);
+        open.Push(startNode);
 
-        while (open.length > 0)
+        while (open.Size > 0)
         {
             this.Steps++;
             if (this.Steps > this.MaxNodes)
                 return null;
 
-            open.sort((a, b) => a.F - b.F);
-            const cur = open.shift()!;
-            const curIx = this.NearestIndex(pXs, cur.X);
-            const curIy = this.NearestIndex(pYs, cur.Y);
+            const cur = open.Pop()!;
+            const curIx = cur.Ix;
+            const curIy = cur.Iy;
 
             if (curIx === endIx && curIy === endIy)
                 return this.Reconstruct(cur);
@@ -416,8 +484,10 @@ export class XRouter
                 if (oldG !== undefined && oldG <= g)
                     continue;
 
-                open.push({
+                open.Push({
                     Key: key,
+                    Ix: nbr.Ix,
+                    Iy: nbr.Iy,
                     X: nx,
                     Y: ny,
                     Dir: stepDir,

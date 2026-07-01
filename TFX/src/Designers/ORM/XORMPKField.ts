@@ -1,4 +1,5 @@
 import { XORMField } from "./XORMField.js";
+import type { XORMTable } from "./XORMTable.js";
 
 /**
  * XORMPKField - Campo de Chave Primária para tabelas ORM
@@ -87,11 +88,30 @@ export class XORMPKField extends XORMField
     }
 
     /**
-     * Trava o DataType, impedindo alterações futuras
+     * Trava o DataType, impedindo alterações externas.
+     * Após travado, o tipo só pode ser alterado pela própria tabela
+     * (via {@link SetDataTypeFromTable}), que é a fonte da verdade (XORMTable.PKType).
      */
     public LockDataType(): void
     {
         this._DataTypeLocked = true;
+    }
+
+    /**
+     * Altera o DataType do campo PK a pedido da tabela proprietária.
+     *
+     * Único caminho que ignora o lock — chamado exclusivamente pelo setter de
+     * XORMTable.PKType. A autoria é verificada exigindo que o chamador seja a
+     * tabela que possui este campo como PK (pCaller.GetPKField() === this),
+     * garantindo que o tipo da PK só muda através da tabela.
+     */
+    public SetDataTypeFromTable(pValue: string, pCaller: XORMTable): void
+    {
+        if (pCaller?.GetPKField?.() !== this)
+            throw new Error("XORMPKField DataType can only be changed by its owning table.");
+
+        super.DataType = pValue;
+        this.UpdateAutoIncrementForDataType(pValue);
     }
 
     /**

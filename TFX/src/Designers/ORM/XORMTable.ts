@@ -5,6 +5,8 @@ import { XGuid } from "../../Core/XGuid.js";
 import { XORMField } from "./XORMField.js";
 import { XORMPKField } from "./XORMPKField.js";
 import { XORMStateField } from "./XORMStateField.js";
+import type { XORMDesign } from "./XORMDesign.js";
+import type { XORMReference } from "./XORMReference.js";
 
 export interface XICreateFieldOptions
 {
@@ -113,6 +115,35 @@ export class XORMTable extends XRectangle
     public set PKType(pValue: string)
     {
         this.SetValue(XORMTable.PKTypeProp, pValue);
+        // PKType é a fonte da verdade: propaga para o campo PK e para todas as
+        // FKs que dependem desta tabela.
+        this.PropagatePKType(pValue);
+    }
+
+    /**
+     * Empurra o PKType da tabela para baixo:
+     *   - campo PK (XORMPKField) — único caminho que altera seu DataType travado;
+     *   - todas as FKs (em qualquer tabela do design) que referenciam esta tabela.
+     */
+    private PropagatePKType(pType: string): void
+    {
+        const pkField = this.GetPKField();
+        if (pkField !== null)
+            pkField.SetDataTypeFromTable(pType, this);
+
+        const design = this.ParentNode as XORMDesign | null;
+        if (!design || typeof design.GetReferences !== "function" || typeof design.FindFieldByID !== "function")
+            return;
+
+        for (const ref of design.GetReferences() as XORMReference[])
+        {
+            if (ref.Target !== this.ID)
+                continue;
+
+            const fkField = design.FindFieldByID(ref.Source);
+            if (fkField !== null && fkField.DataType !== pType)
+                fkField.DataType = pType;
+        }
     }
 
     public get IsShadow(): boolean
@@ -275,22 +306,24 @@ export class XORMTable extends XRectangle
         const pkField = new XORMPKField();
         pkField.ID = XGuid.NewValue();
 
-        // Aplica opções se fornecidas
         if (pOptions?.Name)
             pkField.Name = pOptions.Name;
-        if (pOptions?.DataType)
-            pkField.DataType = pOptions.DataType;
+
+        // Insere o PKField como primeiro filho ANTES de travar/definir o tipo,
+        // para que GetPKField() o reconheça e a propagação de PKType funcione.
+        this.InsertChildAt(pkField, 0);
+
+        // Trava o DataType: a partir daqui só a tabela (via PKType) altera o tipo.
+        pkField.LockDataType();
+
+        // PKType é a fonte da verdade. Define o tipo desejado (opção ou default
+        // atual da tabela) e propaga para o campo PK travado.
+        this.PKType = pOptions?.DataType ?? this.PKType;
+
+        // Override explícito de auto-increment vence o default derivado do tipo.
         if (pOptions?.IsAutoIncrement !== undefined)
             pkField.IsAutoIncrement = pOptions.IsAutoIncrement;
 
-        // Trava o DataType após configuração inicial
-        pkField.LockDataType();
-
-        // Sincroniza o PKType da tabela com o DataType do campo
-        this.PKType = pkField.DataType;
-
-        // Insere o PKField como primeiro filho
-        this.InsertChildAt(pkField, 0);
         this.UpdateFieldIndexes();
         this.UpdateHeightForFields();
         return pkField;

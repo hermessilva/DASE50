@@ -13,6 +13,7 @@
         AddTable: "AddTable",
         AddField: "AddField",
         MoveElement: "MoveElement",
+        MoveElements: "MoveElements",
         ReorderField: "ReorderField",
         DragDropAddRelation: "DragDropAddRelation",
         DeleteSelected: "DeleteSelected",
@@ -66,6 +67,8 @@
     let _Model = { DesignID: null, Tables: [], References: [] };
     let _SelectedIDs = [];
     let _DragState = null;
+    let _Marquee = null; // { startX, startY, rectEl, mode } in canvas coords
+    let _Search = { Active: false, Query: "", Matches: [], Index: -1 }; // table name search
     let _RelationDragState = null;
     let _FieldDragState = null;
     let _ContextMenuPosition = { X: 0, Y: 0 };
@@ -146,6 +149,7 @@
         SetupContextMenu();
         SetupZoomPan();
         SetupMessageHandler();
+        SetupTableSearch();
         SendMessage(XMessageType.DesignerReady, {});
     }
 
@@ -485,13 +489,6 @@
         ApplyViewport();
     }
 
-    /** Reset zoom to 100 % and pan to origin. */
-    function ZoomReset() {
-        _Zoom = 1.0;
-        _PanX = 0;
-        _PanY = 0;
-        ApplyViewport();
-    }
 
     function SetupZoomPan() {
         const ZOOM_FACTOR = 1.1;
@@ -524,10 +521,18 @@
                 _CanvasContainer.classList.add("space-pan");
             }
 
-            // Ctrl+0 → reset to 100 %
-            if (e.code === "Digit0" && e.ctrlKey) {
+            // Ctrl+0 → reset zoom to 100 % (no zoom), keeping the current view centre
+            // so the canvas doesn't jump. Works with both the top-row 0 and numpad 0.
+            if ((e.code === "Digit0" || e.code === "Numpad0") && e.ctrlKey) {
                 e.preventDefault();
-                ZoomReset();
+                const r = _CanvasContainer.getBoundingClientRect();
+                ZoomAtPoint(r.left + r.width / 2, r.top + r.height / 2, 1 / _Zoom);
+            }
+
+            // Ctrl+F → open the table search box
+            if (e.code === "KeyF" && e.ctrlKey && !e.shiftKey && !e.altKey) {
+                e.preventDefault();
+                OpenTableSearch();
             }
 
             // Ctrl+= / Ctrl++ → zoom in
@@ -604,6 +609,12 @@
 
     function SetupCanvasEvents() {
         _Canvas.addEventListener("click", function (e) {
+            // A marquee drag just finished → swallow the synthetic click so it
+            // doesn't clobber the freshly computed selection.
+            if (_Marquee && _Marquee.Consumed) {
+                _Marquee = null;
+                return;
+            }
             if (e.target === _Canvas || e.target.id === "relations-layer" || e.target.id === "tables-layer") {
                 // Select the Design when clicking on the background
                 if (_Model.DesignID)
@@ -613,6 +624,8 @@
             }
         });
 
+        SetupMarquee();
+
         _CanvasContainer.addEventListener("contextmenu", function (e) {
             e.preventDefault();
 
@@ -621,11 +634,217 @@
         });
     }
 
+    // ── Computed table bounding box (canvas/model coords). Mirrors the geometry
+    //    used by CreateTableElement so the marquee hit-test is pixel-precise. ──
+    function GetTableBBox(pTable) {
+        const w = pTable.Width || 200;
+        const isShadow = !!pTable.IsShadow;
+        const fieldCount = isShadow ? 0 : ((pTable.Fields && pTable.Fields.length) || 0);
+        const h = 28 + (fieldCount > 0 ? fieldCount * 16 + 12 : 0);
+        return { x: pTable.X, y: pTable.Y, w: w, h: h };
+    }
+
+    function RectContainsBBox(pR, pB) {
+        return pB.x >= pR.x1 && pB.y >= pR.y1 &&
+               pB.x + pB.w <= pR.x2 && pB.y + pB.h <= pR.y2;
+    }
+
+    function RectIntersectsBBox(pR, pB) {
+        return pB.x < pR.x2 && pB.x + pB.w > pR.x1 &&
+               pB.y < pR.y2 && pB.y + pB.h > pR.y1;
+    }
+
+    // ── Rubber-band (marquee) selection ──────────────────────────────────────
+    //  Direction rule (CAD convention):
+    //   • drag DOWNWARD  → "contain"  : only tables fully inside the rectangle.
+    //   • drag UPWARD    → "crossing" : every table touching the rectangle.
+    //  Shift/Ctrl unions with the current selection; otherwise it replaces it.
+    //  A threshold avoids hijacking a plain background click. Esc cancels.
+    function SetupMarquee() {
+        const THRESHOLD = 4; // client px before the marquee actually starts
+
+        _Canvas.addEventListener("mousedown", function (e) {
+            if (e.button !== 0) return;
+            if (_SpaceDown) return; // space-pan owns the gesture
+            // Only start on empty canvas background, never on a table/field/anchor.
+            if (!(e.target === _Canvas || e.target.id === "relations-layer" || e.target.id === "tables-layer"))
+                return;
+
+            _Marquee = null; // clear any stale consumed flag from a prior gesture
+            const startClientX = e.clientX;
+            const startClientY = e.clientY;
+            const startCanvas = ClientToCanvas(startClientX, startClientY);
+            const additive = e.shiftKey || e.ctrlKey;
+            const baseSelection = additive ? _SelectedIDs.slice() : [];
+
+            let started = false;
+            let rectEl = null;
+
+            const onMove = function (me) {
+                const dxC = Math.abs(me.clientX - startClientX);
+                const dyC = Math.abs(me.clientY - startClientY);
+                if (!started) {
+                    if (dxC < THRESHOLD && dyC < THRESHOLD) return;
+                    started = true;
+                    rectEl = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                    rectEl.setAttribute("class", "orm-marquee");
+                    _Canvas.appendChild(rectEl);
+                    _Marquee = { rectEl: rectEl, Consumed: false };
+                }
+
+                const cur = ClientToCanvas(me.clientX, me.clientY);
+                const upward = me.clientY < startClientY; // crossing when dragging up
+                const r = NormalizeRect(startCanvas.x, startCanvas.y, cur.x, cur.y);
+
+                rectEl.setAttribute("x", r.x1);
+                rectEl.setAttribute("y", r.y1);
+                rectEl.setAttribute("width", r.x2 - r.x1);
+                rectEl.setAttribute("height", r.y2 - r.y1);
+                rectEl.classList.toggle("orm-marquee-crossing", upward);
+                rectEl.classList.toggle("orm-marquee-contain", !upward);
+
+                // Live preview of which tables will be picked.
+                const hit = HitTestTables(r, upward);
+                PreviewMarqueeSelection(baseSelection, hit);
+            };
+
+            const finish = function (me, cancelled) {
+                document.removeEventListener("mousemove", onMove);
+                document.removeEventListener("mouseup", onUp);
+                document.removeEventListener("keydown", onKey, true);
+                if (!started) { _Marquee = null; return; }
+                if (rectEl && rectEl.parentNode) rectEl.parentNode.removeChild(rectEl);
+
+                if (cancelled) {
+                    // Restore the visual selection we were previewing over.
+                    UpdateSelectionVisuals();
+                    _Marquee = null;
+                    return;
+                }
+
+                const cur = ClientToCanvas(me.clientX, me.clientY);
+                const upward = me.clientY < startClientY;
+                const r = NormalizeRect(startCanvas.x, startCanvas.y, cur.x, cur.y);
+                const hit = HitTestTables(r, upward);
+                const finalIDs = UnionIDs(baseSelection, hit);
+
+                // Mark consumed so the trailing click handler doesn't override us.
+                _Marquee = { Consumed: true };
+                SendMessage(XMessageType.SelectElement, { SelectIDs: finalIDs });
+            };
+
+            const onUp = function (me) { finish(me, false); };
+            const onKey = function (ke) {
+                if (ke.key === "Escape") {
+                    ke.preventDefault();
+                    ke.stopPropagation();
+                    finish(ke, true);
+                }
+            };
+
+            document.addEventListener("mousemove", onMove);
+            document.addEventListener("mouseup", onUp);
+            document.addEventListener("keydown", onKey, true);
+        });
+    }
+
+    function NormalizeRect(pX1, pY1, pX2, pY2) {
+        return {
+            x1: Math.min(pX1, pX2), y1: Math.min(pY1, pY2),
+            x2: Math.max(pX1, pX2), y2: Math.max(pY1, pY2)
+        };
+    }
+
+    function HitTestTables(pRect, pCrossing) {
+        const ids = [];
+        for (const t of _Model.Tables) {
+            const b = GetTableBBox(t);
+            const hit = pCrossing ? RectIntersectsBBox(pRect, b) : RectContainsBBox(pRect, b);
+            if (hit) ids.push(t.ID);
+        }
+        return ids;
+    }
+
+    function UnionIDs(pBase, pExtra) {
+        const out = pBase.slice();
+        for (const id of pExtra)
+            if (out.indexOf(id) < 0) out.push(id);
+        return out;
+    }
+
+    // Paint the marquee preview without round-tripping to the extension host.
+    function PreviewMarqueeSelection(pBase, pHit) {
+        const preview = UnionIDs(pBase, pHit);
+        const tables = _TablesLayer.querySelectorAll(".orm-table");
+        tables.forEach(function (t) {
+            const id = t.getAttribute("data-id");
+            t.classList.toggle("selected", preview.indexOf(id) >= 0);
+        });
+    }
+
     function RenderModel() {
+        ComputeAllTableWidths();
         RenderRelations();
         RenderTables();
         UpdateSelectionVisuals();
         AutoSizeCanvas();
+        if (_Search.Active) ApplySearchHighlight();
+    }
+
+    // ── Auto-fit table width to its content ─────────────────────────────────
+    //  Tables must never clip the title or field names. Width is derived from the
+    //  widest text row (title, badge, or any field) measured in the real font, so
+    //  nothing "overflows" the box. Result is stored on the model up-front so the
+    //  relation/anchor/auto-size geometry all agree before anything is drawn.
+    let _MeasureCtx = null;
+
+    function GetCanvasFontFamily() {
+        const ff = getComputedStyle(document.body).fontFamily;
+        return (ff && ff.trim()) ? ff : "sans-serif";
+    }
+
+    function MeasureText(pText, pFont, pLetterSpacing) {
+        if (!pText) return 0;
+        if (!_MeasureCtx)
+            _MeasureCtx = document.createElement("canvas").getContext("2d");
+        _MeasureCtx.font = pFont;
+        let w = _MeasureCtx.measureText(pText).width;
+        if (pLetterSpacing)
+            w += pLetterSpacing * Math.max(0, pText.length - 1);
+        return w;
+    }
+
+    function ComputeTableWidth(pTable) {
+        const family = GetCanvasFontFamily();
+        const isShadow = !!pTable.IsShadow;
+
+        // Title: x=28, 12px/600 with 0.3px letter-spacing; leave an 12px right pad.
+        const titleW = MeasureText(pTable.Name || "Unnamed", "600 12px " + family, 0.3);
+        let need;
+        if (isShadow && pTable.ShadowDocumentName) {
+            // Title and the right-aligned "↗ doc" badge must not collide.
+            const badgeW = MeasureText("↗ " + pTable.ShadowDocumentName, "italic 9px " + family, 0);
+            need = 28 + titleW + 14 + badgeW + 6;
+        } else {
+            need = 28 + titleW + 12;
+        }
+
+        if (!isShadow && pTable.Fields) {
+            for (const f of pTable.Fields) {
+                // Field name: x=30; required-checkbox occupies the last ~26px on the right.
+                const weight = f.IsPrimaryKey ? "700" : "400";
+                const name = f.Name || f.FieldName || "field";
+                const w = 30 + MeasureText(name, weight + " 10px " + family, 0) + 26;
+                if (w > need) need = w;
+            }
+        }
+
+        return Math.max(200, Math.ceil(need));
+    }
+
+    function ComputeAllTableWidths() {
+        for (const t of _Model.Tables)
+            t.Width = ComputeTableWidth(t);
     }
 
     function AutoSizeCanvas() {
@@ -662,7 +881,7 @@
         g.setAttribute("data-id", pTable.ID);
         g.setAttribute("transform", "translate(" + pTable.X + "," + pTable.Y + ")");
 
-        const width = pTable.Width || 200;
+        const width = pTable.Width || ComputeTableWidth(pTable);
         const headerHeight = 28;
         const fieldHeight = 16;
 
@@ -907,47 +1126,89 @@
             e.preventDefault();
             e.stopPropagation();
 
-            if (!e.ctrlKey)
-                SendMessage(XMessageType.SelectElement, { ElementID: pTable.ID });
-            else
+            const inSelection = _SelectedIDs.indexOf(pTable.ID) >= 0;
+            // Group drag: grab any table already part of a multi-selection and the
+            // whole set moves together. Ctrl always means "toggle", never group-drag.
+            const groupDrag = inSelection && _SelectedIDs.length > 1 && !e.ctrlKey;
+
+            if (e.ctrlKey)
                 SendMessage(XMessageType.SelectElement, { ElementID: pTable.ID, Toggle: true });
+            else if (!inSelection)
+                // Grabbing an unselected table collapses the selection to just it.
+                SendMessage(XMessageType.SelectElement, { ElementID: pTable.ID });
 
             isDragging = true;
             dragStartX = e.clientX;
             dragStartY = e.clientY;
-            elementStartX = pTable.X;
-            elementStartY = pTable.Y;
+
+            // Build the list of tables that will travel with this drag and snapshot
+            // their start positions. Single drag → just this table.
+            const movers = groupDrag
+                ? _Model.Tables.filter(function (t) { return _SelectedIDs.indexOf(t.ID) >= 0; })
+                : [pTable];
+            const starts = movers.map(function (t) {
+                return {
+                    table: t,
+                    el: _TablesLayer.querySelector('.orm-table[data-id="' + t.ID + '"]'),
+                    x: t.X,
+                    y: t.Y
+                };
+            });
+            // Clamp so the whole group is shifted as one when it hits the X/Y=0 edge.
+            const minStartX = Math.min.apply(null, starts.map(function (s) { return s.x; }));
+            const minStartY = Math.min.apply(null, starts.map(function (s) { return s.y; }));
+            const moverIDs = new Set(movers.map(function (t) { return t.ID; }));
 
             let rafPending = false;
+            let lastDX = 0;
+            let lastDY = 0;
             const onMouseMove = function (e) {
                 if (!isDragging)
                     return;
 
-                const dx = (e.clientX - dragStartX) / _Zoom;
-                const dy = (e.clientY - dragStartY) / _Zoom;
-                const newX = Math.max(0, elementStartX + dx);
-                const newY = Math.max(0, elementStartY + dy);
+                let dx = (e.clientX - dragStartX) / _Zoom;
+                let dy = (e.clientY - dragStartY) / _Zoom;
+                dx = Math.max(dx, -minStartX);
+                dy = Math.max(dy, -minStartY);
+                lastDX = dx;
+                lastDY = dy;
 
-                pElement.setAttribute("transform", "translate(" + newX + "," + newY + ")");
-                pTable.X = newX;
-                pTable.Y = newY;
+                for (const s of starts) {
+                    const newX = s.x + dx;
+                    const newY = s.y + dy;
+                    if (s.el)
+                        s.el.setAttribute("transform", "translate(" + newX + "," + newY + ")");
+                    s.table.X = newX;
+                    s.table.Y = newY;
+                }
 
                 if (!rafPending) {
                     rafPending = true;
                     requestAnimationFrame(function () {
                         rafPending = false;
-                        UpdateRelationsTouchingTable(pTable);
+                        UpdateRelationsForDrag(moverIDs, lastDX, lastDY);
+                        DrawGroupBBox();
                     });
                 }
             };
 
             const onMouseUp = function (e) {
-                if (isDragging && (pTable.X !== elementStartX || pTable.Y !== elementStartY)) {
-                    SendMessage(XMessageType.MoveElement, {
-                        ElementID: pTable.ID,
-                        X: pTable.X,
-                        Y: pTable.Y
+                if (isDragging) {
+                    const moved = starts.filter(function (s) {
+                        return s.table.X !== s.x || s.table.Y !== s.y;
                     });
+                    if (moved.length === 1)
+                        SendMessage(XMessageType.MoveElement, {
+                            ElementID: moved[0].table.ID,
+                            X: moved[0].table.X,
+                            Y: moved[0].table.Y
+                        });
+                    else if (moved.length > 1)
+                        SendMessage(XMessageType.MoveElements, {
+                            Moves: moved.map(function (s) {
+                                return { ElementID: s.table.ID, X: s.table.X, Y: s.table.Y };
+                            })
+                        });
                 }
 
                 isDragging = false;
@@ -1521,6 +1782,176 @@
         return Object.assign({}, pRef, { Points: points });
     }
 
+    // Live re-route during a (group) drag. References whose BOTH endpoints belong
+    // to the moving set travel rigidly with it (translate the whole polyline);
+    // references straddling the set border have only their moving endpoint chased.
+    function UpdateRelationsForDrag(pMoverIDs, pDX, pDY) {
+        for (const ref of _Model.References) {
+            let srcTable = _Model.Tables.find(t =>
+                t.Fields && t.Fields.some(f => f.ID === ref.SourceFieldID)
+            );
+            if (!srcTable)
+                srcTable = _Model.Tables.find(t => t.ID === ref.SourceFieldID);
+            const tgtTable = _Model.Tables.find(t => t.ID === ref.TargetTableID);
+            if (!srcTable || !tgtTable) continue;
+
+            const srcIn = pMoverIDs.has(srcTable.ID);
+            const tgtIn = pMoverIDs.has(tgtTable.ID);
+            if (!srcIn && !tgtIn) continue;
+
+            const node = _RelationsLayer.querySelector('[data-id="' + ref.ID + '"]');
+            if (!node) continue;
+
+            if (srcIn && tgtIn) {
+                const pts = (ref.Points || []).map(p => ({ X: p.X + pDX, Y: p.Y + pDY }));
+                UpdateRelationElement(node, Object.assign({}, ref, { Points: pts }));
+            } else {
+                const movingTable = srcIn ? srcTable : tgtTable;
+                UpdateRelationElement(node, MakeLivePreviewRef(ref, movingTable));
+            }
+        }
+    }
+
+    // Dashed "shadow" rectangle hugging the whole multi-selection. Drawn behind
+    // the tables; rebuilt on every selection change and on each group-drag frame.
+    function DrawGroupBBox() {
+        const existing = _TablesLayer.querySelector(".orm-group-bbox");
+        if (existing) existing.remove();
+
+        const sel = _Model.Tables.filter(t => _SelectedIDs.indexOf(t.ID) >= 0);
+        if (sel.length < 2) return;
+
+        let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+        for (const t of sel) {
+            const b = GetTableBBox(t);
+            if (b.x < x1) x1 = b.x;
+            if (b.y < y1) y1 = b.y;
+            if (b.x + b.w > x2) x2 = b.x + b.w;
+            if (b.y + b.h > y2) y2 = b.y + b.h;
+        }
+
+        const pad = 12;
+        const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        rect.setAttribute("class", "orm-group-bbox");
+        rect.setAttribute("x", x1 - pad);
+        rect.setAttribute("y", y1 - pad);
+        rect.setAttribute("width", (x2 - x1) + pad * 2);
+        rect.setAttribute("height", (y2 - y1) + pad * 2);
+        rect.setAttribute("rx", 6);
+        rect.setAttribute("ry", 6);
+        _TablesLayer.insertBefore(rect, _TablesLayer.firstChild);
+    }
+
+    // ── Table search (Ctrl+F) ────────────────────────────────────────────────
+    //  Case-insensitive substring match on the table name (matches anywhere,
+    //  including the middle). Matches get highlighted, non-matches dimmed; the
+    //  focused match is centred. Enter / Shift+Enter cycle, Esc closes.
+    function SetupTableSearch() {
+        const input = document.getElementById("table-search-input");
+        if (!input) return;
+
+        input.addEventListener("input", function () { RunTableSearch(input.value); });
+        input.addEventListener("keydown", function (e) {
+            if (e.key === "Escape") { e.preventDefault(); CloseTableSearch(); }
+            else if (e.key === "Enter") { e.preventDefault(); FocusAdjacentMatch(e.shiftKey ? -1 : 1); }
+        });
+
+        const next = document.getElementById("table-search-next");
+        const prev = document.getElementById("table-search-prev");
+        const close = document.getElementById("table-search-close");
+        if (next) next.addEventListener("click", function () { input.focus(); FocusAdjacentMatch(1); });
+        if (prev) prev.addEventListener("click", function () { input.focus(); FocusAdjacentMatch(-1); });
+        if (close) close.addEventListener("click", CloseTableSearch);
+    }
+
+    function OpenTableSearch() {
+        const box = document.getElementById("table-search");
+        const input = document.getElementById("table-search-input");
+        if (!box || !input) return;
+        _Search.Active = true;
+        box.classList.remove("hidden");
+        input.focus();
+        input.select();
+        RunTableSearch(input.value);
+    }
+
+    function CloseTableSearch() {
+        const box = document.getElementById("table-search");
+        _Search.Active = false;
+        _Search.Query = "";
+        _Search.Matches = [];
+        _Search.Index = -1;
+        if (box) box.classList.add("hidden");
+        _TablesLayer.classList.remove("searching");
+        ClearSearchHighlight();
+        const input = document.getElementById("table-search-input");
+        if (input) input.blur();
+    }
+
+    function RunTableSearch(pQuery) {
+        _Search.Query = pQuery || "";
+        const q = _Search.Query.trim().toLowerCase();
+        if (!q) {
+            _Search.Matches = [];
+            _Search.Index = -1;
+        } else {
+            _Search.Matches = _Model.Tables
+                .filter(function (t) { return (t.Name || "").toLowerCase().indexOf(q) >= 0; })
+                .map(function (t) { return t.ID; });
+            _Search.Index = _Search.Matches.length > 0 ? 0 : -1;
+        }
+        _TablesLayer.classList.toggle("searching", q.length > 0);
+        ApplySearchHighlight();
+        UpdateSearchCount();
+        if (_Search.Index >= 0)
+            CenterOnTableID(_Search.Matches[_Search.Index]);
+    }
+
+    function FocusAdjacentMatch(pDir) {
+        if (_Search.Matches.length === 0) return;
+        _Search.Index = (_Search.Index + pDir + _Search.Matches.length) % _Search.Matches.length;
+        ApplySearchHighlight();
+        UpdateSearchCount();
+        CenterOnTableID(_Search.Matches[_Search.Index]);
+    }
+
+    function ApplySearchHighlight() {
+        const focusID = _Search.Index >= 0 ? _Search.Matches[_Search.Index] : null;
+        const matchSet = new Set(_Search.Matches);
+        const tables = _TablesLayer.querySelectorAll(".orm-table");
+        tables.forEach(function (t) {
+            const id = t.getAttribute("data-id");
+            t.classList.toggle("search-match", matchSet.has(id));
+            t.classList.toggle("search-focus", id === focusID);
+        });
+    }
+
+    function ClearSearchHighlight() {
+        const tables = _TablesLayer.querySelectorAll(".orm-table");
+        tables.forEach(function (t) { t.classList.remove("search-match", "search-focus"); });
+    }
+
+    function UpdateSearchCount() {
+        const el = document.getElementById("table-search-count");
+        if (!el) return;
+        const n = _Search.Matches.length;
+        if (!_Search.Query.trim()) el.textContent = "";
+        else if (n === 0) el.textContent = "0";
+        else el.textContent = (_Search.Index + 1) + "/" + n;
+    }
+
+    function CenterOnTableID(pID) {
+        const t = _Model.Tables.find(function (x) { return x.ID === pID; });
+        if (!t) return;
+        const b = GetTableBBox(t);
+        const cx = b.x + b.w / 2;
+        const cy = b.y + b.h / 2;
+        const r = _CanvasContainer.getBoundingClientRect();
+        _PanX = r.width / 2 - cx * _Zoom;
+        _PanY = r.height / 2 - cy * _Zoom;
+        ApplyViewport();
+    }
+
     function RenderRelations() {
         const keep = new Set();
         for (const ref of _Model.References) {
@@ -1695,6 +2126,8 @@
             else
                 f.classList.remove("selected");
         });
+
+        DrawGroupBBox();
     }
 
     function ShowRenameInput(pElementID) {

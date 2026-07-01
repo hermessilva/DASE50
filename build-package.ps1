@@ -181,19 +181,21 @@ try {
     [System.IO.File]::WriteAllText($PackageJsonPath, $pkgText)
     Write-Host "  Updated @tootega/tfx dependency to version $TfxVersion"
 
-    # Determine version
+    # Determine version — increment the build (third) segment by 1 each build.
+    # The bumped version is written back to package.json by `npm version` and
+    # persists (the finally block only restores the @tootega/tfx reference), so the
+    # next build reads the incremented value and bumps again. Monotonic.
     if ([string]::IsNullOrEmpty($Version)) {
         $pkgRead = Get-Content $PackageJsonPath -Raw | ConvertFrom-Json
         $BaseVersion = $pkgRead.version
-        $Timestamp = [DateTimeOffset]::Now.ToUnixTimeSeconds()
-        $BuildNumber = $Timestamp % 100000
         $VersionParts = $BaseVersion -split '\.'
+        $BuildNumber = [int]$VersionParts[2] + 1
         $Version = "$($VersionParts[0]).$($VersionParts[1]).$BuildNumber"
     }
 
-    Write-Host "  Version: $Version"
+    Write-Host "  Version: $Version (build incremented)"
 
-    # Update package.json version
+    # Update package.json version (persisted across builds for monotonic increment)
     npm version $Version --no-git-tag-version --allow-same-version 2>$null
     
     Write-Host "  Compiling TypeScript..."

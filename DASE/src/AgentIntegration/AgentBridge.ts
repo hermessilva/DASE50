@@ -2,7 +2,7 @@
 import * as vscode from "vscode";
 import { GetLogService } from "../Services/LogService";
 import type { XORMDesignerEditorProvider } from "../Designers/ORM/ORMDesignerEditorProvider";
-import type { XTFXBridge, ITableData } from "../Services/TFXBridge";
+import type { XTFXBridge, ITableData, IAddShadowTablePayload } from "../Services/TFXBridge";
 
 /**
  * AgentBridge — Adapter layer between AI agent tools/participants and the DASE extension.
@@ -18,6 +18,12 @@ export class XAgentBridge {
     private static _Instance: XAgentBridge | null = null;
     private _Provider: XORMDesignerEditorProvider | null = null;
     private _OrganizationSnapshot: ITableSnapshot[] | null = null;
+    /**
+     * URI of the document an MCP call is targeting. When set, all resolution
+     * (bridge, state, panel) goes to this document instead of the active editor.
+     * Set per-call via {@link SetTargetDocument}, cleared via {@link ClearTarget}.
+     */
+    private _TargetUri: string | null = null;
 
     private constructor() { }
 
@@ -36,15 +42,58 @@ export class XAgentBridge {
     }
 
     /**
-     * Get the active XTFXBridge instance from the active custom editor.
-     * Returns null if no ORM designer is currently open.
+     * Get the target XTFXBridge — the bridge of the document set via
+     * {@link SetTargetDocument}, or the active custom editor when no target is set.
+     * Returns null if no matching ORM designer is open.
      */
     private GetActiveBridge(): XTFXBridge | null {
+        return this.GetTargetState()?.Bridge ?? null;
+    }
+
+    /** Resolve the target state (set document or active editor). */
+    private GetTargetState() {
         if (!this._Provider)
             return null;
+        if (this._TargetUri)
+            return this._Provider.GetStateByUri(this._TargetUri);
+        return this._Provider.GetActiveState();
+    }
 
-        const state = this._Provider.GetActiveState();
-        return state?.Bridge ?? null;
+    /** Resolve the target webview panel (set document or active editor). */
+    private GetTargetPanel() {
+        if (!this._Provider)
+            return null;
+        if (this._TargetUri)
+            return this._Provider.GetPanelByUri(this._TargetUri);
+        return this._Provider.GetActivePanel();
+    }
+
+    /**
+     * Point subsequent operations at a specific `.dsorm` document by file name,
+     * relative path, or URI — opening it if it is not already open. Pass a falsy
+     * value to clear the target (operate on the active editor).
+     *
+     * Returns `{ name }` of the resolved document, or `{ error }` when no matching
+     * `.dsorm` file exists.
+     */
+    async SetTargetDocument(pDocument?: string): Promise<{ name?: string; error?: string }> {
+        this._TargetUri = null;
+        if (!pDocument)
+            return {};
+        if (!this._Provider)
+            return { error: "No ORM designer provider available." };
+
+        const resolved = await this._Provider.OpenDocument(pDocument);
+        if (!resolved)
+            return { error: `No .dsorm document matching "${pDocument}" was found in the workspace.` };
+
+        this._TargetUri = resolved.Uri;
+        return { name: resolved.Name };
+    }
+
+    /** Clear the per-call document target. */
+    ClearTarget(): void {
+        this._TargetUri = null;
     }
 
     /**
@@ -123,7 +172,7 @@ export class XAgentBridge {
                 const pkField = table.Fields?.find((f: any) => f.IsPrimaryKey);
                 const pkInfo = pkField ? ` (PK: ${pkField.Name} ${pkField.DataType})` : "";
                 const shadowLabel = table.IsShadow ? " [Shadow]" : "";
-                result += `- **${table.Name}**${shadowLabel}${pkInfo} — ${fieldCount} fields\n`;
+                result += `- **${table.Name}**${shadowLabel}${pkInfo} — ${fieldCount} fields — tableId: \`${table.ID}\`\n`;
             }
 
             return result;
@@ -137,19 +186,17 @@ export class XAgentBridge {
     /**
      * Get detailed information about a specific table by name.
      */
-    GetTableDetails(pTableName: string): string {
+    GetTableDetails(pTableName?: string, pTableId?: string, pIsShadow?: boolean): string {
         const bridge = this.GetActiveBridge();
         if (!bridge)
             return "No ORM designer is currently open. Please open a .dsorm file first.";
 
         try {
             const modelData = bridge.GetModelData();
-            const table = modelData.Tables?.find(
-                (t: ITableData) => t.Name.toLowerCase() === pTableName.toLowerCase()
-            );
-
-            if (!table)
-                return `Table "${pTableName}" not found. Use the list_tables tool to see available tables.`;
+            const rt = this.ResolveTable(bridge, pTableName, pTableId, pIsShadow);
+            if (rt.error)
+                return rt.error;
+            const table = rt.table!;
 
             let result = `## Table: ${table.Name}\n`;
             result += `- **ID:** ${table.ID}\n`;
@@ -227,8 +274,10 @@ export class XAgentBridge {
             const y = pY ?? 100;
             const result = bridge.AddTable(x, y, pName);
 
-            if (result.Success)
+            if (result.Success) {
+                this.RefreshActive();
                 return `Table "${pName}" added successfully at position (${x}, ${y}).`;
+            }
             else
                 return `Failed to add table "${pName}": ${result.Message ?? "Unknown error"}.`;
         }
@@ -241,66 +290,71 @@ export class XAgentBridge {
     /**
      * Add a field to a table.
      */
-    AddField(pTableName: string, pFieldName: string, pDataType: string): string {
+    AddField(pTableName: string | undefined, pFieldName: string, pDataType: string, pTableId?: string, pIsShadow?: boolean): string {
         const bridge = this.GetActiveBridge();
         if (!bridge)
             return "No ORM designer is currently open. Please open a .dsorm file first.";
 
         try {
-            const modelData = bridge.GetModelData();
-            const table = modelData.Tables?.find(
-                (t: ITableData) => t.Name.toLowerCase() === pTableName.toLowerCase()
-            );
-
-            if (!table)
-                return `Table "${pTableName}" not found. Use the list_tables tool to see available tables.`;
+            const rt = this.ResolveTable(bridge, pTableName, pTableId, pIsShadow);
+            if (rt.error)
+                return rt.error;
+            const table = rt.table!;
 
             const result = bridge.AddField(table.ID, pFieldName, pDataType);
 
-            if (result.Success)
-                return `Field "${pFieldName}" (${pDataType}) added to table "${pTableName}" successfully.`;
+            if (result.Success) {
+                this.RefreshActive();
+                return `Field "${pFieldName}" (${pDataType}) added to table "${table.Name}" successfully.`;
+            }
             else
-                return `Failed to add field "${pFieldName}" to "${pTableName}": ${result.Message ?? "Unknown error"}.`;
+                return `Failed to add field "${pFieldName}" to "${table.Name}": ${result.Message ?? "Unknown error"}.`;
         }
         catch (err) {
             GetLogService().Error("AgentBridge.AddField failed", err);
-            return `Error adding field "${pFieldName}" to "${pTableName}".`;
+            return `Error adding field "${pFieldName}" to "${pTableName ?? pTableId}".`;
         }
     }
 
     /**
      * Add a FK reference between two tables.
      */
-    AddReference(pSourceTable: string, pTargetTable: string, pName?: string): string {
+    AddReference(
+        pSourceTable: string | undefined,
+        pTargetTable: string | undefined,
+        pName?: string,
+        pSourceTableId?: string,
+        pTargetTableId?: string,
+        pSourceIsShadow?: boolean,
+        pTargetIsShadow?: boolean
+    ): string {
         const bridge = this.GetActiveBridge();
         if (!bridge)
             return "No ORM designer is currently open. Please open a .dsorm file first.";
 
         try {
-            const modelData = bridge.GetModelData();
-            const sourceTable = modelData.Tables?.find(
-                (t: ITableData) => t.Name.toLowerCase() === pSourceTable.toLowerCase()
-            );
-            const targetTable = modelData.Tables?.find(
-                (t: ITableData) => t.Name.toLowerCase() === pTargetTable.toLowerCase()
-            );
+            const rs = this.ResolveTable(bridge, pSourceTable, pSourceTableId, pSourceIsShadow);
+            if (rs.error)
+                return `Source: ${rs.error}`;
+            const rt = this.ResolveTable(bridge, pTargetTable, pTargetTableId, pTargetIsShadow);
+            if (rt.error)
+                return `Target: ${rt.error}`;
+            const sourceTable = rs.table!;
+            const targetTable = rt.table!;
 
-            if (!sourceTable)
-                return `Source table "${pSourceTable}" not found.`;
-            if (!targetTable)
-                return `Target table "${pTargetTable}" not found.`;
-
-            const refName = pName || `FK_${pSourceTable}_${pTargetTable}`;
+            const refName = pName || `FK_${sourceTable.Name}_${targetTable.Name}`;
             const result = bridge.AddReference(sourceTable.ID, targetTable.ID, refName);
 
-            if (result.Success)
-                return `Reference "${refName}" from "${pSourceTable}" to "${pTargetTable}" created successfully.`;
+            if (result.Success) {
+                this.RefreshActive();
+                return `Reference "${refName}" from "${sourceTable.Name}" to "${targetTable.Name}" created successfully.`;
+            }
             else
                 return `Failed to create reference: ${result.Message ?? "Unknown error"}.`;
         }
         catch (err) {
             GetLogService().Error("AgentBridge.AddReference failed", err);
-            return `Error creating reference from "${pSourceTable}" to "${pTargetTable}".`;
+            return `Error creating reference from "${pSourceTable ?? pSourceTableId}" to "${pTargetTable ?? pTargetTableId}".`;
         }
     }
 
@@ -402,8 +456,10 @@ export class XAgentBridge {
 
         try {
             const result = bridge.UpdateProperty(pElementId, pPropertyKey, pValue);
-            if (result.Success)
+            if (result.Success) {
+                this.RefreshActive();
                 return `Property "${pPropertyKey}" updated successfully.`;
+            }
             else
                 return `Failed to update property "${pPropertyKey}": ${result.Message ?? "Unknown error"}.`;
         }
@@ -456,29 +512,28 @@ export class XAgentBridge {
     /**
      * Move a table to a specific position on the canvas (by table name).
      */
-    MoveTable(pTableName: string, pX: number, pY: number): string {
+    MoveTable(pTableName: string | undefined, pX: number, pY: number, pTableId?: string, pIsShadow?: boolean): string {
         const bridge = this.GetActiveBridge();
         if (!bridge)
             return "No ORM designer is currently open. Please open a .dsorm file first.";
 
         try {
-            const modelData = bridge.GetModelData();
-            const table = modelData.Tables?.find(
-                (t: ITableData) => t.Name.toLowerCase() === pTableName.toLowerCase()
-            );
-
-            if (!table)
-                return `Table "${pTableName}" not found.`;
+            const rt = this.ResolveTable(bridge, pTableName, pTableId, pIsShadow);
+            if (rt.error)
+                return rt.error;
+            const table = rt.table!;
 
             const result = bridge.MoveElement(table.ID, pX, pY);
-            if (result.Success)
-                return `Table "${pTableName}" moved to (${pX}, ${pY}).`;
+            if (result.Success) {
+                this.RefreshActive();
+                return `Table "${table.Name}" moved to (${pX}, ${pY}).`;
+            }
             else
-                return `Failed to move table "${pTableName}": ${result.Message ?? "Unknown error"}.`;
+                return `Failed to move table "${table.Name}": ${result.Message ?? "Unknown error"}.`;
         }
         catch (err) {
             GetLogService().Error("AgentBridge.MoveTable failed", err);
-            return `Error moving table "${pTableName}".`;
+            return `Error moving table "${pTableName ?? pTableId}".`;
         }
     }
 
@@ -486,30 +541,29 @@ export class XAgentBridge {
      * Set the fill color of a table (by table name).
      * Accepts CSS hex colors (#RRGGBB) or ARGB (AARRGGBB).
      */
-    SetTableColor(pTableName: string, pColor: string): string {
+    SetTableColor(pTableName: string | undefined, pColor: string, pTableId?: string, pIsShadow?: boolean): string {
         const bridge = this.GetActiveBridge();
         if (!bridge)
             return "No ORM designer is currently open. Please open a .dsorm file first.";
 
         try {
-            const modelData = bridge.GetModelData();
-            const table = modelData.Tables?.find(
-                (t: ITableData) => t.Name.toLowerCase() === pTableName.toLowerCase()
-            );
-
-            if (!table)
-                return `Table "${pTableName}" not found.`;
+            const rt = this.ResolveTable(bridge, pTableName, pTableId, pIsShadow);
+            if (rt.error)
+                return rt.error;
+            const table = rt.table!;
 
             const tfxColor = this.CssToTfxColor(pColor);
             const result = bridge.UpdateProperty(table.ID, "Fill", tfxColor);
-            if (result.Success)
-                return `Table "${pTableName}" color set to ${pColor}.`;
+            if (result.Success) {
+                this.RefreshActive();
+                return `Table "${table.Name}" color set to ${pColor}.`;
+            }
             else
-                return `Failed to set color for "${pTableName}": ${result.Message ?? "Unknown error"}.`;
+                return `Failed to set color for "${table.Name}": ${result.Message ?? "Unknown error"}.`;
         }
         catch (err) {
             GetLogService().Error("AgentBridge.SetTableColor failed", err);
-            return `Error setting color for table "${pTableName}".`;
+            return `Error setting color for table "${pTableName ?? pTableId}".`;
         }
     }
 
@@ -572,8 +626,8 @@ export class XAgentBridge {
             bridge.AlignLines();
 
             if (this._Provider) {
-                const state = this._Provider.GetActiveState();
-                const panel = this._Provider.GetActivePanel();
+                const state = this.GetTargetState();
+                const panel = this.GetTargetPanel();
                 if (state && panel) {
                     state.IsDirty = true;
                     panel.webview.postMessage({ Type: "LoadModel", Payload: state.GetModelData() });
@@ -681,8 +735,8 @@ export class XAgentBridge {
 
             // Refresh the webview via the provider
             if (this._Provider) {
-                const state = this._Provider.GetActiveState();
-                const panel = this._Provider.GetActivePanel();
+                const state = this.GetTargetState();
+                const panel = this.GetTargetPanel();
                 if (state && panel) {
                     state.IsDirty = true;
                     const modelData = state.GetModelData();
@@ -704,6 +758,532 @@ export class XAgentBridge {
             GetLogService().Error("AgentBridge.ApplyOrganizationPlan failed", err);
             return { success: false, message: String(err), tablesOrganized: 0, groupCount: 0 };
         }
+    }
+
+    // ─── Shared mutation plumbing ───────────────────────────────────────────
+
+    /**
+     * Refresh the active designer webview from the current model and persist it.
+     *
+     * Mirrors the provider's post-mutation flow (LoadModel + Save). postMessage is
+     * synchronous; Save is fire-and-forget so callers can stay synchronous and the
+     * VS Code Language Model Tools keep their existing string-returning contract.
+     */
+    private RefreshActive(): void {
+        if (!this._Provider)
+            return;
+        try {
+            const state = this.GetTargetState();
+            const panel = this.GetTargetPanel();
+            if (state && panel) {
+                state.IsDirty = true;
+                panel.webview.postMessage({ Type: "LoadModel", Payload: state.GetModelData() });
+                void state.Save();
+            }
+        }
+        catch (err) {
+            GetLogService().Warn(`AgentBridge.RefreshActive failed: ${err}`);
+        }
+    }
+
+    // ─── Name → element resolvers ───────────────────────────────────────────
+
+    /**
+     * Resolve a table by ID (preferred — unambiguous) or by name.
+     *
+     * Because shadow tables may share a name with another (real or shadow) table, a
+     * name alone can be ambiguous. When `pId` is given it wins outright. Otherwise the
+     * name is matched and, if more than one candidate remains, `pIsShadow` narrows it;
+     * a still-ambiguous match returns an error listing every candidate's ID + shadow
+     * flag so the caller can retry with a `tableId`.
+     */
+    private ResolveTable(
+        pBridge: XTFXBridge,
+        pName?: string,
+        pId?: string,
+        pIsShadow?: boolean
+    ): { table?: ITableData; error?: string } {
+        const tables: ITableData[] = pBridge.GetModelData().Tables ?? [];
+
+        if (pId) {
+            const byId = tables.find(t => t.ID === pId);
+            return byId ? { table: byId } : { error: `Table with ID "${pId}" not found.` };
+        }
+
+        if (!pName)
+            return { error: "Provide a tableName or a tableId." };
+
+        let matches = tables.filter(t => t.Name.toLowerCase() === pName.toLowerCase());
+        if (pIsShadow !== undefined)
+            matches = matches.filter(t => !!t.IsShadow === pIsShadow);
+
+        if (matches.length === 0)
+            return {
+                error: pIsShadow !== undefined
+                    ? `Table "${pName}" (isShadow=${pIsShadow}) not found.`
+                    : `Table "${pName}" not found.`
+            };
+
+        if (matches.length > 1) {
+            const list = matches
+                .map(t => `- ${t.Name} (tableId: ${t.ID}, isShadow: ${!!t.IsShadow})`)
+                .join("\n");
+            return {
+                error: `Multiple tables named "${pName}". Disambiguate with tableId (preferred) or isShadow:\n${list}`
+            };
+        }
+
+        return { table: matches[0] };
+    }
+
+    /** Resolve a field within an already-resolved table, by ID (preferred) or name. */
+    private ResolveField(
+        pTable: ITableData,
+        pFieldName?: string,
+        pFieldId?: string
+    ): { field?: any; error?: string } {
+        const fields: any[] = pTable.Fields ?? [];
+
+        if (pFieldId) {
+            const byId = fields.find(f => f.ID === pFieldId);
+            return byId ? { field: byId } : { error: `Field with ID "${pFieldId}" not found in "${pTable.Name}".` };
+        }
+
+        if (!pFieldName)
+            return { error: "Provide a fieldName or a fieldId." };
+
+        const matches = fields.filter(f => f.Name.toLowerCase() === pFieldName.toLowerCase());
+        if (matches.length === 0)
+            return { error: `Field "${pFieldName}" not found in table "${pTable.Name}".` };
+        if (matches.length > 1) {
+            const list = matches.map(f => `- ${f.Name} (fieldId: ${f.ID})`).join("\n");
+            return { error: `Multiple fields named "${pFieldName}" in "${pTable.Name}". Use fieldId:\n${list}` };
+        }
+        return { field: matches[0] };
+    }
+
+    /** Resolve an FK reference by ID (preferred) or name; name may be ambiguous. */
+    private ResolveReference(
+        pBridge: XTFXBridge,
+        pName?: string,
+        pId?: string
+    ): { ref?: any; error?: string } {
+        const refs: any[] = pBridge.GetModelData().References ?? [];
+
+        if (pId) {
+            const byId = refs.find(r => r.ID === pId);
+            return byId ? { ref: byId } : { error: `Reference with ID "${pId}" not found.` };
+        }
+
+        if (!pName)
+            return { error: "Provide a reference name or a referenceId." };
+
+        const matches = refs.filter(r => (r.Name ?? "").toLowerCase() === pName.toLowerCase());
+        if (matches.length === 0)
+            return { error: `Reference "${pName}" not found.` };
+        if (matches.length > 1) {
+            const list = matches.map(r => `- ${r.Name} (referenceId: ${r.ID})`).join("\n");
+            return { error: `Multiple references named "${pName}". Use referenceId:\n${list}` };
+        }
+        return { ref: matches[0] };
+    }
+
+    // ─── Documents ──────────────────────────────────────────────────────────
+
+    /** List all open ORM designer documents. */
+    ListDocuments(): string {
+        if (!this._Provider)
+            return "No ORM designer provider available.";
+        const docs = this._Provider.GetOpenDocuments();
+        if (docs.length === 0)
+            return "No ORM designer is currently open.";
+        let result = `Found ${docs.length} open document(s):\n\n`;
+        for (const d of docs)
+            result += `- **${d.Name}**${d.Active ? " _(active)_" : ""}\n  - URI: ${d.Uri}\n`;
+        return result;
+    }
+
+    /** Save the target (or active) document to disk. */
+    SaveActiveDocument(): string {
+        if (!this._Provider)
+            return "No ORM designer provider available.";
+        const state = this.GetTargetState();
+        if (!state)
+            return "No ORM designer is currently open.";
+        void state.Save();
+        return "Active ORM document saved.";
+    }
+
+    // ─── Table mutations (by name) ──────────────────────────────────────────
+
+    DeleteTable(pTableName?: string, pTableId?: string, pIsShadow?: boolean): string {
+        const bridge = this.GetActiveBridge();
+        if (!bridge)
+            return "No ORM designer is currently open. Please open a .dsorm file first.";
+        try {
+            const r = this.ResolveTable(bridge, pTableName, pTableId, pIsShadow);
+            if (r.error)
+                return r.error;
+            const result = bridge.DeleteElement(r.table!.ID);
+            if (!result.Success)
+                return `Failed to delete table "${r.table!.Name}": ${result.Message ?? "Unknown error"}.`;
+            this.RefreshActive();
+            return `Table "${r.table!.Name}" (ID ${r.table!.ID}) deleted.`;
+        }
+        catch (err) {
+            GetLogService().Error("AgentBridge.DeleteTable failed", err);
+            return `Error deleting table "${pTableName ?? pTableId}".`;
+        }
+    }
+
+    RenameTable(pTableName?: string, pNewName?: string, pTableId?: string, pIsShadow?: boolean): string {
+        const bridge = this.GetActiveBridge();
+        if (!bridge)
+            return "No ORM designer is currently open. Please open a .dsorm file first.";
+        if (!pNewName)
+            return "Provide newName.";
+        try {
+            const r = this.ResolveTable(bridge, pTableName, pTableId, pIsShadow);
+            if (r.error)
+                return r.error;
+            const result = bridge.RenameElement(r.table!.ID, pNewName);
+            if (!result.Success)
+                return `Failed to rename table "${r.table!.Name}": ${result.Message ?? "Unknown error"}.`;
+            this.RefreshActive();
+            return `Table "${r.table!.Name}" renamed to "${pNewName}".`;
+        }
+        catch (err) {
+            GetLogService().Error("AgentBridge.RenameTable failed", err);
+            return `Error renaming table "${pTableName ?? pTableId}".`;
+        }
+    }
+
+    // ─── Field mutations (by name) ──────────────────────────────────────────
+
+    DeleteField(pTableName?: string, pFieldName?: string, pTableId?: string, pFieldId?: string, pIsShadow?: boolean): string {
+        const bridge = this.GetActiveBridge();
+        if (!bridge)
+            return "No ORM designer is currently open. Please open a .dsorm file first.";
+        try {
+            const rt = this.ResolveTable(bridge, pTableName, pTableId, pIsShadow);
+            if (rt.error)
+                return rt.error;
+            const rf = this.ResolveField(rt.table!, pFieldName, pFieldId);
+            if (rf.error)
+                return rf.error;
+            const result = bridge.DeleteElement(rf.field.ID);
+            if (!result.Success)
+                return `Failed to delete field "${rf.field.Name}": ${result.Message ?? "Unknown error"}.`;
+            this.RefreshActive();
+            return `Field "${rf.field.Name}" deleted from "${rt.table!.Name}".`;
+        }
+        catch (err) {
+            GetLogService().Error("AgentBridge.DeleteField failed", err);
+            return `Error deleting field "${pFieldName ?? pFieldId}".`;
+        }
+    }
+
+    RenameField(pTableName?: string, pFieldName?: string, pNewName?: string, pTableId?: string, pFieldId?: string, pIsShadow?: boolean): string {
+        const bridge = this.GetActiveBridge();
+        if (!bridge)
+            return "No ORM designer is currently open. Please open a .dsorm file first.";
+        if (!pNewName)
+            return "Provide newName.";
+        try {
+            const rt = this.ResolveTable(bridge, pTableName, pTableId, pIsShadow);
+            if (rt.error)
+                return rt.error;
+            const rf = this.ResolveField(rt.table!, pFieldName, pFieldId);
+            if (rf.error)
+                return rf.error;
+            const result = bridge.RenameElement(rf.field.ID, pNewName);
+            if (!result.Success)
+                return `Failed to rename field "${rf.field.Name}": ${result.Message ?? "Unknown error"}.`;
+            this.RefreshActive();
+            return `Field "${rf.field.Name}" renamed to "${pNewName}" in "${rt.table!.Name}".`;
+        }
+        catch (err) {
+            GetLogService().Error("AgentBridge.RenameField failed", err);
+            return `Error renaming field "${pFieldName ?? pFieldId}".`;
+        }
+    }
+
+    ReorderField(pTableName?: string, pFieldName?: string, pNewIndex?: number, pTableId?: string, pFieldId?: string, pIsShadow?: boolean): string {
+        const bridge = this.GetActiveBridge();
+        if (!bridge)
+            return "No ORM designer is currently open. Please open a .dsorm file first.";
+        if (pNewIndex === undefined)
+            return "Provide newIndex.";
+        try {
+            const rt = this.ResolveTable(bridge, pTableName, pTableId, pIsShadow);
+            if (rt.error)
+                return rt.error;
+            const rf = this.ResolveField(rt.table!, pFieldName, pFieldId);
+            if (rf.error)
+                return rf.error;
+            const result = bridge.ReorderField(rf.field.ID, pNewIndex);
+            if (!result.Success)
+                return `Failed to reorder field "${rf.field.Name}": ${result.Message ?? "Unknown error"}.`;
+            this.RefreshActive();
+            return `Field "${rf.field.Name}" moved to index ${pNewIndex} in "${rt.table!.Name}".`;
+        }
+        catch (err) {
+            GetLogService().Error("AgentBridge.ReorderField failed", err);
+            return `Error reordering field "${pFieldName ?? pFieldId}".`;
+        }
+    }
+
+    // ─── Reference mutations ────────────────────────────────────────────────
+
+    DeleteReference(pName?: string, pReferenceId?: string): string {
+        const bridge = this.GetActiveBridge();
+        if (!bridge)
+            return "No ORM designer is currently open. Please open a .dsorm file first.";
+        try {
+            const r = this.ResolveReference(bridge, pName, pReferenceId);
+            if (r.error)
+                return r.error;
+            const result = bridge.DeleteElement(r.ref.ID);
+            if (!result.Success)
+                return `Failed to delete reference "${r.ref.Name}": ${result.Message ?? "Unknown error"}.`;
+            this.RefreshActive();
+            return `Reference "${r.ref.Name}" (ID ${r.ref.ID}) deleted.`;
+        }
+        catch (err) {
+            GetLogService().Error("AgentBridge.DeleteReference failed", err);
+            return `Error deleting reference "${pName ?? pReferenceId}".`;
+        }
+    }
+
+    // ─── Generic element ops (by ID) ────────────────────────────────────────
+
+    DeleteElementById(pElementId: string): string {
+        const bridge = this.GetActiveBridge();
+        if (!bridge)
+            return "No ORM designer is currently open. Please open a .dsorm file first.";
+        try {
+            const result = bridge.DeleteElement(pElementId);
+            if (!result.Success)
+                return `Failed to delete element "${pElementId}": ${result.Message ?? "Unknown error"}.`;
+            this.RefreshActive();
+            return `Element "${pElementId}" deleted.`;
+        }
+        catch (err) {
+            GetLogService().Error("AgentBridge.DeleteElementById failed", err);
+            return `Error deleting element "${pElementId}".`;
+        }
+    }
+
+    RenameElementById(pElementId: string, pNewName: string): string {
+        const bridge = this.GetActiveBridge();
+        if (!bridge)
+            return "No ORM designer is currently open. Please open a .dsorm file first.";
+        try {
+            const result = bridge.RenameElement(pElementId, pNewName);
+            if (!result.Success)
+                return `Failed to rename element "${pElementId}": ${result.Message ?? "Unknown error"}.`;
+            this.RefreshActive();
+            return `Element "${pElementId}" renamed to "${pNewName}".`;
+        }
+        catch (err) {
+            GetLogService().Error("AgentBridge.RenameElementById failed", err);
+            return `Error renaming element "${pElementId}".`;
+        }
+    }
+
+    GetElementInfoText(pElementId: string): string {
+        const bridge = this.GetActiveBridge();
+        if (!bridge)
+            return "No ORM designer is currently open. Please open a .dsorm file first.";
+        const info = bridge.GetElementInfo(pElementId);
+        if (!info)
+            return `Element "${pElementId}" not found.`;
+        return `### Element\n- **ID:** ${info.ID}\n- **Name:** ${info.Name}\n- **Type:** ${info.Type}\n`;
+    }
+
+    // ─── Layout ─────────────────────────────────────────────────────────────
+
+    AlignLines(): string {
+        const bridge = this.GetActiveBridge();
+        if (!bridge)
+            return "No ORM designer is currently open. Please open a .dsorm file first.";
+        try {
+            const ok = bridge.AlignLines();
+            this.RefreshActive();
+            return ok ? "Reference lines aligned." : "Align lines completed with no changes.";
+        }
+        catch (err) {
+            GetLogService().Error("AgentBridge.AlignLines failed", err);
+            return "Error aligning lines.";
+        }
+    }
+
+    // ─── Seed / fixture data ────────────────────────────────────────────────
+
+    GetSeed(pTableName?: string, pTableId?: string, pIsShadow?: boolean): string {
+        const bridge = this.GetActiveBridge();
+        if (!bridge)
+            return "No ORM designer is currently open. Please open a .dsorm file first.";
+        try {
+            const rt = this.ResolveTable(bridge, pTableName, pTableId, pIsShadow);
+            if (rt.error)
+                return rt.error;
+            const table = rt.table!;
+            const payload = bridge.GetSeedData(table.ID);
+            if (!payload)
+                return `Table "${table.Name}" has no seed data support.`;
+
+            const cols = payload.Columns.map(c => c.Name);
+            let result = `## Seed Data: ${payload.TableName}\n`;
+            result += `Columns: ${cols.join(", ")}\n\n`;
+            if (payload.Rows.length === 0) {
+                result += "_(no rows)_\n";
+                return result;
+            }
+            result += `| ${cols.join(" | ")} |\n`;
+            result += `| ${cols.map(() => "---").join(" | ")} |\n`;
+            for (const row of payload.Rows)
+                result += `| ${payload.Columns.map(c => row.Values[c.FieldID] ?? "").join(" | ")} |\n`;
+            return result;
+        }
+        catch (err) {
+            GetLogService().Error("AgentBridge.GetSeed failed", err);
+            return `Error reading seed data for "${pTableName}".`;
+        }
+    }
+
+    /**
+     * Replace seed rows of a table. `pRows` is an array of objects keyed by column
+     * NAME (the LLM does not know field IDs); they are mapped to field IDs here.
+     */
+    SaveSeed(pTableName: string | undefined, pRows: Array<Record<string, string>>, pTableId?: string, pIsShadow?: boolean): string {
+        const bridge = this.GetActiveBridge();
+        if (!bridge)
+            return "No ORM designer is currently open. Please open a .dsorm file first.";
+        try {
+            const rt = this.ResolveTable(bridge, pTableName, pTableId, pIsShadow);
+            if (rt.error)
+                return rt.error;
+            const table = rt.table!;
+            const payload = bridge.GetSeedData(table.ID);
+            if (!payload)
+                return `Table "${table.Name}" has no seed data support.`;
+
+            const nameToId = new Map<string, string>();
+            for (const c of payload.Columns)
+                nameToId.set(c.Name.toLowerCase(), c.FieldID);
+
+            const saveRows = pRows.map((row, i) => {
+                const values: Record<string, string> = {};
+                for (const [k, v] of Object.entries(row)) {
+                    const fid = nameToId.get(k.toLowerCase());
+                    if (fid)
+                        values[fid] = String(v);
+                }
+                return { TupleID: `row-${i}`, Values: values };
+            });
+
+            const result = bridge.SaveSeedData(table.ID, saveRows);
+            if (!result.Success)
+                return `Failed to save seed data: ${result.Message ?? "Unknown error"}.`;
+            this.RefreshActive();
+            return `Saved ${saveRows.length} seed row(s) to "${table.Name}".`;
+        }
+        catch (err) {
+            GetLogService().Error("AgentBridge.SaveSeed failed", err);
+            return `Error saving seed data for "${pTableName}".`;
+        }
+    }
+
+    // ─── Shadow tables ──────────────────────────────────────────────────────
+
+    GetShadowTableOptions(pX: number, pY: number): string {
+        const bridge = this.GetActiveBridge();
+        if (!bridge)
+            return "No ORM designer is currently open. Please open a .dsorm file first.";
+        try {
+            const data = bridge.GetShadowTablePickerData(pX, pY);
+            if (!data.Models || data.Models.length === 0)
+                return "No external models available to shadow.";
+            let result = `### Shadow Table Sources\n`;
+            for (const m of data.Models) {
+                result += `\n#### Model: ${m.ModelName} (module ${m.ModuleName})\n`;
+                result += `- DocumentID: ${m.DocumentID}\n- ModuleID: ${m.ModuleID}\n`;
+                for (const t of m.Tables)
+                    result += `  - ${t.Name} (ID: ${t.ID})\n`;
+            }
+            return result;
+        }
+        catch (err) {
+            GetLogService().Error("AgentBridge.GetShadowTableOptions failed", err);
+            return "Error reading shadow table options.";
+        }
+    }
+
+    AddShadowTable(pPayload: IAddShadowTablePayload): string {
+        const bridge = this.GetActiveBridge();
+        if (!bridge)
+            return "No ORM designer is currently open. Please open a .dsorm file first.";
+        try {
+            const result = bridge.AddShadowTable(pPayload);
+            if (!result.Success)
+                return `Failed to add shadow table "${pPayload.TableName}": ${result.Message ?? "Unknown error"}.`;
+            this.RefreshActive();
+            return `Shadow table "${pPayload.TableName}" added from model "${pPayload.ModelName}".`;
+        }
+        catch (err) {
+            GetLogService().Error("AgentBridge.AddShadowTable failed", err);
+            return `Error adding shadow table "${pPayload.TableName}".`;
+        }
+    }
+
+    // ─── MCP-driven table organization ──────────────────────────────────────
+
+    /**
+     * Return the organization context (tables + fields + reference topology + canvas
+     * size) as JSON so an EXTERNAL AI can compute a layout itself — no VS Code LM
+     * involved. The AI then submits the plan via {@link ApplyOrganization}.
+     */
+    GetOrganizationContextText(): string {
+        const ctx = this.GetOrganizationContext();
+        if (!ctx)
+            return "No ORM designer is currently open, or the model has no tables.";
+        return JSON.stringify(ctx, null, 2);
+    }
+
+    /**
+     * Apply an externally-computed organization plan: snapshot current positions for
+     * one-shot revert, reposition + color tables, re-route lines, refresh, and save.
+     */
+    ApplyOrganization(pPlan: IAIOrganizationPlan): string {
+        const bridge = this.GetActiveBridge();
+        if (!bridge)
+            return "No ORM designer is currently open. Please open a .dsorm file first.";
+        if (!pPlan || !Array.isArray(pPlan.groups) || pPlan.groups.length === 0)
+            return "Invalid plan: 'groups' must be a non-empty array.";
+
+        try {
+            this.CaptureCurrentPositions();
+            const result = this.ApplyOrganizationPlan(pPlan);
+            if (!result.success)
+                return `Failed to apply organization: ${result.message}`;
+
+            void this.GetTargetState()?.Save();
+            return `Organization applied: ${result.tablesOrganized} table(s) across ${result.groupCount} group(s). Use dase_revert_organization to undo.`;
+        }
+        catch (err) {
+            GetLogService().Error("AgentBridge.ApplyOrganization failed", err);
+            return `Error applying organization: ${err}`;
+        }
+    }
+
+    /** Revert the last {@link ApplyOrganization} using the captured snapshot. */
+    RevertOrganizationText(): string {
+        const result = this.RevertOrganization();
+        if (!result.success)
+            return `Revert failed: ${result.message}`;
+        void this.GetTargetState()?.Save();
+        return `Reverted ${result.tablesOrganized} table(s) to their previous positions and colors.`;
     }
 }
 

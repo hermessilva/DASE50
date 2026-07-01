@@ -12,6 +12,7 @@ interface ISelectPayload {
     Toggle?: boolean;
     Add?: boolean;
     ElementID?: string;
+    SelectIDs?: string[];
 }
 
 interface IAddTablePayload {
@@ -37,6 +38,10 @@ interface IMoveElementPayload {
     ElementID: string;
     X: number;
     Y: number;
+}
+
+interface IMoveElementsPayload {
+    Moves: IMoveElementPayload[];
 }
 
 interface IUpdatePropertyPayload {
@@ -163,6 +168,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
 
     async resolveCustomEditor(pDocument: ICustomDocument, pWebviewPanel: vscode.WebviewPanel, _pToken: vscode.CancellationToken): Promise<void> {
         const key = pDocument.uri.toString();
+        GetLogService().Info(`ORMDesigner: resolveCustomEditor start → ${pDocument.uri.fsPath}`);
         const state = new XORMDesignerState(pDocument as unknown as vscode.TextDocument);
         this._States.set(key, state);
         this._Webviews.set(key, pWebviewPanel);
@@ -196,6 +202,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         };
 
         pWebviewPanel.webview.html = this.GetWebviewContent(pWebviewPanel.webview);
+        GetLogService().Info("ORMDesigner: webview HTML set");
 
         this.SetupMessageHandling(pWebviewPanel, state);
 
@@ -210,9 +217,11 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         });
 
         try {
+            GetLogService().Info("ORMDesigner: state.Load() start");
             await state.Load();
             // Initial validation to populate issue service even before webview is ready
             state.Validate();
+            GetLogService().Info("ORMDesigner: state.Load() done");
         }
         catch (err) {
             GetLogService().Error(`Failed to load document: ${pDocument.uri.fsPath}`, err);
@@ -310,6 +319,10 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
 
             case XDesignerMessageType.MoveElement:
                 await this.OnMoveElement(pPanel, pState, payload as IMoveElementPayload);
+                break;
+
+            case XDesignerMessageType.MoveElements:
+                await this.OnMoveElements(pPanel, pState, payload as IMoveElementsPayload);
                 break;
 
             case XDesignerMessageType.ReorderField:
@@ -502,8 +515,14 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
     }
 
     async OnDesignerReady(pPanel: vscode.WebviewPanel, pState: XORMDesignerState): Promise<void> {
-        // Route all lines before sending model to ensure proper orthogonal routing
-        pState.AlignLines();
+        // Route all lines before sending model to ensure proper orthogonal routing.
+        // This is initial display preparation on open, NOT a user edit, so route via
+        // the bridge directly instead of pState.AlignLines() — the state method would
+        // set IsDirty=true and fire an onDidChangeCustomDocument edit event, making
+        // VS Code mark the freshly-opened document as modified even though nothing
+        // changed. RouteAllLines() always returns true regardless of actual geometry
+        // changes, so it must never drive the document dirty state on open.
+        pState.Bridge.AlignLines();
 
         const modelData = await pState.GetModelData();
         pPanel.webview.postMessage({
@@ -534,6 +553,8 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
 
         if (pPayload.Clear)
             selectionService.Clear();
+        else if (pPayload.SelectIDs)
+            selectionService.SelectMultiple(pPayload.SelectIDs);
         else if (pPayload.Toggle && pPayload.ElementID)
             selectionService.ToggleSelection(pPayload.ElementID);
         else if (pPayload.Add && pPayload.ElementID)
@@ -560,10 +581,40 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
     async OnMoveElement(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: IMoveElementPayload): Promise<void> {
         const result = pState.MoveElement(pPayload.ElementID, pPayload.X, pPayload.Y);
         if (result.Success) {
-            // Route all lines to update connections after table movement
-            pState.AlignLines();
+            // Moving a table only re-routes the references that touch it (handled inside
+            // MoveElement → Design.RouteReferencesOf). We deliberately do NOT call
+            // AlignLines()/RouteAllLines() here: a full re-route redistributes anchors
+            // across every table and must not happen on a single drag. Tables are only
+            // repositioned by the user or by AI reorganization — never by route recalc.
 
             // Reload model with updated line positions
+            const modelData = await pState.GetModelData();
+            pPanel.webview.postMessage({
+                Type: XDesignerMessageType.LoadModel,
+                Payload: modelData
+            });
+
+            await this.SendIssuesUpdate(pPanel, pState);
+            this.NotifyDocumentChanged(pState);
+        }
+    }
+
+    async OnMoveElements(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: IMoveElementsPayload): Promise<void> {
+        const moves = pPayload.Moves || [];
+        if (moves.length === 0)
+            return;
+
+        // Batch group drag: reposition every table, re-routing only the references
+        // that touch a moved table (same per-table policy as a single MoveElement —
+        // never a global AlignLines). Reload the model once at the end.
+        let any = false;
+        for (const m of moves) {
+            const result = pState.MoveElement(m.ElementID, m.X, m.Y);
+            if (result.Success)
+                any = true;
+        }
+
+        if (any) {
             const modelData = await pState.GetModelData();
             pPanel.webview.postMessage({
                 Type: XDesignerMessageType.LoadModel,
@@ -913,6 +964,102 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         return null;
     }
 
+    /**
+     * Enumerate every open ORM designer document.
+     * Used by the MCP integration to let external clients discover open models.
+     */
+    GetOpenDocuments(): Array<{ Uri: string; Name: string; Active: boolean }> {
+        const result: Array<{ Uri: string; Name: string; Active: boolean }> = [];
+        for (const [key, state] of this._States) {
+            const panel = this._Webviews.get(key);
+            const name = state.Bridge?.Document?.Name ?? vscode.Uri.parse(key).path.split("/").pop() ?? key;
+            result.push({ Uri: key, Name: name, Active: panel?.active ?? false });
+        }
+        return result;
+    }
+
+    /**
+     * Resolve a designer state by its document URI string.
+     * Returns null when no designer is open for that URI.
+     */
+    GetStateByUri(pUri: string): XORMDesignerState | null {
+        return this._States.get(pUri) ?? null;
+    }
+
+    /** Resolve the webview panel for an open document by its URI string. */
+    GetPanelByUri(pUri: string): vscode.WebviewPanel | null {
+        return this._Webviews.get(pUri) ?? null;
+    }
+
+    /**
+     * Match an open document URI by file name, relative path, or full URI string.
+     * Case-insensitive; returns the URI string key or null when no open doc matches.
+     */
+    private MatchOpenDocument(pDocument: string): string | null {
+        const needle = pDocument.replace(/\\/g, "/").toLowerCase();
+        // Exact URI match first.
+        if (this._States.has(pDocument))
+            return pDocument;
+        for (const key of this._States.keys()) {
+            const lower = key.replace(/\\/g, "/").toLowerCase();
+            const base = lower.split("/").pop() ?? lower;
+            if (lower === needle || base === needle || lower.endsWith("/" + needle))
+                return key;
+        }
+        return null;
+    }
+
+    /**
+     * Ensure the named `.dsorm` document is open in an ORM designer, opening it if
+     * necessary, and return its URI + display name.
+     *
+     * Resolution order: already-open documents (by file name / relative path / URI),
+     * then a workspace search for `.dsorm` files. When found but not open, it is opened
+     * via the custom editor and we wait briefly for its state to register.
+     *
+     * Returns null when no matching `.dsorm` file exists.
+     */
+    async OpenDocument(pDocument: string): Promise<{ Uri: string; Name: string } | null> {
+        // 1. Already open?
+        let key = this.MatchOpenDocument(pDocument);
+
+        // 2. Not open — search the workspace for a matching .dsorm file.
+        if (!key) {
+            const needle = pDocument.replace(/\\/g, "/").toLowerCase();
+            const candidates = await vscode.workspace.findFiles("**/*.dsorm", "**/node_modules/**", 500);
+            const hit = candidates.find(u => {
+                const p = u.path.toLowerCase();
+                const base = p.split("/").pop() ?? p;
+                return p === needle || base === needle || p.endsWith("/" + needle) || u.toString().toLowerCase() === needle;
+            });
+            if (!hit)
+                return null;
+
+            await vscode.commands.executeCommand("vscode.openWith", hit, XORMDesignerEditorProvider.ViewType);
+            key = await this.WaitForState(hit.toString(), 5000);
+            if (!key)
+                return null;
+        }
+
+        const state = this._States.get(key);
+        if (!state)
+            return null;
+
+        const name = state.Bridge?.Document?.Name ?? vscode.Uri.parse(key).path.split("/").pop() ?? key;
+        return { Uri: key, Name: name };
+    }
+
+    /** Poll until a state is registered for the given URI key, or timeout. */
+    private async WaitForState(pKey: string, pTimeoutMs: number): Promise<string | null> {
+        const deadline = Date.now() + pTimeoutMs;
+        while (Date.now() < deadline) {
+            if (this._States.has(pKey))
+                return pKey;
+            await new Promise(r => setTimeout(r, 50));
+        }
+        return this._States.has(pKey) ? pKey : null;
+    }
+
     async AddTableToActiveDesigner(): Promise<void> {
         const state = this.GetActiveState();
         const panel = this.GetActivePanel();
@@ -1021,6 +1168,14 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
     <div id="designer-container">
         <div id="canvas-container">
             <div id="zoom-indicator">100%</div>
+            <div id="table-search" class="table-search hidden">
+                <span class="table-search-icon">&#x1f50d;</span>
+                <input id="table-search-input" type="text" placeholder="Buscar tabelas…" spellcheck="false" />
+                <span id="table-search-count" class="table-search-count"></span>
+                <button id="table-search-prev" class="table-search-btn" title="Anterior (Shift+Enter)">&#x25b2;</button>
+                <button id="table-search-next" class="table-search-btn" title="Pr&#xf3;ximo (Enter)">&#x25bc;</button>
+                <button id="table-search-close" class="table-search-btn" title="Fechar (Esc)">&#x2715;</button>
+            </div>
             <svg id="canvas" xmlns="http://www.w3.org/2000/svg">
                 <defs>
                     <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">

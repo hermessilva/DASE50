@@ -2,7 +2,7 @@
     "name": "dase",
     "displayName": "DASE - Design-Aided Software Engineering",
     "description": "Visual design environment for multi-tier, multi-platform web applications",
-    "version": "1.0.41855",
+    "version": "1.0.41869",
     "publisher": "tootega",
     "repository": {
         "type": "git",
@@ -110,6 +110,12 @@
                 "title": "Generate ORM Code using AI",
                 "category": "DASE",
                 "icon": "$(code)"
+            },
+            {
+                "command": "Dase.DetachDesigner",
+                "title": "Detach Designer to New Window",
+                "category": "DASE",
+                "icon": "$(multiple-windows)"
             }
         ],
         "customEditors": [
@@ -148,6 +154,13 @@
             ]
         },
         "menus": {
+            "editor/title": [
+                {
+                    "when": "activeCustomEditorId == 'Dase.ORMDesigner'",
+                    "command": "Dase.DetachDesigner",
+                    "group": "navigation@1"
+                }
+            ],
             "explorer/context": [
                 {
                     "when": "resourceExtname == .dsorm",
@@ -562,9 +575,11 @@
     },
     "dependencies": {
         "@dbml/core": "^6.4.0",
+        "@modelcontextprotocol/sdk": "^1.29.0",
         "@tootega/tfx": "file:../TFX",
         "@types/dagre": "^0.7.54",
-        "dagre": "^0.8.5"
+        "dagre": "^0.8.5",
+        "zod": "^3.25.76"
     },
     "bundledDependencies": [
         "@tootega/tfx",

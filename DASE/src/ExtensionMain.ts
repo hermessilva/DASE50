@@ -19,10 +19,12 @@ import { RegisterClaudeCliProvider } from "./AgentIntegration/ClaudeCli";
 import { XOrganizeTablesCommand } from "./Designers/ORM/Commands/OrganizeTablesCommand";
 import { XCreateSQLScriptCommand } from "./Designers/ORM/Commands/CreateSQLScriptCommand";
 import { XGenerateORMCodeCommand } from "./Designers/ORM/Commands/GenerateORMCodeCommand";
+import { XDetachDesignerCommand } from "./Designers/ORM/Commands/DetachDesignerCommand";
 
 export function activate(pContext: vscode.ExtensionContext): void {
     const log = InitializeLogService(pContext);
-    log.Info("DASE extension is activating...");
+    const version = (pContext.extension?.packageJSON?.version as string | undefined) ?? "unknown";
+    log.Info(`DASE extension v${version} is activating...`);
 
     try {
         const designerProvider = XORMDesignerEditorProvider.Register(pContext);
@@ -41,6 +43,7 @@ export function activate(pContext: vscode.ExtensionContext): void {
         XOrganizeTablesCommand.Register(pContext, designerProvider);
         XCreateSQLScriptCommand.Register(pContext, designerProvider);
         XGenerateORMCodeCommand.Register(pContext, designerProvider);
+        XDetachDesignerCommand.Register(pContext);
 
         XIssuesViewProvider.Register(pContext);
         XPropertiesViewProvider.Register(pContext, designerProvider);
