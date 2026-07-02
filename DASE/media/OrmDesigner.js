@@ -25,6 +25,7 @@
         RequestRename: "RequestRename",
         RenameCompleted: "RenameCompleted",
         AlignLines: "AlignLines",
+        MoveReferenceTarget: "MoveReferenceTarget",
         // Seed editor
         OpenSeedEditor: "OpenSeedEditor",
         RequestSeedData: "RequestSeedData",
@@ -74,6 +75,8 @@
     let _ContextMenuPosition = { X: 0, Y: 0 };
     let _ContextMenuTarget = null;
     let _FieldContextMenuTarget = null;
+    let _RelationContextMenuTarget = null; // reference ID whose target is being moved
+    let _MoveTargetState = null; // { RefID } while user is picking a new target table
     let _Issues = [];
 
     // ── Viewport state (zoom + pan) ─────────────────────────────────────────
@@ -143,6 +146,7 @@
     const _ContextMenu = document.getElementById("context-menu");
     const _TableContextMenu = document.getElementById("table-context-menu");
     const _FieldContextMenu = document.getElementById("field-context-menu");
+    const _RelationContextMenu = document.getElementById("relation-context-menu");
 
     function Initialize() {
         SetupCanvasEvents();
@@ -360,9 +364,29 @@
             });
         }
 
+        if (_RelationContextMenu) {
+            _RelationContextMenu.addEventListener("click", function (e) {
+                const item = e.target.closest(".context-menu-item");
+                if (!item)
+                    return;
+
+                const action = item.getAttribute("data-action");
+                const refID = _RelationContextMenuTarget;
+                HideContextMenu();
+
+                switch (action) {
+                    case "move-target-table":
+                        if (refID)
+                            EnterMoveTargetMode(refID);
+                        break;
+                }
+            });
+        }
+
         document.addEventListener("click", function (e) {
             if (!_ContextMenu.contains(e.target) && !_TableContextMenu.contains(e.target) &&
-                (!_FieldContextMenu || !_FieldContextMenu.contains(e.target)))
+                (!_FieldContextMenu || !_FieldContextMenu.contains(e.target)) &&
+                (!_RelationContextMenu || !_RelationContextMenu.contains(e.target)))
                 HideContextMenu();
         });
     }
@@ -375,6 +399,19 @@
             _FieldContextMenu.style.left = pX + "px";
             _FieldContextMenu.style.top = pY + "px";
             _FieldContextMenu.classList.add("visible");
+        }
+    }
+
+    function ShowRelationContextMenu(pX, pY, pRefID) {
+        _RelationContextMenuTarget = pRefID;
+        _ContextMenu.classList.remove("visible");
+        _TableContextMenu.classList.remove("visible");
+        if (_FieldContextMenu)
+            _FieldContextMenu.classList.remove("visible");
+        if (_RelationContextMenu) {
+            _RelationContextMenu.style.left = pX + "px";
+            _RelationContextMenu.style.top = pY + "px";
+            _RelationContextMenu.classList.add("visible");
         }
     }
 
@@ -456,8 +493,11 @@
         _TableContextMenu.classList.remove("visible");
         if (_FieldContextMenu)
             _FieldContextMenu.classList.remove("visible");
+        if (_RelationContextMenu)
+            _RelationContextMenu.classList.remove("visible");
         _ContextMenuTarget = null;
         _FieldContextMenuTarget = null;
+        _RelationContextMenuTarget = null;
     }
 
     // ── Viewport helpers ─────────────────────────────────────────────────────
@@ -1601,6 +1641,97 @@
         document.addEventListener("mouseup", onMouseUp);
     }
 
+    // ── Move Target Table (FK re-point) ──────────────────────────────────────
+
+    function EnterMoveTargetMode(pRefID) {
+        ExitMoveTargetMode(); // clear any prior pick
+        _MoveTargetState = { RefID: pRefID };
+
+        if (_CanvasContainer)
+            _CanvasContainer.classList.add("picking-target");
+
+        ShowMoveTargetHint();
+
+        document.addEventListener("mousedown", OnMoveTargetPick, true);
+        document.addEventListener("keydown", OnMoveTargetKey, true);
+        document.addEventListener("contextmenu", OnMoveTargetContext, true);
+    }
+
+    function ExitMoveTargetMode() {
+        _MoveTargetState = null;
+        if (_CanvasContainer)
+            _CanvasContainer.classList.remove("picking-target");
+        HideMoveTargetHint();
+        document.removeEventListener("mousedown", OnMoveTargetPick, true);
+        document.removeEventListener("keydown", OnMoveTargetKey, true);
+        document.removeEventListener("contextmenu", OnMoveTargetContext, true);
+    }
+
+    function OnMoveTargetKey(e) {
+        if (e.key === "Escape") {
+            e.preventDefault();
+            e.stopPropagation();
+            ExitMoveTargetMode();
+        }
+    }
+
+    function OnMoveTargetContext(e) {
+        // Suppress the canvas context menu while picking a target
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    function OnMoveTargetPick(e) {
+        if (!_MoveTargetState)
+            return;
+
+        // Any non-primary button cancels the operation
+        if (e.button !== 0) {
+            e.preventDefault();
+            e.stopPropagation();
+            ExitMoveTargetMode();
+            return;
+        }
+
+        const cc = ClientToCanvas(e.clientX, e.clientY);
+        const table = FindTableAtPoint(cc.x, cc.y);
+
+        // Stop the click from starting a table drag / selection either way
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Empty canvas → cancel
+        if (!table) {
+            ExitMoveTargetMode();
+            return;
+        }
+
+        const refID = _MoveTargetState.RefID;
+        ExitMoveTargetMode();
+        SendMessage(XMessageType.MoveReferenceTarget, {
+            ReferenceID: refID,
+            TargetTableID: table.ID
+        });
+    }
+
+    function ShowMoveTargetHint() {
+        let hint = document.getElementById("move-target-hint");
+        if (!hint) {
+            hint = document.createElement("div");
+            hint.id = "move-target-hint";
+            hint.className = "move-target-hint";
+            document.body.appendChild(hint);
+        }
+        hint.textContent = "Click a table to move the FK target here — Esc to cancel";
+        hint.style.display = "block";
+    }
+
+    function HideMoveTargetHint() {
+        const hint = document.getElementById("move-target-hint");
+        if (hint)
+            hint.style.display = "none";
+    }
+
     function FindTableAtPoint(pX, pY) {
         const headerHeight = 28;
         const fieldHeight = 16;
@@ -2094,6 +2225,12 @@
                 SendMessage(XMessageType.SelectElement, { ElementID: pRef.ID });
             else
                 SendMessage(XMessageType.SelectElement, { ElementID: pRef.ID, Toggle: true });
+        });
+
+        g.addEventListener("contextmenu", function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            ShowRelationContextMenu(e.clientX, e.clientY, pRef.ID);
         });
 
         return g;

@@ -83,6 +83,27 @@ body {
     cursor: grabbing;
 }
 
+#canvas-container.picking-target,
+#canvas-container.picking-target * {
+    cursor: crosshair;
+}
+
+.move-target-hint {
+    position: fixed;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    padding: 6px 14px;
+    border-radius: 4px;
+    background: var(--vscode-editorWidget-background, #252526);
+    color: var(--vscode-editorWidget-foreground, #ccc);
+    border: 1px solid var(--vscode-focusBorder, #007acc);
+    font-size: 12px;
+    pointer-events: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
 #canvas {
     width: 3000px;
     height: 2000px;

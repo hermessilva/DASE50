@@ -28,6 +28,11 @@ interface IAddRelationPayload {
     IsOneToOne?: boolean;
 }
 
+interface IMoveReferenceTargetPayload {
+    ReferenceID: string;
+    TargetTableID: string;
+}
+
 interface IAddFieldPayload {
     TableID: string;
     Name: string;
@@ -351,6 +356,10 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
 
             case XDesignerMessageType.AlignLines:
                 await this.OnAlignLines(pPanel, pState);
+                break;
+
+            case XDesignerMessageType.MoveReferenceTarget:
+                await this.OnMoveReferenceTarget(pPanel, pState, payload as IMoveReferenceTargetPayload);
                 break;
 
             case XDesignerMessageType.ReloadDataTypes:
@@ -726,6 +735,27 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
 
             await this.SendIssuesUpdate(pPanel, pState);
             this.NotifyDocumentChanged(pState);
+        }
+    }
+
+    async OnMoveReferenceTarget(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: IMoveReferenceTargetPayload): Promise<void> {
+        const result = pState.MoveReferenceTarget(pPayload.ReferenceID, pPayload.TargetTableID);
+
+        if (result.Success) {
+            // Re-route so the moved line renders cleanly against its new target
+            pState.AlignLines();
+
+            const modelData = await pState.GetModelData();
+            pPanel.webview.postMessage({
+                Type: XDesignerMessageType.LoadModel,
+                Payload: modelData
+            });
+
+            await this.SendIssuesUpdate(pPanel, pState);
+            this.NotifyDocumentChanged(pState);
+        }
+        else {
+            vscode.window.showWarningMessage(result.Message || "Cannot move reference target.");
         }
     }
 
@@ -1276,6 +1306,9 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         <div class="context-menu-item" data-action="rename-field"><span class="icon">✏️</span>Rename Field</div>
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="delete-field"><span class="icon">🗑️</span>Delete Field</div>
+    </div>
+    <div id="relation-context-menu" class="context-menu">
+        <div class="context-menu-item" data-action="move-target-table"><span class="icon">🎯</span>Move Target Table</div>
     </div>
 
     <!-- AI SQL Script Generation overlay -->

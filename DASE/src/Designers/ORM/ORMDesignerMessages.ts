@@ -20,6 +20,7 @@ export const XDesignerMessageType = {
     RequestRename: "RequestRename",
     RenameCompleted: "RenameCompleted",
     AlignLines: "AlignLines",
+    MoveReferenceTarget: "MoveReferenceTarget",
     ReloadDataTypes: "ReloadDataTypes",
     DataTypesReloaded: "DataTypesReloaded",
     // Seed / fixture-data editor

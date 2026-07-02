@@ -889,6 +889,50 @@ export class XTFXBridge {
         return this._Controller?.RouteAllLines?.() ?? false;
     }
 
+    /**
+     * Re-points an existing FK reference to a different target table.
+     *
+     * Only allowed between tables that share the same "origin identity":
+     *   originID(t) = t.IsShadow ? t.ShadowTableID : t.ID
+     *
+     * This permits swapping a reference between a real table and a same-model shadow
+     * of it (in either direction), or between two shadows of the same origin — but
+     * never re-targeting to an unrelated table.
+     */
+    MoveReferenceTarget(pReferenceID: string, pTargetTableID: string): XIOperationResult {
+        const design = this._Controller?.Design as XORMDesign | null;
+        if (!design)
+            return { Success: false, Message: "No design loaded." };
+
+        const reference = design.FindReferenceByID(pReferenceID);
+        if (!reference)
+            return { Success: false, Message: "Reference not found." };
+
+        const newTarget = design.FindTableByID(pTargetTableID) as XORMTable | null;
+        if (!newTarget)
+            return { Success: false, Message: "Target table not found." };
+
+        const currentTarget = design.FindTableByID(reference.Target) as XORMTable | null;
+        if (!currentTarget)
+            return { Success: false, Message: "Current target table not found." };
+
+        if (newTarget.ID === currentTarget.ID)
+            return { Success: false, Message: "The reference already targets this table." };
+
+        const originOf = (t: XORMTable): string => (t.IsShadow ? (t.ShadowTableID || "") : t.ID);
+        const currentOrigin = originOf(currentTarget);
+        const newOrigin = originOf(newTarget);
+
+        if (!currentOrigin || !newOrigin || currentOrigin !== newOrigin)
+            return {
+                Success: false,
+                Message: `Cannot move target: "${newTarget.Name}" does not share the same origin as "${currentTarget.Name}".`
+            };
+
+        reference.Target = pTargetTableID;
+        return { Success: true };
+    }
+
     SuspendRouting(): void {
         this._Controller?.Design?.SuspendRouting?.();
     }

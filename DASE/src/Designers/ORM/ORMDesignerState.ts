@@ -177,6 +177,13 @@ export class XORMDesignerState {
         return { Success: result };
     }
 
+    MoveReferenceTarget(pReferenceID: string, pTargetTableID: string): XIOperationResult {
+        const result = this._Bridge.MoveReferenceTarget(pReferenceID, pTargetTableID);
+        if (result?.Success)
+            this.IsDirty = true;
+        return result || { Success: false };
+    }
+
     async LoadParentModelTables(pModels: string[]): Promise<void> {
         return this._Bridge.LoadParentModelTables(pModels);
     }
