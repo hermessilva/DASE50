@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Tootega/DASE50/master/DASE/media/icon.png" width="96" alt="DASE logo" />
+  <img src="https://raw.githubusercontent.com/hermessilva/DASE50/master/DASE/media/icon.png" width="96" alt="DASE logo" />
 </p>
 
 <h1 align="center">DASE — Design-Aided Software Engineering</h1>
@@ -18,7 +18,7 @@
 files. Design your schema visually, validate it in real time, exchange it with DBML, and drive the
 whole thing with AI — through GitHub Copilot **and** any external Model Context Protocol (MCP) client.
 
-![ORM Designer canvas with color-coded tables, FK routing and the Properties panel](https://raw.githubusercontent.com/Tootega/DASE50/master/DASE/media/screen-01.png)
+![ORM Designer canvas with color-coded tables, FK routing and the Properties panel](https://raw.githubusercontent.com/hermessilva/DASE50/master/DASE/media/screen-01.png)
 
 ## Features
 
@@ -40,7 +40,7 @@ whole thing with AI — through GitHub Copilot **and** any external Model Contex
 ### 💾 Transparent persistence
 - Models are plain **XML** (`.dsorm`) — diff-friendly and version-control-ready
 
-![Designer context menu: add tables, validate, align, export DBML, and AI actions](https://raw.githubusercontent.com/Tootega/DASE50/master/DASE/media/screen-02.png)
+![Designer context menu: add tables, validate, align, export DBML, and AI actions](https://raw.githubusercontent.com/hermessilva/DASE50/master/DASE/media/screen-02.png)
 
 ## AI Integration
 
@@ -72,7 +72,7 @@ When Copilot is in Agent Mode, it can invoke DASE tools to **read and modify** t
 domain clusters, repositions everything into readable groups, and color-codes each group. Pick your model,
 tune the layout, preview the prompt — and **Revert** in one click if you don't like the result.
 
-![AI Table Organization dialog: model picker, layout controls and prompt preview](https://raw.githubusercontent.com/Tootega/DASE50/master/DASE/media/screen-03.png)
+![AI Table Organization dialog: model picker, layout controls and prompt preview](https://raw.githubusercontent.com/hermessilva/DASE50/master/DASE/media/screen-03.png)
 
 ## Model Context Protocol (MCP) — standard, client-agnostic AI
 
@@ -124,11 +124,11 @@ allowlist (anti DNS-rebind, per the MCP spec). Disabled until you opt in.
 ## Documentation
 
 For full documentation, development guides, and contribution instructions, see the
-[main repository README](https://github.com/Tootega/DASE50).
+[main repository README](https://github.com/hermessilva/DASE50).
 
 ## License
 
-MIT License — see [LICENSE](https://github.com/Tootega/DASE50/blob/master/DASE/LICENSE) for details.
+MIT License — see [LICENSE](https://github.com/hermessilva/DASE50/blob/master/DASE/LICENSE) for details.
 
 ---
 

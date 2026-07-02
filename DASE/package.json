@@ -6,9 +6,9 @@
     "publisher": "HermesSilva",
     "license": "MIT",
     "icon": "media/icon.png",
-    "homepage": "https://github.com/Tootega/DASE50#readme",
+    "homepage": "https://github.com/hermessilva/DASE50#readme",
     "bugs": {
-        "url": "https://github.com/Tootega/DASE50/issues"
+        "url": "https://github.com/hermessilva/DASE50/issues"
     },
     "keywords": [
         "orm",
@@ -27,7 +27,7 @@
     },
     "repository": {
         "type": "git",
-        "url": "https://github.com/Tootega/DASE50.git"
+        "url": "https://github.com/hermessilva/DASE50.git"
     },
     "engines": {
         "vscode": "^1.99.0"
