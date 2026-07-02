@@ -44,30 +44,23 @@ jobs:
         id: version
         run: |
           BUILD_NUMBER=${{ github.run_number }}
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            VERSION="${{ github.event.inputs.version }}"
-          else
-            VERSION="${GITHUB_REF#refs/tags/v}"
+
+          # package.json is the single source of truth for the published version.
+          VERSION=$(node -p "require('./DASE/package.json').version")
+
+          # If triggered by a tag (v1.2.3), it must match package.json — fail loudly otherwise.
+          if [ "${{ github.event_name }}" == "push" ]; then
+            TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+            if [ "$TAG_VERSION" != "$VERSION" ]; then
+              echo "::error::Tag v$TAG_VERSION does not match DASE/package.json version $VERSION. Bump package.json and retag."
+              exit 1
+            fi
           fi
-          
-          # Parse version parts
-          MAJOR=$(echo $VERSION | cut -d. -f1)
-          MINOR=$(echo $VERSION | cut -d. -f2)
-          PATCH=$(echo $VERSION | cut -d. -f3 | cut -d- -f1)
-          PRERELEASE=$(echo $VERSION | grep -oP '(?<=-).*' || echo '')
-          
-          # Build full version: MAJOR.MINOR.BUILD or MAJOR.MINOR.BUILD-prerelease
-          if [ -n "$PRERELEASE" ]; then
-            FULL_VERSION="${MAJOR}.${MINOR}.${BUILD_NUMBER}-${PRERELEASE}"
-          else
-            FULL_VERSION="${MAJOR}.${MINOR}.${BUILD_NUMBER}"
-          fi
-          
+
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "full_version=$FULL_VERSION" >> $GITHUB_OUTPUT
+          echo "full_version=$VERSION" >> $GITHUB_OUTPUT
           echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
-          echo "📦 Base Version: $VERSION"
-          echo "📦 Full Version: $FULL_VERSION (build #$BUILD_NUMBER)"
+          echo "📦 Version (from package.json): $VERSION (build #$BUILD_NUMBER)"
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -168,14 +161,6 @@ jobs:
       - name: Install DASE dependencies
         run: npm ci
         working-directory: DASE
-
-      - name: Update package.json version
-        working-directory: DASE
-        run: |
-          VERSION="${{ needs.build_test.outputs.full_version }}"
-          BUILD="${{ needs.build_test.outputs.build_number }}"
-          npm version $VERSION --no-git-tag-version --allow-same-version
-          echo "📦 Updated package.json to version $VERSION (build #$BUILD)"
 
       - name: Build DASE
         run: npm run compile

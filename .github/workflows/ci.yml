@@ -169,24 +169,13 @@ jobs:
         if: github.ref == 'refs/heads/master' && github.event_name == 'push'
         run: npm install -g @vscode/vsce
 
-      - name: Update version with build number
-        if: github.ref == 'refs/heads/master' && github.event_name == 'push'
-        working-directory: DASE
-        run: |
-          BUILD_NUMBER=${{ github.run_number }}
-          CURRENT_VERSION=$(node -p "require('./package.json').version")
-          NEW_VERSION="${CURRENT_VERSION%.*}.$BUILD_NUMBER"
-          npm version $NEW_VERSION --no-git-tag-version --allow-same-version
-          echo "📦 Version: $NEW_VERSION (build #$BUILD_NUMBER)"
-
       - name: Package extension
         if: github.ref == 'refs/heads/master' && github.event_name == 'push'
         working-directory: DASE
         run: |
-          BUILD_NUMBER=${{ github.run_number }}
           VERSION=$(node -p "require('./package.json').version")
           vsce package --out dase-${VERSION}.vsix
-          echo "📦 Created dase-${VERSION}.vsix"
+          echo "📦 Created dase-${VERSION}.vsix (build #${{ github.run_number }})"
 
       - name: Upload VSIX artifact
         if: github.ref == 'refs/heads/master' && github.event_name == 'push'
