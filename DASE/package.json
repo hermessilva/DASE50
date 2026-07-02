@@ -2,7 +2,7 @@
     "name": "dase",
     "displayName": "DASE - Design-Aided Software Engineering",
     "description": "Visual design environment for multi-tier, multi-platform web applications",
-    "version": "1.0.41870",
+    "version": "1.0.41871",
     "publisher": "HermesSilva",
     "license": "MIT",
     "icon": "media/icon.png",
@@ -151,6 +151,21 @@
                 "priority": "default"
             }
         ],
+        "configuration": {
+            "title": "DASE",
+            "properties": {
+                "dase.mcp.enabled": {
+                    "type": "boolean",
+                    "default": false,
+                    "markdownDescription": "Enable the embedded **Model Context Protocol (MCP)** server, letting external AI clients (Cursor, Cline, Claude Desktop, or any MCP client) read and edit the active ORM model. Binds to loopback only and is protected by a per-session Bearer token."
+                },
+                "dase.mcp.port": {
+                    "type": "number",
+                    "default": 39100,
+                    "markdownDescription": "Loopback TCP port for the MCP server (only used when `#dase.mcp.enabled#` is on). The endpoint URL and Bearer token are written to `mcp-endpoint.json` in the extension's global storage."
+                }
+            }
+        },
         "viewsContainers": {
             "panel": [
                 {
