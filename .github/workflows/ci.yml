@@ -55,6 +55,10 @@ jobs:
         run: npm run build
         working-directory: TFX
 
+      - name: Pack TFX tarball into DASE
+        run: npm pack --pack-destination ../DASE
+        working-directory: TFX
+
       - name: Test TFX with coverage
         run: npm run test:coverage
         working-directory: TFX
@@ -118,7 +122,7 @@ jobs:
           path: DASE/coverage/
 
       # --------------------
-      # Totais (TFX + DASE)
+      # Totals (TFX + DASE)
       # --------------------
       - name: Extract Total metrics
         id: all-metrics
@@ -159,20 +163,11 @@ jobs:
           } >> $GITHUB_STEP_SUMMARY
 
       # --------------------
-      # Package VSIX (apenas master push)
+      # Package VSIX (master push only)
       # --------------------
       - name: Install vsce
         if: github.ref == 'refs/heads/master' && github.event_name == 'push'
         run: npm install -g @vscode/vsce
-
-      - name: Copy TFX to node_modules
-        if: github.ref == 'refs/heads/master' && github.event_name == 'push'
-        run: |
-          rm -rf DASE/node_modules/@tootega/tfx
-          mkdir -p DASE/node_modules/@tootega/tfx/dist
-          cp -r TFX/dist/* DASE/node_modules/@tootega/tfx/dist/
-          cp TFX/package.json DASE/node_modules/@tootega/tfx/
-          echo "📦 Copied TFX to DASE/node_modules/@tootega/tfx"
 
       - name: Update version with build number
         if: github.ref == 'refs/heads/master' && github.event_name == 'push'
@@ -190,7 +185,7 @@ jobs:
         run: |
           BUILD_NUMBER=${{ github.run_number }}
           VERSION=$(node -p "require('./package.json').version")
-          vsce package --no-dependencies --out dase-${VERSION}.vsix
+          vsce package --out dase-${VERSION}.vsix
           echo "📦 Created dase-${VERSION}.vsix"
 
       - name: Upload VSIX artifact
@@ -338,7 +333,7 @@ jobs:
           color: blueviolet
 
       # --------------------
-      # README (atualiza URLs reais se você usa o script)
+      # README (updates real URLs if you use the script)
       # --------------------
       - name: Update README with Gist ID
         run: node scripts/update-readme-badges.js ${{ vars.BADGE_GIST_ID }}

@@ -2,14 +2,35 @@
     "name": "dase",
     "displayName": "DASE - Design-Aided Software Engineering",
     "description": "Visual design environment for multi-tier, multi-platform web applications",
-    "version": "1.0.41869",
-    "publisher": "tootega",
+    "version": "1.0.41870",
+    "publisher": "HermesSilva",
+    "license": "MIT",
+    "icon": "media/icon.png",
+    "homepage": "https://github.com/Tootega/DASE50#readme",
+    "bugs": {
+        "url": "https://github.com/Tootega/DASE50/issues"
+    },
+    "keywords": [
+        "orm",
+        "database",
+        "erd",
+        "entity-relationship",
+        "data-modeling",
+        "dbml",
+        "designer",
+        "sql",
+        "schema"
+    ],
+    "galleryBanner": {
+        "color": "#1e1e1e",
+        "theme": "dark"
+    },
     "repository": {
         "type": "git",
         "url": "https://github.com/Tootega/DASE50.git"
     },
     "engines": {
-        "vscode": "^1.109.0"
+        "vscode": "^1.99.0"
     },
     "categories": [
         "Other",
@@ -238,7 +259,7 @@
                 "id": "dase.ormAssistant",
                 "name": "dase",
                 "fullName": "DASE ORM Assistant",
-                "description": "ORM design assistant ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â query, validate, and modify your database model",
+                "description": "ORM design assistant — query, validate, and modify your database model",
                 "isSticky": true,
                 "commands": [
                     {
@@ -576,7 +597,7 @@
     "dependencies": {
         "@dbml/core": "^6.4.0",
         "@modelcontextprotocol/sdk": "^1.29.0",
-        "@tootega/tfx": "file:../TFX",
+        "@tootega/tfx": "file:tootega-tfx-1.0.0.tgz",
         "@types/dagre": "^0.7.54",
         "dagre": "^0.8.5",
         "zod": "^3.25.76"
@@ -588,7 +609,7 @@
     "devDependencies": {
         "@types/jest": "^30.0.0",
         "@types/node": "^20.10.0",
-        "@types/vscode": "^1.109.0",
+        "@types/vscode": "^1.99.0",
         "jest": "^30.2.0",
         "ts-jest": "^29.4.6",
         "typescript": "^5.3.0"

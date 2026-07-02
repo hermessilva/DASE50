@@ -99,6 +99,10 @@ jobs:
           name: tfx-coverage
           path: TFX/coverage/
 
+      - name: Pack TFX tarball into DASE
+        run: npm pack --pack-destination ../DASE
+        working-directory: TFX
+
       # --------------------
       # DASE Build & Test
       # --------------------
@@ -155,17 +159,15 @@ jobs:
       # --------------------
       # Build & Package DASE
       # --------------------
+      - name: Pack TFX tarball into DASE
+        run: |
+          npm pack --pack-destination ../DASE
+          echo "📦 Packed TFX tarball into DASE/"
+        working-directory: TFX
+
       - name: Install DASE dependencies
         run: npm ci
         working-directory: DASE
-
-      - name: Copy TFX to node_modules
-        run: |
-          rm -rf DASE/node_modules/@tootega/tfx
-          mkdir -p DASE/node_modules/@tootega/tfx/dist
-          cp -r TFX/dist/* DASE/node_modules/@tootega/tfx/dist/
-          cp TFX/package.json DASE/node_modules/@tootega/tfx/
-          echo "📦 Copied TFX to DASE/node_modules/@tootega/tfx"
 
       - name: Update package.json version
         working-directory: DASE
@@ -187,7 +189,7 @@ jobs:
         run: |
           VERSION="${{ needs.build_test.outputs.full_version }}"
           BUILD="${{ needs.build_test.outputs.build_number }}"
-          vsce package --no-dependencies --out dase-${VERSION}.vsix
+          vsce package --out dase-${VERSION}.vsix
           echo "📦 Created dase-${VERSION}.vsix (build #$BUILD)"
 
       - name: Upload VSIX artifact

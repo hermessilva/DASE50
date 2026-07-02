@@ -1,5 +1,5 @@
-// O LogService usa um singleton, então precisamos testar de forma diferente
-// já que ele já pode ter sido inicializado por outros testes
+// LogService uses a singleton, so we need to test it differently
+// since it may already have been initialized by other tests
 
 import * as vscode from 'vscode';
 import { GetLogService, InitializeLogService } from '../../Services/LogService';
@@ -193,7 +193,7 @@ describe('LogService', () => {
             service.Info('Test message');
 
             const call = mockOutputChannel.appendLine.mock.calls[mockOutputChannel.appendLine.mock.calls.length - 1];
-            // Verifica formato ISO: [YYYY-MM-DDTHH:mm:ss
+            // Check ISO format: [YYYY-MM-DDTHH:mm:ss
             expect(call[0]).toMatch(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
         });
     });

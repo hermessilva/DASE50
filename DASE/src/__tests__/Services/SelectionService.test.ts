@@ -1,4 +1,4 @@
-// Importar mock antes do módulo real
+// Import mock before the real module
 jest.mock('vscode');
 
 import { XSelectionService, GetSelectionService } from '../../Services/SelectionService';

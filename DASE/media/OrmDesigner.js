@@ -1632,7 +1632,7 @@
         // Helper: arredondar valor
         function round(v) { return Math.round(v * 10) / 10; }
 
-        // Helper: calcula ponto no círculo (mesmo algoritmo do XMath.PointCircle)
+        // Helper: computes a point on the circle (same algorithm as XMath.PointCircle)
         function pointCircle(pCenter, pPoint, pRadius) {
             const dx = pPoint.X - pCenter.X;
             const dy = pPoint.Y - pCenter.Y;
@@ -1642,7 +1642,7 @@
             return { X: pCenter.X + dx * ratio, Y: pCenter.Y + dy * ratio };
         }
 
-        // Helper: calcula os pontos do canto arredondado (mesmo algoritmo do XMath.AddCorner)
+        // Helper: computes the rounded corner points (same algorithm as XMath.AddCorner)
         function addCorner(pCorner, pMaxRadius, pBefore, pAfter) {
             const p1 = { X: round(pBefore.X), Y: round(pBefore.Y) };
             const p2 = { X: round(pAfter.X), Y: round(pAfter.Y) };
@@ -1678,21 +1678,21 @@
             const next = i < pPoints.length - 1 ? pPoints[i + 1] : null;
 
             if (next) {
-                // Tenta criar canto arredondado
+                // Try to create a rounded corner
                 const corner = addCorner(curr, CORNER_RADIUS, prev, next);
                 if (corner) {
-                    // Linha até o ponto antes da curva
+                    // Line up to the point before the curve
                     path += ` L ${corner.before.X} ${corner.before.Y}`;
-                    // Curva Bezier quadrática (Q) usando o canto como ponto de controle
+                    // Quadratic Bezier curve (Q) using the corner as the control point
                     path += ` Q ${corner.corner.X} ${corner.corner.Y} ${corner.after.X} ${corner.after.Y}`;
                 }
                 else {
-                    // Sem canto válido, linha reta normal
+                    // No valid corner, plain straight line
                     path += ` L ${curr.X} ${curr.Y}`;
                 }
             }
             else {
-                // Último ponto, linha reta
+                // Last point, straight line
                 path += ` L ${curr.X} ${curr.Y}`;
             }
         }
@@ -1702,20 +1702,20 @@
 
     function SimplifyReferencePoints(pPoints, pSourceTable, pTargetTable) {
         // ══════════════════════════════════════════════════════════════════════════════
-        // ROTEAMENTO É FEITO PELO TFX (XORMDesign.ts)
-        // Esta função apenas valida e limpa os pontos recebidos
-        // NÃO recalcular rotas - respeitar os pontos enviados pelo backend
+        // ROUTING IS DONE BY TFX (XORMDesign.ts)
+        // This function only validates and cleans the received points
+        // DO NOT recompute routes - respect the points sent by the backend
         // ══════════════════════════════════════════════════════════════════════════════
 
         if (!pPoints || pPoints.length < 2)
             return [];
 
-        // Filtrar pontos inválidos
+        // Filter out invalid points
         const valid = pPoints.filter(p => p && Number.isFinite(p.X) && Number.isFinite(p.Y));
         if (valid.length < 2)
             return [];
 
-        // Remover pontos duplicados consecutivos
+        // Remove consecutive duplicate points
         const cleaned = [valid[0]];
         for (let i = 1; i < valid.length; i++) {
             const prev = cleaned[cleaned.length - 1];
@@ -1723,7 +1723,7 @@
                 cleaned.push(valid[i]);
         }
 
-        // Remover pontos colineares intermediários
+        // Remove intermediate collinear points
         if (cleaned.length > 2) {
             const final = [cleaned[0]];
             for (let i = 1; i < cleaned.length - 1; i++) {
@@ -2040,7 +2040,7 @@
         g.setAttribute("class", "orm-reference");
         g.setAttribute("data-id", pRef.ID);
 
-        // Se há pontos de roteamento, use-os; caso contrário, calcule um caminho simples
+        // If there are routing points, use them; otherwise compute a simple path
         const pointsRaw = pRef.Points && pRef.Points.length >= 2 ? pRef.Points : [];
         const points = SimplifyReferencePoints(pointsRaw, sourceTable, targetTable);
 

@@ -1,115 +1,115 @@
 # Property Editor - TreeView Implementation
 
-## Visão Geral
+## Overview
 
-Implementação completa de um **Property Editor** robusto usando TreeView nativo do VSCode, preparado para oferecer uma experiência rica de edição de propriedades conforme demonstrado nas imagens de referência.
+Complete implementation of a robust **Property Editor** using VSCode's native TreeView, designed to offer a rich property editing experience as demonstrated in the reference images.
 
-## Arquitetura
+## Architecture
 
 ### 1. **PropertyEditorProvider** (`Views/PropertyEditorProvider.ts`)
-   - **TreeDataProvider** nativo do VSCode
-   - Organização hierárquica por grupos (Ordinary Properties, etc.)
-   - Suporte para múltiplos tipos de itens:
-     - `Group`: grupos de propriedades
-     - `Property`: propriedades editáveis
-     - `Separator`: separadores visuais
-   - Tooltips ricos com `MarkdownString`
-   - Formatação inteligente de valores (boolean, string, number)
-   - Integração com comandos para edição inline
+   - Native VSCode **TreeDataProvider**
+   - Hierarchical organization by groups (Ordinary Properties, etc.)
+   - Support for multiple item types:
+     - `Group`: property groups
+     - `Property`: editable properties
+     - `Separator`: visual separators
+   - Rich tooltips with `MarkdownString`
+   - Smart value formatting (boolean, string, number)
+   - Integration with commands for inline editing
 
 ### 2. **PropertyEditorService** (`Services/PropertyEditorService.ts`)
-   - Gerenciamento do TreeView
-   - Integração com `SelectionService` para reagir à seleção
-   - Editores modais especializados:
-     - **Boolean**: Quick Pick com ✓ True / ✗ False
-     - **Number**: InputBox com validação numérica
-     - **Enum**: Quick Pick com opções configuráveis
-     - **String**: InputBox simples
-   - Atualização automática do modelo TFX
-   - Sincronização com o designer visual
+   - TreeView management
+   - Integration with `SelectionService` to react to selection
+   - Specialized modal editors:
+     - **Boolean**: Quick Pick with ✓ True / ✗ False
+     - **Number**: InputBox with numeric validation
+     - **Enum**: Quick Pick with configurable options
+     - **String**: simple InputBox
+   - Automatic TFX model update
+   - Synchronization with the visual designer
 
 ### 3. **PropertyEditorCommands** (`Commands/PropertyEditorCommands.ts`)
-   - `Dase.EditProperty`: abre editor modal para propriedade
-   - `Dase.RefreshProperties`: força refresh do painel
+   - `Dase.EditProperty`: opens the modal editor for a property
+   - `Dase.RefreshProperties`: forces a panel refresh
 
-### 4. **Modelos**
-   - `XPropertyTreeItem`: item do TreeView com metadados ricos
-   - `IPropertyTreeItem`: interface para criação de itens
-   - `XPropertyItemType`: enum para tipos de itens
+### 4. **Models**
+   - `XPropertyTreeItem`: TreeView item with rich metadata
+   - `IPropertyTreeItem`: interface for creating items
+   - `XPropertyItemType`: enum for item types
 
-## Funcionalidades Implementadas
+## Implemented Features
 
-✅ **Hierarquia de Grupos**
-- Organização automática de propriedades por grupos
-- Grupo padrão "Ordinary Properties" para propriedades sem grupo
-- Ordenação alfabética com "Ordinary Properties" sempre por último
-- Expansão/colapso de grupos
+✅ **Group Hierarchy**
+- Automatic organization of properties by groups
+- Default group "Ordinary Properties" for ungrouped properties
+- Alphabetical ordering with "Ordinary Properties" always last
+- Group expand/collapse
 
-✅ **Tipos de Editores**
-- Boolean (checkbox simulado via Quick Pick)
-- Number (validação numérica)
-- Enum (lista de opções)
-- String (texto livre)
+✅ **Editor Types**
+- Boolean (checkbox simulated via Quick Pick)
+- Number (numeric validation)
+- Enum (option list)
+- String (free text)
 
-✅ **Recursos de UI**
-- Tooltips informativos com:
-  - Descrição da propriedade
-  - Tipo de dados
-  - Key da propriedade
-  - Valor atual
-  - Indicadores de read-only
-- Formatação visual de valores:
-  - Boolean: ✓ (true) ou vazio (false)
-  - String: truncamento com "..." após 40 caracteres
-  - Number: formatação numérica
-- Propriedades read-only (ID) não clicáveis
-- Comandos inline para propriedades editáveis
+✅ **UI Features**
+- Informative tooltips with:
+  - Property description
+  - Data type
+  - Property key
+  - Current value
+  - Read-only indicators
+- Visual value formatting:
+  - Boolean: ✓ (true) or empty (false)
+  - String: truncation with "..." after 40 characters
+  - Number: numeric formatting
+- Read-only properties (ID) are not clickable
+- Inline commands for editable properties
 
-✅ **Integração TFX**
-- Uso de `XProperty` para metadados
-- Suporte a `Group` em `XPropertyItem`
-- Integração com `TFXBridge.GetElementInfo()`
-- Atualização automática do modelo via `TFXBridge`
+✅ **TFX Integration**
+- Use of `XProperty` for metadata
+- Support for `Group` in `XPropertyItem`
+- Integration with `TFXBridge.GetElementInfo()`
+- Automatic model update via `TFXBridge`
 
-✅ **Sincronização**
-- Reação automática à mudança de seleção
-- Atualização do designer visual após edição
-- Persistência automática (save) após mudanças
+✅ **Synchronization**
+- Automatic reaction to selection changes
+- Visual designer update after editing
+- Automatic persistence (save) after changes
 
-## Preparação para Funcionalidades Futuras
+## Preparation for Future Features
 
-O editor está preparado para suportar (nas imagens):
+The editor is prepared to support (as shown in the images):
 
 ### 🔜 **Color Picker** (Aquamarine, Azure, etc.)
-- Interface: `Options` já suporta array de strings
-- Implementação futura: detectar tipo "Color" e abrir color picker nativo do VSCode
+- Interface: `Options` already supports an array of strings
+- Future implementation: detect "Color" type and open VSCode's native color picker
 
-### 🔜 **Tree Selector** (hierarquia TFX.Core.Data...)
-- Interface: `Options` pode conter IDs de elementos
-- Implementação futura: modal com TreeView para seleção de elementos relacionados
+### 🔜 **Tree Selector** (TFX.Core.Data... hierarchy)
+- Interface: `Options` can contain element IDs
+- Future implementation: modal with TreeView to select related elements
 
 ### 🔜 **Advanced Dropdowns** (PK Type: XGuid, XInt16, XInt32, XInt64)
-- Interface: `Options` com tipos TFX
-- Implementação futura: Quick Pick com ícones e descrições
+- Interface: `Options` with TFX types
+- Future implementation: Quick Pick with icons and descriptions
 
-### 🔜 **Validação e Regras**
-- `XPropertyDefault` expõe:
-  - `IsRequired`: obrigatoriedade
-  - `MaxLength`: validação de tamanho
-  - `MinValue`: validação numérica
-  - `Scale`: precisão decimal
-  - `HasError`: indicador de erro
-- Implementação futura: validação antes de confirmar edição
+### 🔜 **Validation and Rules**
+- `XPropertyDefault` exposes:
+  - `IsRequired`: required flag
+  - `MaxLength`: length validation
+  - `MinValue`: numeric validation
+  - `Scale`: decimal precision
+  - `HasError`: error indicator
+- Future implementation: validation before confirming an edit
 
-### 🔜 **Metadados Ricos**
-- `XPropertyDefault` expõe:
-  - `Title`: título localizado
-  - `Group`: agrupamento
-  - `Order`: ordenação customizada
-  - `CultureSensitive`: propriedades localizáveis
-  - `IsLinked`: propriedades com referências
+### 🔜 **Rich Metadata**
+- `XPropertyDefault` exposes:
+  - `Title`: localized title
+  - `Group`: grouping
+  - `Order`: custom ordering
+  - `CultureSensitive`: localizable properties
+  - `IsLinked`: properties with references
 
-## Registro no VSCode
+## VSCode Registration
 
 ### `package.json`
 ```json
@@ -146,47 +146,47 @@ pContext.subscriptions.push(
 );
 ```
 
-## Uso
+## Usage
 
-1. **Seleção de elemento**: O painel reage automaticamente ao `SelectionService`
-2. **Edição**: Clicar em uma propriedade abre o editor modal apropriado
-3. **Atualização**: Após confirmar, o modelo é atualizado e o designer visual é sincronizado
-4. **Persistência**: O documento é salvo automaticamente
+1. **Element selection**: the panel reacts automatically to `SelectionService`
+2. **Editing**: clicking a property opens the appropriate modal editor
+3. **Update**: after confirming, the model is updated and the visual designer is synchronized
+4. **Persistence**: the document is saved automatically
 
-## Testes
+## Tests
 
 ✅ **PropertyEditorProvider**
-- Inicialização
-- SetProperties (com grupos)
+- Initialization
+- SetProperties (with groups)
 - Clear
 - UpdatePropertyValue
 - GetParent
-- Formatação de valores
+- Value formatting
 
 ✅ **PropertyEditorCommands**
 - EditPropertyCommand
 - RefreshPropertiesCommand
-- Tratamento de erros
+- Error handling
 
-## Próximos Passos
+## Next Steps
 
-1. **Teste manual** no VSCode para validar UX
-2. **Color Picker** para propriedades de cor
-3. **Tree Selector** para referências entre elementos
-4. **Validação inline** usando metadados de `XPropertyDefault`
-5. **Edição inline** (sem modal) para strings e numbers
-6. **Undo/Redo** integrado com `XChangeTracker`
+1. **Manual test** in VSCode to validate UX
+2. **Color Picker** for color properties
+3. **Tree Selector** for references between elements
+4. **Inline validation** using `XPropertyDefault` metadata
+5. **Inline editing** (no modal) for strings and numbers
+6. **Undo/Redo** integrated with `XChangeTracker`
 
-## Observações Técnicas
+## Technical Notes
 
-- **Context**: DASE (VS Code Extension), não TFX
-- **Dependency direction**: DASE → TFX (nunca o contrário)
-- **Property System**: usa `XProperty` e `XPropertyDefault` do TFX
-- **Coverage**: testes cobrem lógica core; runtime UI requer teste manual
-- **Standards**: segue rigorosamente os coding standards do repositório
+- **Context**: DASE (VS Code Extension), not TFX
+- **Dependency direction**: DASE → TFX (never the other way around)
+- **Property System**: uses `XProperty` and `XPropertyDefault` from TFX
+- **Coverage**: tests cover core logic; runtime UI requires manual testing
+- **Standards**: strictly follows the repository's coding standards
 
 ---
 
-**Status**: ✅ Implementação completa e funcional  
-**Coverage impactado**: PropertyEditorProvider e PropertyEditorService (requerem testes de runtime)  
-**Compilação**: ✅ Sem erros
+**Status**: ✅ Complete and functional implementation  
+**Coverage impacted**: PropertyEditorProvider and PropertyEditorService (require runtime tests)  
+**Compilation**: ✅ No errors

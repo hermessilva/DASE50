@@ -19,10 +19,10 @@ describe('XTFXBridge', () => {
 
     describe('GetModelData', () => {
         it('should return empty data when not initialized', async () => {
-            // Cria bridge mas mocka Controller.Document para ser null
+            // Create bridge but mock Controller.Document to be null
             const newBridge = new XTFXBridge();
             await newBridge.LoadOrmModelFromText('{}');
-            // Força Document para null para testar o branch
+            // Force Document to null to test the branch
             (newBridge as any)._Controller.Document = null;
             
             const data = await newBridge.GetModelData();
@@ -36,7 +36,7 @@ describe('XTFXBridge', () => {
             
             bridge.Controller.GetTables = jest.fn().mockReturnValue([]);
             bridge.Controller.GetReferences = jest.fn().mockReturnValue([]);
-            // Garante que Document.Design existe
+            // Ensure Document.Design exists
             bridge.Controller.Document = { Design: {} };
 
             const data = await bridge.GetModelData();

@@ -1,60 +1,60 @@
 # DASE — AI Integration Guide
 
-> **Documentação dos comandos de integração com AI (GitHub Copilot) da extensão DASE.**
+> **Documentation of the DASE extension's AI integration commands (GitHub Copilot).**
 
-A extensão DASE oferece integração profunda com o GitHub Copilot e outros Language Models do VS Code, permitindo que você use linguagem natural para consultar, modificar e organizar seus modelos ORM.
+The DASE extension offers deep integration with GitHub Copilot and other VS Code Language Models, letting you use natural language to query, modify, and organize your ORM models.
 
 ---
 
-## Sumário
+## Table of Contents
 
-1. [Visão Geral](#visão-geral)
+1. [Overview](#overview)
 2. [Chat Participant (@dase)](#chat-participant-dase)
 3. [Language Model Tools (Agent Mode)](#language-model-tools-agent-mode)
-4. [AI Organization (Organização Automática)](#ai-organization-organização-automática)
-5. [Exemplos Práticos](#exemplos-práticos)
+4. [AI Organization (Automatic Organization)](#ai-organization-automatic-organization)
+5. [Practical Examples](#practical-examples)
 
 ---
 
-## Visão Geral
+## Overview
 
-A integração AI do DASE funciona em três níveis:
+DASE's AI integration works at three levels:
 
-| Modo | Descrição | Ativação |
+| Mode | Description | Activation |
 |------|-----------|----------|
-| **Chat Participant** | Assistente de chat `@dase` para perguntas e comandos | Digite `@dase` no Copilot Chat |
-| **Agent Mode Tools** | Ferramentas que o Copilot pode invocar automaticamente | Copilot Agent Mode (automático) |
-| **AI Organization** | Organização visual de tabelas por domínio funcional | Comando `Dase.OrganizeTablesAI` |
+| **Chat Participant** | `@dase` chat assistant for questions and commands | Type `@dase` in Copilot Chat |
+| **Agent Mode Tools** | Tools Copilot can invoke automatically | Copilot Agent Mode (automatic) |
+| **AI Organization** | Visual organization of tables by functional domain | `Dase.OrganizeTablesAI` command |
 
-### Requisitos
+### Requirements
 
 - VS Code 1.93+
-- GitHub Copilot instalado e ativo
-- Um arquivo `.dsorm` aberto no ORM Designer
+- GitHub Copilot installed and active
+- A `.dsorm` file open in the ORM Designer
 
 ---
 
 ## Chat Participant (@dase)
 
-O chat participant `@dase` é um assistente especializado em design ORM que você pode invocar diretamente no Copilot Chat.
+The `@dase` chat participant is an assistant specialized in ORM design that you can invoke directly in Copilot Chat.
 
 ### Slash Commands
 
-| Comando | Descrição | Exemplo |
+| Command | Description | Example |
 |---------|-----------|---------|
-| `/model` | Mostra visão geral do modelo ORM atual | `@dase /model` |
-| `/table [nome]` | Lista todas as tabelas ou detalha uma específica | `@dase /table Customer` |
-| `/validate` | Executa validação do modelo e mostra erros/warnings | `@dase /validate` |
-| `/export` | Exporta o modelo para formato DBML | `@dase /export` |
-| `/types` | Mostra tipos de dados disponíveis | `@dase /types` |
-| `/help` | Exibe ajuda com todos os comandos | `@dase /help` |
+| `/model` | Shows an overview of the current ORM model | `@dase /model` |
+| `/table [name]` | Lists all tables or details a specific one | `@dase /table Customer` |
+| `/validate` | Runs model validation and shows errors/warnings | `@dase /validate` |
+| `/export` | Exports the model to DBML format | `@dase /export` |
+| `/types` | Shows available data types | `@dase /types` |
+| `/help` | Displays help with all commands | `@dase /help` |
 
-### Exemplos de Uso
+### Usage Examples
 
 ```
 @dase /model
 ```
-Retorna:
+Returns:
 ```
 ## ORM Model: MyDatabase
 - **Schema:** dbo
@@ -72,14 +72,14 @@ Retorna:
 ```
 @dase /table Order
 ```
-Retorna detalhes completos da tabela incluindo campos, tipos, PKs, FKs e referências.
+Returns full table details including fields, types, PKs, FKs, and references.
 
 ---
 
 ```
 @dase /validate
 ```
-Retorna:
+Returns:
 ```
 ### Validation Results
 - **Errors:** 1
@@ -94,96 +94,96 @@ Retorna:
 
 ---
 
-### Perguntas em Linguagem Natural
+### Natural Language Questions
 
-Além dos slash commands, você pode fazer perguntas livremente:
-
-```
-@dase Como devo modelar um relacionamento many-to-many entre Product e Category?
-```
+Besides slash commands, you can ask questions freely:
 
 ```
-@dase Quais são as boas práticas para nomear foreign keys?
+@dase How should I model a many-to-many relationship between Product and Category?
 ```
 
 ```
-@dase Me ajude a entender a estrutura da tabela Customer
+@dase What are the best practices for naming foreign keys?
+```
+
+```
+@dase Help me understand the structure of the Customer table
 ```
 
 ---
 
 ## Language Model Tools (Agent Mode)
 
-Quando o Copilot está em **Agent Mode**, ele pode invocar automaticamente as ferramentas DASE para realizar operações no modelo ORM.
+When Copilot is in **Agent Mode**, it can automatically invoke the DASE tools to perform operations on the ORM model.
 
-### Ferramentas Disponíveis
+### Available Tools
 
-#### Ferramentas de Leitura
+#### Read Tools
 
-| Tool | Descrição | Parâmetros |
+| Tool | Description | Parameters |
 |------|-----------|------------|
-| `dase_get_model` | Obtém informações gerais do modelo | — |
-| `dase_list_tables` | Lista tabelas (com filtro opcional) | `filter?: string` |
-| `dase_get_table` | Detalhes de uma tabela específica | `tableName: string` |
-| `dase_get_properties` | Propriedades de um elemento | `elementId: string` |
-| `dase_validate` | Executa validação do modelo | — |
-| `dase_export_dbml` | Exporta para DBML | — |
+| `dase_get_model` | Gets general model information | — |
+| `dase_list_tables` | Lists tables (with optional filter) | `filter?: string` |
+| `dase_get_table` | Details of a specific table | `tableName: string` |
+| `dase_get_properties` | Properties of an element | `elementId: string` |
+| `dase_validate` | Runs model validation | — |
+| `dase_export_dbml` | Exports to DBML | — |
 
-#### Ferramentas de Modificação
+#### Modification Tools
 
-| Tool | Descrição | Parâmetros |
+| Tool | Description | Parameters |
 |------|-----------|------------|
-| `dase_add_table` | Adiciona nova tabela | `name: string`, `x?: number`, `y?: number` |
-| `dase_add_field` | Adiciona campo a uma tabela | `tableName: string`, `fieldName: string`, `dataType: string` |
-| `dase_add_reference` | Cria FK entre tabelas | `sourceTable: string`, `targetTable: string`, `name?: string` |
-| `dase_update_property` | Atualiza propriedade | `elementId: string`, `propertyKey: string`, `value: any` |
-| `dase_move_table` | Move tabela no canvas | `tableName: string`, `x: number`, `y: number` |
-| `dase_set_color` | Define cor de uma tabela | `tableName: string`, `color: string` |
-| `dase_organize_layout` | Organiza layout via AI | — |
+| `dase_add_table` | Adds a new table | `name: string`, `x?: number`, `y?: number` |
+| `dase_add_field` | Adds a field to a table | `tableName: string`, `fieldName: string`, `dataType: string` |
+| `dase_add_reference` | Creates an FK between tables | `sourceTable: string`, `targetTable: string`, `name?: string` |
+| `dase_update_property` | Updates a property | `elementId: string`, `propertyKey: string`, `value: any` |
+| `dase_move_table` | Moves a table on the canvas | `tableName: string`, `x: number`, `y: number` |
+| `dase_set_color` | Sets a table's color | `tableName: string`, `color: string` |
+| `dase_organize_layout` | Organizes the layout via AI | — |
 
-### Exemplos de Prompts para Agent Mode
+### Example Prompts for Agent Mode
 
 ```
-Crie uma tabela Customer com campos Name (String), Email (String) e BirthDate (DateTime)
+Create a Customer table with fields Name (String), Email (String) and BirthDate (DateTime)
 ```
 
-O Copilot automaticamente invocará:
-1. `dase_add_table` para criar a tabela
-2. `dase_add_field` (3×) para adicionar os campos
+Copilot will automatically invoke:
+1. `dase_add_table` to create the table
+2. `dase_add_field` (3×) to add the fields
 
 ---
 
 ```
-Mova a tabela Order para a posição (500, 200) e mude sua cor para azul
+Move the Order table to position (500, 200) and change its color to blue
 ```
 
-Invoca:
-1. `dase_move_table` com `x=500, y=200`
-2. `dase_set_color` com `color=#4A90D9`
+Invokes:
+1. `dase_move_table` with `x=500, y=200`
+2. `dase_set_color` with `color=#4A90D9`
 
 ---
 
 ```
-Crie uma FK da tabela Order para Customer
+Create an FK from the Order table to Customer
 ```
 
-Invoca `dase_add_reference` com:
+Invokes `dase_add_reference` with:
 - `sourceTable: "Order"`
 - `targetTable: "Customer"`
 
 ---
 
 ```
-Liste todas as tabelas que começam com "Sys"
+List all tables that start with "Sys"
 ```
 
-Invoca `dase_list_tables` com `filter: "Sys"`
+Invokes `dase_list_tables` with `filter: "Sys"`
 
 ---
 
-### Confirmação de Operações
+### Operation Confirmation
 
-Operações que modificam o modelo (add, update, move) exibem uma confirmação antes de executar:
+Operations that modify the model (add, update, move) show a confirmation before executing:
 
 ```
 ┌─────────────────────────────────────┐
@@ -198,24 +198,24 @@ Operações que modificam o modelo (add, update, move) exibem uma confirmação 
 
 ---
 
-## AI Organization (Organização Automática)
+## AI Organization (Automatic Organization)
 
-O comando `Dase.OrganizeTablesAI` usa inteligência artificial para:
+The `Dase.OrganizeTablesAI` command uses artificial intelligence to:
 
-1. **Analisar** nomes de tabelas e relacionamentos FK
-2. **Agrupar** tabelas por domínio funcional (ex: Security, Sales, Inventory)
-3. **Posicionar** grupos em clusters visuais no canvas
-4. **Colorir** cada grupo com uma cor distinta
+1. **Analyze** table names and FK relationships
+2. **Group** tables by functional domain (e.g. Security, Sales, Inventory)
+3. **Position** groups in visual clusters on the canvas
+4. **Color** each group with a distinct color
 
-### Como Usar
+### How to Use
 
-1. Abra um arquivo `.dsorm` no ORM Designer
-2. Execute o comando `DASE: Organize Tables with AI` (Ctrl+Shift+P)
-3. Selecione o modelo de linguagem preferido na lista
-4. Aguarde o processamento
-5. Visualize o resultado — use **Revert** se não gostar
+1. Open a `.dsorm` file in the ORM Designer
+2. Run the `DASE: Organize Tables with AI` command (Ctrl+Shift+P)
+3. Select your preferred language model from the list
+4. Wait for processing
+5. Review the result — use **Revert** if you don't like it
 
-### Fluxo Visual
+### Visual Flow
 
 ```
 ┌────────────────────────────────────────────────┐
@@ -245,114 +245,114 @@ O comando `Dase.OrganizeTablesAI` usa inteligência artificial para:
 └────────────────────────────────────────────────┘
 ```
 
-### Paleta de Cores dos Grupos
+### Group Color Palette
 
-| Domínio | Cor |
+| Domain | Color |
 |---------|-----|
-| Grupo 1 | 🔵 #4A90D9 (Blue) |
-| Grupo 2 | 🟢 #50C878 (Emerald) |
-| Grupo 3 | 🟡 #E8A838 (Amber) |
-| Grupo 4 | 🔴 #D85C8A (Rose) |
-| Grupo 5 | 🟣 #7B68EE (Purple) |
-| Grupo 6 | 🩵 #20B2AA (Teal) |
-| Grupo 7 | 🟠 #FF7F50 (Coral) |
-| Grupo 8 | 🟢 #9ACD32 (Lime) |
-| Outros | ⚪ #AAAAAA (Gray) |
+| Group 1 | 🔵 #4A90D9 (Blue) |
+| Group 2 | 🟢 #50C878 (Emerald) |
+| Group 3 | 🟡 #E8A838 (Amber) |
+| Group 4 | 🔴 #D85C8A (Rose) |
+| Group 5 | 🟣 #7B68EE (Purple) |
+| Group 6 | 🩵 #20B2AA (Teal) |
+| Group 7 | 🟠 #FF7F50 (Coral) |
+| Group 8 | 🟢 #9ACD32 (Lime) |
+| Others | ⚪ #AAAAAA (Gray) |
 
-### Revert (Desfazer)
+### Revert (Undo)
 
-Se o resultado não for satisfatório:
+If the result is unsatisfactory:
 
-1. Clique no botão **Revert** no overlay
-2. Ou execute `Dase.OrganizeTablesAIRevert`
+1. Click the **Revert** button on the overlay
+2. Or run `Dase.OrganizeTablesAIRevert`
 
-O modelo volta ao estado anterior imediatamente.
+The model returns to its previous state immediately.
 
 ---
 
-## Exemplos Práticos
+## Practical Examples
 
-### Cenário 1: Criar um Modelo Completo
+### Scenario 1: Create a Complete Model
 
 ```
-@dase Crie um modelo para um e-commerce com as seguintes tabelas:
+@dase Create a model for an e-commerce with the following tables:
 - Customer (ID, Name, Email, Phone, Address)
 - Product (ID, Name, Description, Price, Stock)
 - Category (ID, Name, ParentCategoryID)
 - Order (ID, CustomerID, OrderDate, TotalAmount, Status)
 - OrderItem (ID, OrderID, ProductID, Quantity, UnitPrice)
 
-Adicione as FKs apropriadas entre as tabelas.
+Add the appropriate FKs between the tables.
 ```
 
-### Cenário 2: Analisar Modelo Existente
+### Scenario 2: Analyze an Existing Model
 
 ```
 @dase /model
 
-Agora me diga: quais tabelas estão "órfãs" (sem nenhuma FK entrando ou saindo)?
+Now tell me: which tables are "orphans" (with no incoming or outgoing FK)?
 ```
 
-### Cenário 3: Refatorar Organização Visual
+### Scenario 3: Refactor the Visual Organization
 
 ```
-Organize todas as tabelas do modelo atual usando AI, agrupando por domínio funcional.
-Coloque as tabelas de segurança (User, Role, Permission) juntas em azul.
+Organize all tables in the current model using AI, grouping them by functional domain.
+Put the security tables (User, Role, Permission) together in blue.
 ```
 
-### Cenário 4: Exportar para Documentação
+### Scenario 4: Export for Documentation
 
 ```
 @dase /export
 
-Agora converta esse DBML para uma documentação Markdown com descrição de cada tabela.
+Now convert this DBML into Markdown documentation with a description of each table.
 ```
 
-### Cenário 5: Validação e Correção
+### Scenario 5: Validation and Fixing
 
 ```
 @dase /validate
 
-Para cada erro encontrado, me sugira como corrigir.
+For each error found, suggest how to fix it.
 ```
 
 ---
 
-## Referência Rápida
+## Quick Reference
 
 ### Chat Commands
 
-| Input | Resultado |
+| Input | Result |
 |-------|-----------|
-| `@dase /model` | Visão geral do modelo |
-| `@dase /table` | Lista todas as tabelas |
-| `@dase /table Customer` | Detalhes da tabela Customer |
-| `@dase /validate` | Executa validação |
-| `@dase /export` | Exporta para DBML |
-| `@dase /types` | Lista tipos de dados |
-| `@dase /help` | Ajuda |
+| `@dase /model` | Model overview |
+| `@dase /table` | Lists all tables |
+| `@dase /table Customer` | Details of the Customer table |
+| `@dase /validate` | Runs validation |
+| `@dase /export` | Exports to DBML |
+| `@dase /types` | Lists data types |
+| `@dase /help` | Help |
 
 ### Agent Mode Examples
 
-| Prompt | Tool Invocado |
+| Prompt | Tool Invoked |
 |--------|---------------|
-| "Liste as tabelas" | `dase_list_tables` |
-| "Crie tabela X" | `dase_add_table` |
-| "Adicione campo Y na tabela X" | `dase_add_field` |
-| "Crie FK de A para B" | `dase_add_reference` |
-| "Valide o modelo" | `dase_validate` |
-| "Exporte para DBML" | `dase_export_dbml` |
-| "Mova tabela X para (100, 200)" | `dase_move_table` |
-| "Mude a cor de X para vermelho" | `dase_set_color` |
-| "Organize as tabelas" | `dase_organize_layout` |
+| "List the tables" | `dase_list_tables` |
+| "Create table X" | `dase_add_table` |
+| "Add field Y to table X" | `dase_add_field` |
+| "Create FK from A to B" | `dase_add_reference` |
+| "Validate the model" | `dase_validate` |
+| "Export to DBML" | `dase_export_dbml` |
+| "Move table X to (100, 200)" | `dase_move_table` |
+| "Change the color of X to red" | `dase_set_color` |
+| "Organize the tables" | `dase_organize_layout` |
 
 ### VS Code Commands
 
-| Command ID | Descrição |
+| Command ID | Description |
 |------------|-----------|
-| `Dase.OrganizeTablesAI` | Abre picker de AI e organiza tabelas |
-| `Dase.OrganizeTablesAIExecute` | Executa organização com modelo selecionado |
-| `Dase.OrganizeTablesAIRevert` | Desfaz última organização AI |
+| `Dase.OrganizeTablesAI` | Opens the AI picker and organizes tables |
+| `Dase.OrganizeTablesAIExecute` | Runs organization with the selected model |
+| `Dase.OrganizeTablesAIRevert` | Undoes the last AI organization |
 
 ---
 
@@ -360,21 +360,21 @@ Para cada erro encontrado, me sugira como corrigir.
 
 ### "No ORM designer is currently open"
 
-Certifique-se de ter um arquivo `.dsorm` aberto no ORM Designer antes de usar os comandos.
+Make sure you have a `.dsorm` file open in the ORM Designer before using the commands.
 
 ### "No AI language model available"
 
-Instale o GitHub Copilot ou outra extensão que forneça Language Model API.
+Install GitHub Copilot or another extension that provides the Language Model API.
 
-### AI retorna formato não reconhecido
+### AI returns an unrecognized format
 
-Tente novamente com outro modelo (GPT-4o costuma ter melhor aderência ao formato JSON).
+Try again with another model (GPT-4o tends to adhere better to the JSON format).
 
-### Organização não ficou boa
+### The organization didn't turn out well
 
-Use o botão **Revert** e tente novamente, ou ajuste manualmente após a organização inicial.
+Use the **Revert** button and try again, or adjust manually after the initial organization.
 
 ---
 
 *DASE — Design-Aided Software Engineering*  
-*Versão: 2026-03-02*
+*Version: 2026-03-02*

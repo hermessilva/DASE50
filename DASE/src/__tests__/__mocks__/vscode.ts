@@ -1,4 +1,4 @@
-// Mock do módulo vscode para testes unitários
+// Mock of the vscode module for unit tests
 
 export class EventEmitter<T> {
     private listeners: ((e: T) => void)[] = [];
