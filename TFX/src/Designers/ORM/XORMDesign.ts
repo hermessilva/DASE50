@@ -7,7 +7,23 @@ import { XORMReference } from "./XORMReference.js";
 import { XORMStateReference } from "./XORMStateReference.js";
 import { XORMField } from "./XORMField.js";
 import { XRouterShape, XRouterDirection } from "../../Design/XRouterTypes.js";
+import { XRouteContext } from "../../Design/XRouteContext.js";
 import { XORMMetrics } from "./XORMMetrics.js";
+
+/**
+ * Métricas de qualidade do roteamento — usadas em testes e telemetria.
+ */
+export interface XIRoutingMetrics
+{
+    ReferenceCount: number;
+    TotalLength: number;
+    TotalBends: number;
+    Crossings: number;
+    /** Pares de segmentos colineares de refs distintas com sobreposição > 2px a menos de 2px de distância. */
+    Overlaps: number;
+    /** Segmentos que atravessam o interior de alguma tabela. */
+    TableCrossings: number;
+}
 
 export interface XICreateTableOptions
 {
@@ -43,8 +59,13 @@ export interface XIEnableStateControlResult
  *   - Source exits horizontally (East or West) aligned with the FK field row.
  *   - Target may be entered from any side (East, West, North, South).
  *   - Obstacles (all other tables) are registered so routes go around them.
- *   - Two-pass: first with CheckCrossRect=true; if no valid route found,
- *     retries with CheckCrossRect=false (mirrors C# DoRoute fallback).
+ *   - Cooperative routing: a shared XRouteContext holds the global track grid
+ *     and an occupancy map of already-routed lines, so the A* penalizes
+ *     colinear overlap and crossings instead of stacking lines on one track.
+ *   - Three-pass per reference: (1) pinned anchors, (2) relaxed anchors with
+ *     obstacles kept, (3) orthogonal L/Z fallback — never a diagonal line.
+ *   - A final orthogonal nudging pass spreads residual near-colinear segments
+ *     into parallel lanes, validated against table bounds.
  */
 export class XORMDesign extends XDesign
 {
@@ -200,8 +221,21 @@ export class XORMDesign extends XDesign
         if (touching.length === 0)
             return;
         const anchors = this.ComputeAnchorDistribution(refs, tables);
-        for (const ref of touching)
-            this.RouteReference(ref, tables, anchors.get(ref.ID));
+        // Incremental context: routes of untouched references are pre-committed
+        // to the occupancy map so the moved table's lines avoid them, without
+        // ever re-routing lines that do not touch the moved table.
+        const context = this.CreateRouteContext(tables);
+        for (const ref of refs)
+        {
+            if (!touching.includes(ref) && ref.Points && ref.Points.length >= 2)
+                context.Occupancy.AddPath(ref.Points, ref.ID);
+        }
+        for (const ref of this.OrderForRouting(touching, anchors))
+        {
+            this.RouteReference(ref, tables, anchors.get(ref.ID), context);
+            if (ref.Points && ref.Points.length >= 2)
+                context.Occupancy.AddPath(ref.Points, ref.ID);
+        }
     }
 
     private ReferenceTouchesTable(pRef: XORMReference, pTable: XORMTable): boolean
@@ -513,28 +547,72 @@ export class XORMDesign extends XDesign
         this.SetupTableListeners();
         const references = this.GetReferences();
         const tables = this.GetTables();
+        const context = this.CreateRouteContext(tables);
         const anchors = this.ComputeAnchorDistribution(references, tables);
-        for (const ref of references)
-            this.RouteReference(ref, tables, anchors.get(ref.ID));
+        // Longest references first: hard routes reserve corridors before the
+        // easy ones fill in around them. Deterministic tie-break by ID.
+        for (const ref of this.OrderForRouting(references, anchors))
+        {
+            this.RouteReference(ref, tables, anchors.get(ref.ID), context);
+            if (ref.Points && ref.Points.length >= 2)
+                context.Occupancy.AddPath(ref.Points, ref.ID);
+        }
 
-        this.DeOverlapSegments(references);
+        this.NudgeSegments(references, context);
+    }
+
+    private CreateRouteContext(pTables: XORMTable[]): XRouteContext
+    {
+        const rects = pTables.map(t => ({ ID: t.ID, Rect: this.GetVisualBounds(t) }));
+        return new XRouteContext(rects, XORMMetrics.RouterGap);
     }
 
     /**
-     * Pulls apart collinear, overlapping interior segments of different
-     * references into distinct parallel "lanes" so lines no longer stack on
-     * top of each other. Only interior segments (those with a corner on both
-     * ends) are shifted — the first/last stubs stay glued to their table
-     * anchors. Endpoints of the shifted segment slide along their perpendicular
-     * neighbours, so orthogonality is preserved.
-     *
-     * Runs only from a full re-route (AlignLines); a single-table move never
-     * calls this, so untouched references keep their positions.
+     * Deterministic routing order: descending anchor-to-anchor Manhattan
+     * distance (hardest first), ties broken by reference ID.
      */
-    private DeOverlapSegments(pRefs: XORMReference[]): void
+    private OrderForRouting(
+        pRefs: XORMReference[],
+        pAnchors: Map<string, { TargetAnchor: XPoint; TargetSide: XRouterDirection; SourceAnchor: XPoint; SourceSide: XRouterDirection } | undefined>
+    ): XORMReference[]
     {
-        const laneGap = XORMMetrics.RouterGap / 2;
-        const tol = 1.5;
+        const distOf = (pRef: XORMReference): number =>
+        {
+            const a = pAnchors.get(pRef.ID);
+            if (!a)
+                return 0;
+            return Math.abs(a.SourceAnchor.X - a.TargetAnchor.X) + Math.abs(a.SourceAnchor.Y - a.TargetAnchor.Y);
+        };
+        return [...pRefs].sort((a, b) =>
+        {
+            const d = distOf(b) - distOf(a);
+            if (d !== 0)
+                return d;
+            return a.ID < b.ID ? -1 : (a.ID > b.ID ? 1 : 0);
+        });
+    }
+
+    /**
+     * Orthogonal nudging pass (libavoid-style). Pulls apart near-colinear,
+     * overlapping interior segments of different references into parallel
+     * lanes so lines never stack. Improvements over the old DeOverlapSegments:
+     *   - clusters NEAR-colinear segments (within one lane pitch), not only
+     *     exactly coincident ones;
+     *   - lane order follows each line's approach side (fewer new crossings);
+     *   - every shift is validated against table bounds — a lane that would
+     *     cut through a table keeps a safe position instead;
+     *   - lane pitch 8-12px instead of 20px, keeping bundles compact.
+     * Only interior segments are shifted — the first/last stubs stay glued to
+     * their table anchors (source FK row / distributed target anchors).
+     * Endpoints slide along their perpendicular neighbours, preserving
+     * orthogonality.
+     */
+    private NudgeSegments(pRefs: XORMReference[], pContext?: XRouteContext): void
+    {
+        const lanePitch = Math.max(8, Math.round(XORMMetrics.RouterGap / 4));
+        const clusterTol = lanePitch;
+        const orientTol = 1.5;
+        const clearance = 4;
 
         interface ISeg {
             Ref: XORMReference;
@@ -543,6 +621,8 @@ export class XORMDesign extends XDesign
             Fixed: number;      // shared coordinate (X for vertical, Y for horizontal)
             Lo: number;
             Hi: number;
+            /** Mean perpendicular coordinate of the two neighbour joints — orders lanes by approach side. */
+            ApproachKey: number;
         }
 
         const segs: ISeg[] = [];
@@ -556,55 +636,103 @@ export class XORMDesign extends XDesign
             {
                 const a = pts[i];
                 const b = pts[i + 1];
-                const vertical = Math.abs(a.X - b.X) < tol;
-                const horizontal = Math.abs(a.Y - b.Y) < tol;
+                const vertical = Math.abs(a.X - b.X) < orientTol;
+                const horizontal = Math.abs(a.Y - b.Y) < orientTol;
                 if (vertical === horizontal)
                     continue; // diagonal or zero-length — leave untouched
+                const prev = pts[i - 1];
+                const next = pts[i + 2];
                 if (vertical)
-                    segs.push({ Ref: ref, I: i, Vertical: true, Fixed: a.X, Lo: Math.min(a.Y, b.Y), Hi: Math.max(a.Y, b.Y) });
+                    segs.push({
+                        Ref: ref, I: i, Vertical: true, Fixed: a.X,
+                        Lo: Math.min(a.Y, b.Y), Hi: Math.max(a.Y, b.Y),
+                        ApproachKey: (prev.X + next.X) / 2
+                    });
                 else
-                    segs.push({ Ref: ref, I: i, Vertical: false, Fixed: a.Y, Lo: Math.min(a.X, b.X), Hi: Math.max(a.X, b.X) });
+                    segs.push({
+                        Ref: ref, I: i, Vertical: false, Fixed: a.Y,
+                        Lo: Math.min(a.X, b.X), Hi: Math.max(a.X, b.X),
+                        ApproachKey: (prev.Y + next.Y) / 2
+                    });
             }
         }
 
-        const shiftSeg = (pSeg: ISeg, pDelta: number): void =>
+        const moveSegTo = (pSeg: ISeg, pTarget: number): void =>
         {
             const pts = pSeg.Ref.Points;
             const a = pts[pSeg.I];
             const b = pts[pSeg.I + 1];
-            if (pSeg.Vertical) { a.X += pDelta; b.X += pDelta; }
-            else { a.Y += pDelta; b.Y += pDelta; }
+            if (pSeg.Vertical) { a.X = pTarget; b.X = pTarget; }
+            else { a.Y = pTarget; b.Y = pTarget; }
+            pSeg.Fixed = pTarget;
+        };
+
+        /** Position is acceptable when it does not cut through any table. */
+        const isFree = (pSeg: ISeg, pTarget: number): boolean =>
+        {
+            if (!pContext)
+                return true;
+            return pContext.IsSegmentFree(pSeg.Vertical, pTarget, pSeg.Lo, pSeg.Hi, clearance);
         };
 
         const process = (pGroup: ISeg[]): void =>
         {
-            // Bucket by shared coordinate.
+            // Cluster by near-coincident shared coordinate (chained within tolerance).
             pGroup.sort((a, b) => a.Fixed - b.Fixed);
             let i = 0;
             while (i < pGroup.length)
             {
                 let j = i + 1;
-                while (j < pGroup.length && Math.abs(pGroup[j].Fixed - pGroup[i].Fixed) <= tol)
+                while (j < pGroup.length && pGroup[j].Fixed - pGroup[j - 1].Fixed <= clusterTol)
                     j++;
                 const bucket = pGroup.slice(i, j);
                 i = j;
                 if (bucket.length < 2)
                     continue;
-                // Within a coincident bucket keep only those whose spans overlap;
-                // spread them symmetrically around the shared coordinate.
+                // Within a cluster keep only those whose spans overlap.
                 bucket.sort((a, b) => a.Lo - b.Lo);
                 const overlapping: ISeg[] = [];
                 for (const seg of bucket)
                 {
-                    const hits = overlapping.some(o => seg.Lo < o.Hi - tol && seg.Hi > o.Lo + tol);
+                    const hits = overlapping.some(o => seg.Lo < o.Hi - orientTol && seg.Hi > o.Lo + orientTol);
                     if (overlapping.length === 0 || hits)
                         overlapping.push(seg);
                 }
                 if (overlapping.length < 2)
                     continue;
+
+                // Lane order by approach side: lines coming from the left get
+                // the left lanes, avoiding crossings introduced by the nudge.
+                overlapping.sort((a, b) =>
+                {
+                    const d = a.ApproachKey - b.ApproachKey;
+                    if (Math.abs(d) > 0.5)
+                        return d;
+                    return a.Ref.ID < b.Ref.ID ? -1 : 1;
+                });
+
                 const k = overlapping.length;
+                let center = 0;
+                for (const seg of overlapping)
+                    center += seg.Fixed;
+                center /= k;
+
                 for (let m = 0; m < k; m++)
-                    shiftSeg(overlapping[m], (m - (k - 1) / 2) * laneGap);
+                {
+                    const seg = overlapping[m];
+                    const offset = (m - (k - 1) / 2) * lanePitch;
+                    // Try full pitch, then half pitch, then keep the original
+                    // position — never shift a lane into a table.
+                    const candidates = [center + offset, center + offset / 2];
+                    for (const target of candidates)
+                    {
+                        if (isFree(seg, target))
+                        {
+                            moveSegTo(seg, target);
+                            break;
+                        }
+                    }
+                }
             }
         };
 
@@ -673,12 +801,41 @@ export class XORMDesign extends XDesign
             });
         }
 
-        // Group by (target, target-side) for incoming distribution
+        // Group by (target, target-side) for incoming distribution.
+        // Side assignment is congestion-aware: each side has a capacity
+        // (usable border length / minimum anchor spacing); when the preferred
+        // side is full, the reference overflows to its next-ranked side so
+        // hub tables spread their incoming arrows over multiple borders.
+        const minAnchorSpacing = 14;
+        const sideCapacity = (pBounds: XRect, pSide: XRouterDirection): number =>
+        {
+            const margin = XORMMetrics.RouterGap / 2;
+            const inset = Math.min(margin, Math.min(pBounds.Width, pBounds.Height) / 4);
+            const usable = (pSide === XRouterDirection.East || pSide === XRouterDirection.West)
+                ? pBounds.Height - 2 * inset
+                : pBounds.Width - 2 * inset;
+            return Math.max(1, Math.floor(usable / minAnchorSpacing));
+        };
+
+        // Deterministic processing order so overflow assignment is stable.
+        const orderedPlans = [...plans].sort((a, b) => a.Ref.ID < b.Ref.ID ? -1 : (a.Ref.ID > b.Ref.ID ? 1 : 0));
+
         const incomingBySide = new Map<string, IPlan[]>();
         const planSides = new Map<IPlan, { TargetSide: XRouterDirection; SourceSide: XRouterDirection }>();
-        for (const plan of plans)
+        for (const plan of orderedPlans)
         {
-            const tSide = this.PickEntrySide(plan.SourceBounds, plan.TargetBounds);
+            const ranked = this.RankEntrySides(plan.SourceBounds, plan.TargetBounds);
+            let tSide = ranked[0];
+            for (const side of ranked)
+            {
+                const key = `${plan.TargetTable.ID}|${side}`;
+                const used = incomingBySide.get(key)?.length ?? 0;
+                if (used < sideCapacity(plan.TargetBounds, side))
+                {
+                    tSide = side;
+                    break;
+                }
+            }
             // The FK line MUST leave the source horizontally (East/West) at the
             // field-row height — never from the top/bottom. Choose the side that
             // faces the target.
@@ -733,15 +890,29 @@ export class XORMDesign extends XDesign
 
     private PickEntrySide(pFrom: XRect, pTo: XRect): XRouterDirection
     {
+        return this.RankEntrySides(pFrom, pTo)[0];
+    }
+
+    /**
+     * Entry sides of the target ranked by geometric preference: the side facing
+     * the source first, then the orthogonal side facing it, then the opposites.
+     * Used by the congestion-aware anchor distribution to overflow hub tables.
+     */
+    private RankEntrySides(pFrom: XRect, pTo: XRect): XRouterDirection[]
+    {
         const fromCx = pFrom.Left + pFrom.Width / 2;
         const fromCy = pFrom.Top + pFrom.Height / 2;
         const toCx = pTo.Left + pTo.Width / 2;
         const toCy = pTo.Top + pTo.Height / 2;
         const dx = fromCx - toCx;
         const dy = fromCy - toCy;
+        const horiz = dx >= 0 ? XRouterDirection.East : XRouterDirection.West;
+        const horizOpp = dx >= 0 ? XRouterDirection.West : XRouterDirection.East;
+        const vert = dy >= 0 ? XRouterDirection.South : XRouterDirection.North;
+        const vertOpp = dy >= 0 ? XRouterDirection.North : XRouterDirection.South;
         if (Math.abs(dx) >= Math.abs(dy))
-            return dx >= 0 ? XRouterDirection.East : XRouterDirection.West;
-        return dy >= 0 ? XRouterDirection.South : XRouterDirection.North;
+            return [horiz, vert, vertOpp, horizOpp];
+        return [vert, horiz, horizOpp, vertOpp];
     }
 
     private AnchorOnSide(pRect: XRect, pSide: XRouterDirection, pT: number): XPoint
@@ -776,12 +947,16 @@ export class XORMDesign extends XDesign
      * Routes a single reference using the XRouter graph-search algorithm.
      * Source exits horizontally (East/West) at the FK field row Y.
      * Target may be entered from any side.
-     * Mirrors the C# XDesigner.DoRoute two-pass approach.
+     * Three passes: (1) pinned anchors + obstacles, (2) relaxed anchors with
+     * obstacles KEPT (never route through tables to "solve" a failure),
+     * (3) orthogonal L/Z fallback so the reference always renders without
+     * diagonals.
      */
     private RouteReference(
         pRef: XORMReference,
         pTables: XORMTable[],
-        pAnchor?: { TargetAnchor: XPoint; TargetSide: XRouterDirection; SourceAnchor: XPoint; SourceSide: XRouterDirection }
+        pAnchor?: { TargetAnchor: XPoint; TargetSide: XRouterDirection; SourceAnchor: XPoint; SourceSide: XRouterDirection },
+        pContext?: XRouteContext
     ): void
     {
         let sourceField = pRef.GetSourceElement<XORMField>();
@@ -855,6 +1030,11 @@ export class XORMDesign extends XDesign
 
         const router = this.Router;
         router.Gap = XORMMetrics.RouterGap;
+        // Turn penalty equal to the gap: a bend must save at least one full
+        // corridor of length to be worth it — kills gratuitous zig-zags.
+        router.TurnPenalty = XORMMetrics.RouterGap;
+        router.Context = pContext ?? null;
+        router.CurrentRefID = pRef.ID;
         router.clearObstacles();
         router.setEndpoints(sourceBounds, targetBounds);
 
@@ -872,6 +1052,11 @@ export class XORMDesign extends XDesign
                 ));
             }
         }
+        // The source and target tables themselves are obstacles too (not
+        // inflated: anchors sit on their borders and exit stubs leave at a
+        // full gap). Without this, a route could cut through its own tables.
+        router.addObstacle(sourceBounds);
+        router.addObstacle(targetBounds);
 
         router.CheckCrossRect = true;
         router.clear();
@@ -879,11 +1064,25 @@ export class XORMDesign extends XDesign
 
         if (!result.IsValid || result.Points.length === 0)
         {
-            router.CheckCrossRect = false;
-            router.clearObstacles();
+            // Pass 2: relax the pinned anchors (all geometrically sensible
+            // direction combinations, free anchor position) but KEEP the
+            // obstacles — a failed route must never cut through tables.
+            const relaxedSrc: XRouterShape = {
+                Rect: fieldRect,
+                StartPoint: isNaN(fieldY) ? new XPoint(NaN, NaN) : new XPoint(NaN, fieldY),
+                DesiredDegree: this.PickSourceDirections(sourceBounds, targetBounds)
+            };
+            const relaxedTgt: XRouterShape = {
+                Rect: targetBounds,
+                StartPoint: new XPoint(NaN, NaN),
+                DesiredDegree: this.PickTargetDirections(sourceBounds, targetBounds)
+            };
             router.clear();
-            result = router.getAllLines(srcShape, tgtShape);
+            result = router.getAllLines(relaxedSrc, relaxedTgt);
         }
+
+        router.Context = null;
+        router.CurrentRefID = "";
 
         if (result.IsValid && result.Points.length > 0)
         {
@@ -891,15 +1090,83 @@ export class XORMDesign extends XDesign
             return;
         }
 
-        // Final guard: if no route was found, fall back to a direct two-point
-        // line between the chosen anchors so the reference always renders.
+        // Final guard: orthogonal L/Z fallback between the chosen anchors so
+        // the reference always renders — never a diagonal line.
+        pRef.Points = this.OrthogonalFallbackRoute(sourceBounds, targetBounds, fieldY, pAnchor);
+    }
+
+    /**
+     * Deterministic orthogonal fallback: exits the source horizontally at the
+     * FK row, runs a vertical trunk one gap away from the source border and
+     * enters the target through its anchor side. Every segment is H/V.
+     */
+    private OrthogonalFallbackRoute(
+        pSourceBounds: XRect,
+        pTargetBounds: XRect,
+        pFieldY: number,
+        pAnchor?: { TargetAnchor: XPoint; TargetSide: XRouterDirection; SourceAnchor: XPoint; SourceSide: XRouterDirection }
+    ): XPoint[]
+    {
+        const gap = XORMMetrics.RouterGap / 2;
+        const srcSide = pAnchor?.SourceSide
+            ?? (pTargetBounds.Left + pTargetBounds.Width / 2 >= pSourceBounds.Left + pSourceBounds.Width / 2
+                ? XRouterDirection.East
+                : XRouterDirection.West);
         const srcPt = pAnchor
             ? pAnchor.SourceAnchor
-            : new XPoint(sourceBounds.Left + sourceBounds.Width, sourceBounds.Top + sourceBounds.Height / 2);
+            : (srcSide === XRouterDirection.East
+                ? new XPoint(pSourceBounds.Right, isNaN(pFieldY) ? pSourceBounds.Top + pSourceBounds.Height / 2 : pFieldY)
+                : new XPoint(pSourceBounds.Left, isNaN(pFieldY) ? pSourceBounds.Top + pSourceBounds.Height / 2 : pFieldY));
+        const tgtSide = pAnchor?.TargetSide
+            ?? (srcSide === XRouterDirection.East ? XRouterDirection.West : XRouterDirection.East);
         const tgtPt = pAnchor
             ? pAnchor.TargetAnchor
-            : new XPoint(targetBounds.Left, targetBounds.Top + targetBounds.Height / 2);
-        pRef.Points = [srcPt, tgtPt];
+            : (tgtSide === XRouterDirection.West
+                ? new XPoint(pTargetBounds.Left, pTargetBounds.Top + pTargetBounds.Height / 2)
+                : new XPoint(pTargetBounds.Right, pTargetBounds.Top + pTargetBounds.Height / 2));
+
+        // Vertical trunk X: one gap out of the source border toward the target.
+        const trunkX = srcSide === XRouterDirection.East
+            ? pSourceBounds.Right + gap
+            : pSourceBounds.Left - gap;
+
+        // Entry stub: one gap out of the target border on the entry side.
+        let entry: XPoint;
+        switch (tgtSide)
+        {
+            case XRouterDirection.West:
+                entry = new XPoint(pTargetBounds.Left - gap, tgtPt.Y);
+                break;
+            case XRouterDirection.East:
+                entry = new XPoint(pTargetBounds.Right + gap, tgtPt.Y);
+                break;
+            case XRouterDirection.North:
+                entry = new XPoint(tgtPt.X, pTargetBounds.Top - gap);
+                break;
+            default: // South
+                entry = new XPoint(tgtPt.X, pTargetBounds.Bottom + gap);
+                break;
+        }
+
+        // Trunk vertical to the entry stub height, horizontal run to the stub,
+        // then the stub enters the anchor (horizontal for E/W, vertical for N/S).
+        const points: XPoint[] = [
+            srcPt,
+            new XPoint(trunkX, srcPt.Y),
+            new XPoint(trunkX, entry.Y),
+            entry,
+            tgtPt
+        ];
+
+        // Drop consecutive duplicates (degenerate spans collapse cleanly).
+        const out: XPoint[] = [points[0]];
+        for (let i = 1; i < points.length; i++)
+        {
+            const prev = out[out.length - 1];
+            if (Math.abs(points[i].X - prev.X) > 0.5 || Math.abs(points[i].Y - prev.Y) > 0.5)
+                out.push(points[i]);
+        }
+        return out;
     }
 
     private PickSourceDirections(pSource: XRect, pTarget: XRect): XRouterDirection[]
@@ -929,5 +1196,102 @@ export class XORMDesign extends XDesign
         if (dirs.indexOf(XRouterDirection.North) < 0) dirs.push(XRouterDirection.North);
         if (dirs.indexOf(XRouterDirection.South) < 0) dirs.push(XRouterDirection.South);
         return dirs;
+    }
+
+    /**
+     * Routing quality metrics over the current reference points — total
+     * length, bends, line/line crossings, colinear overlaps and table
+     * crossings. Used by tests as a regression gate and by telemetry.
+     */
+    public GetRoutingMetrics(): XIRoutingMetrics
+    {
+        interface IMSeg { RefID: string; Vertical: boolean; Fixed: number; Lo: number; Hi: number; }
+        const segs: IMSeg[] = [];
+        const refs = this.GetReferences();
+        let totalLength = 0;
+        let totalBends = 0;
+
+        for (const ref of refs)
+        {
+            const pts = ref.Points;
+            if (!pts || pts.length < 2)
+                continue;
+            for (let i = 1; i < pts.length; i++)
+            {
+                const a = pts[i - 1];
+                const b = pts[i];
+                totalLength += Math.abs(a.X - b.X) + Math.abs(a.Y - b.Y);
+                if (i >= 2)
+                {
+                    const p = pts[i - 2];
+                    const horiz1 = Math.abs(p.Y - a.Y) < 0.5;
+                    const horiz2 = Math.abs(a.Y - b.Y) < 0.5;
+                    if (horiz1 !== horiz2)
+                        totalBends++;
+                }
+                if (Math.abs(a.X - b.X) < 0.5 && Math.abs(a.Y - b.Y) >= 0.5)
+                    segs.push({ RefID: ref.ID, Vertical: true, Fixed: a.X, Lo: Math.min(a.Y, b.Y), Hi: Math.max(a.Y, b.Y) });
+                else if (Math.abs(a.Y - b.Y) < 0.5 && Math.abs(a.X - b.X) >= 0.5)
+                    segs.push({ RefID: ref.ID, Vertical: false, Fixed: a.Y, Lo: Math.min(a.X, b.X), Hi: Math.max(a.X, b.X) });
+            }
+        }
+
+        let crossings = 0;
+        let overlaps = 0;
+        for (let i = 0; i < segs.length; i++)
+        {
+            for (let j = i + 1; j < segs.length; j++)
+            {
+                const a = segs[i];
+                const b = segs[j];
+                if (a.RefID === b.RefID)
+                    continue;
+                if (a.Vertical !== b.Vertical)
+                {
+                    const v = a.Vertical ? a : b;
+                    const h = a.Vertical ? b : a;
+                    if (v.Fixed > h.Lo + 1 && v.Fixed < h.Hi - 1 && h.Fixed > v.Lo + 1 && h.Fixed < v.Hi - 1)
+                        crossings++;
+                }
+                else if (Math.abs(a.Fixed - b.Fixed) < 2)
+                {
+                    const lo = Math.max(a.Lo, b.Lo);
+                    const hi = Math.min(a.Hi, b.Hi);
+                    if (hi - lo > 2)
+                        overlaps++;
+                }
+            }
+        }
+
+        let tableCrossings = 0;
+        const tables = this.GetTables().map(t => this.GetVisualBounds(t));
+        for (const seg of segs)
+        {
+            for (const r of tables)
+            {
+                if (seg.Vertical)
+                {
+                    if (seg.Fixed > r.Left + 1 && seg.Fixed < r.Right - 1 && seg.Hi > r.Top + 1 && seg.Lo < r.Bottom - 1)
+                    {
+                        tableCrossings++;
+                        break;
+                    }
+                }
+                else if (seg.Fixed > r.Top + 1 && seg.Fixed < r.Bottom - 1 && seg.Hi > r.Left + 1 && seg.Lo < r.Right - 1)
+                {
+                    tableCrossings++;
+                    break;
+                }
+            }
+        }
+
+        return {
+            ReferenceCount: refs.length,
+            TotalLength: totalLength,
+            TotalBends: totalBends,
+            Crossings: crossings,
+            Overlaps: overlaps,
+            TableCrossings: tableCrossings
+        };
     }
 }

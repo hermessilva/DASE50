@@ -283,7 +283,7 @@ describe("XORMDesign internal coverage", () =>
         expect(ref.Points.length).toBeGreaterThan(0);
     });
 
-    it("RouteReference falls back to a direct two-point line when both router passes return invalid", () =>
+    it("RouteReference falls back to an orthogonal L/Z route when both router passes return invalid", () =>
     {
         const design = new XORMDesign();
         const sourceTable = design.CreateTable({ Name: "Src", X: 0, Y: 0, Width: 200, Height: 120 });
@@ -304,7 +304,15 @@ describe("XORMDesign internal coverage", () =>
 
         (design as any).RouteReference(ref, [sourceTable, targetTable]);
 
-        // Direct fallback line: exactly two points (source anchor → target anchor)
-        expect(ref.Points.length).toBe(2);
+        // Orthogonal fallback: at least two points, and every segment is H or V.
+        expect(ref.Points.length).toBeGreaterThanOrEqual(2);
+        for (let i = 1; i < ref.Points.length; i++)
+        {
+            const a = ref.Points[i - 1];
+            const b = ref.Points[i];
+            const horizontal = Math.abs(a.Y - b.Y) < 0.5;
+            const vertical = Math.abs(a.X - b.X) < 0.5;
+            expect(horizontal || vertical).toBe(true);
+        }
     });
 });

@@ -8,6 +8,7 @@ import {
     normalizeRect,
     isEmptyRect
 } from "./XRouterTypes.js";
+import { XRouteContext } from "./XRouteContext.js";
 
 export interface XRouterOptions
 {
@@ -32,7 +33,7 @@ export interface XRouterResult
 
 interface IGridNode
 {
-    Key: string;
+    Key: number;
     Ix: number;
     Iy: number;
     X: number;
@@ -112,6 +113,12 @@ const EPS = 0.5;
 const DEFAULT_GAP = 20;
 const DEFAULT_TURN_PENALTY = 12;
 const DEFAULT_MAX_NODES = 20000;
+// Social penalties are deliberately mild: strong values build cost "walls"
+// that bury the A* heuristic and make the search flood large diagrams.
+// Overlap 1/px means a 40px stacked run costs one 40px detour — enough for
+// lines to prefer a free neighbouring lane, cheap enough to stay fast.
+const DEFAULT_OVERLAP_PENALTY_PER_PX = 1;
+const DEFAULT_CROSS_PENALTY = 12;
 
 export class XRouter
 {
@@ -124,6 +131,20 @@ export class XRouter
     public CheckCrossRect: boolean = true;
     public TurnPenalty: number = DEFAULT_TURN_PENALTY;
     public MaxNodes: number = DEFAULT_MAX_NODES;
+
+    /**
+     * Contexto global compartilhado (grade + occupancy). Quando presente:
+     *   - a grade de tracks vem do contexto (construída uma vez por passada)
+     *   - o A* soma custos sociais: sobreposição colinear e cruzamento com
+     *     rotas já traçadas nesta passada (penaliza amontoar linhas).
+     */
+    public Context: XRouteContext | null = null;
+    /** ID da referência sendo roteada — excluída das consultas de ocupação. */
+    public CurrentRefID: string = "";
+    /** Custo por pixel de sobreposição colinear com rota existente. */
+    public OverlapPenaltyPerPx: number = DEFAULT_OVERLAP_PENALTY_PER_PX;
+    /** Custo por cruzamento perpendicular com rota existente. */
+    public CrossPenalty: number = DEFAULT_CROSS_PENALTY;
 
     public SolvedLines: XRouterLine[] = [];
     public AllLines: XRouterLine[] = [];
@@ -231,48 +252,35 @@ export class XRouter
             ? pRight.DesiredDegree
             : [XRouterDirection.East, XRouterDirection.West, XRouterDirection.North, XRouterDirection.South];
 
-        const tracks = this.BuildTracks(leftRect, rightRect);
+        // Base tracks: from the shared context when available (built once per
+        // full reroute), otherwise computed locally for this pair.
+        const baseTracks = this.Context
+            ? { X: this.Context.TracksX, Y: this.Context.TracksY }
+            : this.BuildTracks(leftRect, rightRect);
 
-        let best: XPoint[] | null = null;
-        let bestCost = Infinity;
+        // Search window: routes rarely need to leave the corridor between the
+        // two endpoints. Clipping tracks and obstacles to this window keeps
+        // the A* grid small on large diagrams; a full-grid retry below covers
+        // the rare detour that must leave the window.
+        const windowMargin = this.Gap * 2;
+        const winLeft = Math.min(leftRect.Left, rightRect.Left) - windowMargin;
+        const winRight = Math.max(leftRect.Right, rightRect.Right) + windowMargin;
+        const winTop = Math.min(leftRect.Top, rightRect.Top) - windowMargin;
+        const winBottom = Math.max(leftRect.Bottom, rightRect.Bottom) + windowMargin;
 
-        for (const sd of srcDirs)
-        {
-            for (const td of tgtDirs)
-            {
-                const startAnchor = this.AnchorPoint(leftRect, sd, pLeft.StartPoint);
-                const endAnchor = this.AnchorPoint(rightRect, td, pRight.StartPoint);
-                const startExit = this.ExitPoint(startAnchor, sd);
-                const endEntry = this.ExitPoint(endAnchor, td);
+        const windowTracks = {
+            X: baseTracks.X.filter(v => v >= winLeft && v <= winRight),
+            Y: baseTracks.Y.filter(v => v >= winTop && v <= winBottom)
+        };
+        const windowRects = this.Rects.filter(r =>
+            r.Right >= winLeft && r.Left <= winRight && r.Bottom >= winTop && r.Top <= winBottom);
 
-                this.RegisterTrack(tracks.X, startAnchor.X);
-                this.RegisterTrack(tracks.X, startExit.X);
-                this.RegisterTrack(tracks.X, endAnchor.X);
-                this.RegisterTrack(tracks.X, endEntry.X);
-                this.RegisterTrack(tracks.Y, startAnchor.Y);
-                this.RegisterTrack(tracks.Y, startExit.Y);
-                this.RegisterTrack(tracks.Y, endAnchor.Y);
-                this.RegisterTrack(tracks.Y, endEntry.Y);
+        let best = this.RouteWithTracks(
+            pLeft, pRight, srcDirs, tgtDirs, leftRect, rightRect, windowTracks, windowRects);
 
-                tracks.X.sort((a, b) => a - b);
-                tracks.Y.sort((a, b) => a - b);
-                const xs = this.Unique(tracks.X);
-                const ys = this.Unique(tracks.Y);
-
-                const path = this.AStar(xs, ys, startExit, endEntry, sd, leftRect, rightRect);
-                if (!path)
-                    continue;
-
-                const full: XPoint[] = [startAnchor, ...path, endAnchor];
-                const simplified = this.Simplify(full);
-                const cost = this.PathCost(simplified);
-                if (cost < bestCost)
-                {
-                    bestCost = cost;
-                    best = simplified;
-                }
-            }
-        }
+        if (!best && (windowTracks.X.length < baseTracks.X.length || windowTracks.Y.length < baseTracks.Y.length))
+            best = this.RouteWithTracks(
+                pLeft, pRight, srcDirs, tgtDirs, leftRect, rightRect, baseTracks, this.Rects);
 
         if (best)
         {
@@ -284,6 +292,62 @@ export class XRouter
         }
 
         return this.BestLine;
+    }
+
+    /**
+     * Tries every requested direction combination over the given track set and
+     * obstacle list, returning the cheapest simplified path (or null).
+     */
+    private RouteWithTracks(
+        pLeft: XRouterShape,
+        pRight: XRouterShape,
+        pSrcDirs: number[],
+        pTgtDirs: number[],
+        pLeftRect: XRect,
+        pRightRect: XRect,
+        pTracks: { X: number[]; Y: number[] },
+        pActiveRects: XRect[]
+    ): XPoint[] | null
+    {
+        let best: XPoint[] | null = null;
+        let bestCost = Infinity;
+
+        for (const sd of pSrcDirs)
+        {
+            for (const td of pTgtDirs)
+            {
+                const startAnchor = this.AnchorPoint(pLeftRect, sd, pLeft.StartPoint);
+                const endAnchor = this.AnchorPoint(pRightRect, td, pRight.StartPoint);
+                const startExit = this.ExitPoint(startAnchor, sd);
+                const endEntry = this.ExitPoint(endAnchor, td);
+
+                // Copy base tracks per combination so anchor tracks of one
+                // combo never leak into the next (keeps the base immutable).
+                const tx = pTracks.X.slice();
+                const ty = pTracks.Y.slice();
+                tx.push(startAnchor.X, startExit.X, endAnchor.X, endEntry.X);
+                ty.push(startAnchor.Y, startExit.Y, endAnchor.Y, endEntry.Y);
+                tx.sort((a, b) => a - b);
+                ty.sort((a, b) => a - b);
+                const xs = this.Unique(tx);
+                const ys = this.Unique(ty);
+
+                const path = this.AStar(xs, ys, startExit, endEntry, sd, pLeftRect, pRightRect, pActiveRects);
+                if (!path)
+                    continue;
+
+                const full: XPoint[] = [startAnchor, ...path, endAnchor];
+                const simplified = this.Simplify(full);
+                const cost = this.PathCost(simplified) + this.SocialCost(simplified);
+                if (cost < bestCost)
+                {
+                    bestCost = cost;
+                    best = simplified;
+                }
+            }
+        }
+
+        return best;
     }
 
     private BuildTracks(pLeft: XRect, pRight: XRect): { X: number[]; Y: number[] }
@@ -327,11 +391,6 @@ export class XRouter
         return { X: xs, Y: ys };
     }
 
-    private RegisterTrack(pArr: number[], pV: number): void
-    {
-        pArr.push(pV);
-    }
-
     private Unique(pArr: number[]): number[]
     {
         if (pArr.length === 0) return pArr;
@@ -366,52 +425,6 @@ export class XRouter
         return new XPoint(pAnchor.X + gap, pAnchor.Y);
     }
 
-    private SegmentBlocked(
-        pAx: number, pAy: number, pBx: number, pBy: number,
-        pSrc: XRect, pTgt: XRect
-    ): boolean
-    {
-        if (this.LineIntersectsRectInterior(pSrc, pAx, pAy, pBx, pBy))
-            return true;
-        if (this.LineIntersectsRectInterior(pTgt, pAx, pAy, pBx, pBy))
-            return true;
-
-        if (!this.CheckCollision)
-            return false;
-
-        for (const r of this.Rects)
-        {
-            if (r === pSrc || r === pTgt)
-                continue;
-            if (this.LineIntersectsRectInterior(r, pAx, pAy, pBx, pBy))
-                return true;
-        }
-        return false;
-    }
-
-    private LineIntersectsRectInterior(pR: XRect, pAx: number, pAy: number, pBx: number, pBy: number): boolean
-    {
-        const left = pR.Left + EPS;
-        const right = pR.Left + pR.Width - EPS;
-        const top = pR.Top + EPS;
-        const bottom = pR.Top + pR.Height - EPS;
-
-        if (Math.abs(pAx - pBx) < EPS)
-        {
-            if (pAx <= left || pAx >= right)
-                return false;
-            const ymin = Math.min(pAy, pBy);
-            const ymax = Math.max(pAy, pBy);
-            return ymax > top && ymin < bottom;
-        }
-
-        if (pAy <= top || pAy >= bottom)
-            return false;
-        const xmin = Math.min(pAx, pBx);
-        const xmax = Math.max(pAx, pBx);
-        return xmax > left && xmin < right;
-    }
-
     private AStar(
         pXs: number[],
         pYs: number[],
@@ -419,9 +432,11 @@ export class XRouter
         pEnd: XPoint,
         pStartDir: number,
         pSrc: XRect,
-        pTgt: XRect
+        pTgt: XRect,
+        pActiveRects?: XRect[]
     ): XPoint[] | null
     {
+        const activeRects = pActiveRects ?? this.Rects;
         const startIx = this.NearestIndex(pXs, pStart.X);
         const startIy = this.NearestIndex(pYs, pStart.Y);
         const endIx = this.NearestIndex(pXs, pEnd.X);
@@ -433,26 +448,146 @@ export class XRouter
         const ex = pXs[endIx];
         const ey = pYs[endIy];
 
+        // Precomputed straddle lists: for every x-track, the y-interiors of the
+        // rects that this track passes through (and symmetrically for y-tracks).
+        // Turns the per-edge obstacle test from O(rects) into O(straddling few).
+        const blockRects: XRect[] = [pSrc, pTgt];
+        if (this.CheckCollision)
+        {
+            for (const r of activeRects)
+            {
+                if (r !== pSrc && r !== pTgt)
+                    blockRects.push(r);
+            }
+        }
+        const vBlock: number[][] = new Array(pXs.length);
+        for (let i = 0; i < pXs.length; i++)
+        {
+            const x = pXs[i];
+            const list: number[] = [];
+            for (const r of blockRects)
+            {
+                if (x > r.Left + EPS && x < r.Left + r.Width - EPS)
+                    list.push(r.Top + EPS, r.Top + r.Height - EPS);
+            }
+            vBlock[i] = list;
+        }
+        const hBlock: number[][] = new Array(pYs.length);
+        for (let i = 0; i < pYs.length; i++)
+        {
+            const y = pYs[i];
+            const list: number[] = [];
+            for (const r of blockRects)
+            {
+                if (y > r.Top + EPS && y < r.Top + r.Height - EPS)
+                    list.push(r.Left + EPS, r.Left + r.Width - EPS);
+            }
+            hBlock[i] = list;
+        }
+
+        const verticalStepBlocked = (pIx: number, pYa: number, pYb: number): boolean =>
+        {
+            const list = vBlock[pIx];
+            const lo = pYa < pYb ? pYa : pYb;
+            const hi = pYa < pYb ? pYb : pYa;
+            for (let i = 0; i < list.length; i += 2)
+            {
+                if (hi > list[i] && lo < list[i + 1])
+                    return true;
+            }
+            return false;
+        };
+        const horizontalStepBlocked = (pIy: number, pXa: number, pXb: number): boolean =>
+        {
+            const list = hBlock[pIy];
+            const lo = pXa < pXb ? pXa : pXb;
+            const hi = pXa < pXb ? pXb : pXa;
+            for (let i = 0; i < list.length; i += 2)
+            {
+                if (hi > list[i] && lo < list[i + 1])
+                    return true;
+            }
+            return false;
+        };
+
+        // Strict closed set: each (cell, heading) state expands at most once.
+        // Social costs make the cost landscape inconsistent with the heuristic;
+        // allowing re-expansion caused near-exhaustive searches on large grids
+        // for a marginal quality gain, so re-expansion is deliberately not done.
         const open = new XNodeHeap();
-        const closed = new Map<string, number>();
+        const closed = new Set<number>();
+        const yLen = pYs.length;
+        const xLen = pXs.length;
+        // Exploring more than every (cell, direction) state is pointless.
+        const maxSteps = Math.min(this.MaxNodes, xLen * yLen * 4 + 1000);
 
         const startNode: IGridNode = {
-            Key: this.NodeKey(startIx, startIy, pStartDir),
+            Key: this.NodeKey(startIx, startIy, pStartDir, yLen),
             Ix: startIx,
             Iy: startIy,
             X: pXs[startIx],
             Y: pYs[startIy],
             Dir: pStartDir,
             G: 0,
-            F: this.Heuristic(pXs[startIx], pYs[startIy], ex, ey),
+            F: this.Heuristic(pXs[startIx], pYs[startIy], ex, ey, pStartDir),
             Parent: null
         };
         open.Push(startNode);
 
+        // Social costs are stable for a given edge during one search — cache
+        // them so re-pushed nodes do not rescan the occupancy buckets.
+        const socialCache = new Map<number, number>();
+
+        const tryStep = (pCur: IGridNode, pNIx: number, pNIy: number): void =>
+        {
+            const nx = pXs[pNIx];
+            const ny = pYs[pNIy];
+            let stepDir: number;
+            if (pNIx === pCur.Ix)
+            {
+                if (verticalStepBlocked(pNIx, pCur.Y, ny))
+                    return;
+                stepDir = ny < pCur.Y ? XRouterDirection.North : XRouterDirection.South;
+            }
+            else
+            {
+                if (horizontalStepBlocked(pNIy, pCur.X, nx))
+                    return;
+                stepDir = nx < pCur.X ? XRouterDirection.West : XRouterDirection.East;
+            }
+
+            const turn = pCur.Parent === null ? 0 : (stepDir !== pCur.Dir ? this.TurnPenalty : 0);
+            const step = Math.abs(nx - pCur.X) + Math.abs(ny - pCur.Y);
+            const key = this.NodeKey(pNIx, pNIy, stepDir, yLen);
+            if (closed.has(key))
+                return;
+            let social = socialCache.get(key);
+            if (social === undefined)
+            {
+                social = this.StepSocialCost(pCur.X, pCur.Y, nx, ny);
+                socialCache.set(key, social);
+            }
+            const g = pCur.G + step + turn + social;
+
+            open.Push({
+                Key: key,
+                Ix: pNIx,
+                Iy: pNIy,
+                X: nx,
+                Y: ny,
+                Dir: stepDir,
+                G: g,
+                F: g + this.Heuristic(nx, ny, ex, ey, stepDir),
+                Parent: pCur
+            });
+        };
+
+        let steps = 0;
         while (open.Size > 0)
         {
+            steps++;
             this.Steps++;
-            if (this.Steps > this.MaxNodes)
+            if (steps > maxSteps)
                 return null;
 
             const cur = open.Pop()!;
@@ -462,70 +597,69 @@ export class XRouter
             if (curIx === endIx && curIy === endIy)
                 return this.Reconstruct(cur);
 
-            const prevG = closed.get(cur.Key);
-            if (prevG !== undefined && prevG <= cur.G)
+            if (closed.has(cur.Key))
                 continue;
-            closed.set(cur.Key, cur.G);
+            closed.add(cur.Key);
 
-            for (const nbr of this.Neighbors(curIx, curIy, pXs, pYs))
-            {
-                const nx = pXs[nbr.Ix];
-                const ny = pYs[nbr.Iy];
-                if (this.SegmentBlocked(cur.X, cur.Y, nx, ny, pSrc, pTgt))
-                    continue;
-
-                const stepDir = this.DirOf(cur.X, cur.Y, nx, ny);
-
-                const turn = cur.Parent === null ? 0 : (stepDir !== cur.Dir ? this.TurnPenalty : 0);
-                const step = Math.abs(nx - cur.X) + Math.abs(ny - cur.Y);
-                const g = cur.G + step + turn;
-                const key = this.NodeKey(nbr.Ix, nbr.Iy, stepDir);
-                const oldG = closed.get(key);
-                if (oldG !== undefined && oldG <= g)
-                    continue;
-
-                open.Push({
-                    Key: key,
-                    Ix: nbr.Ix,
-                    Iy: nbr.Iy,
-                    X: nx,
-                    Y: ny,
-                    Dir: stepDir,
-                    G: g,
-                    F: g + this.Heuristic(nx, ny, ex, ey),
-                    Parent: cur
-                });
-            }
+            if (curIx > 0) tryStep(cur, curIx - 1, curIy);
+            if (curIx < xLen - 1) tryStep(cur, curIx + 1, curIy);
+            if (curIy > 0) tryStep(cur, curIx, curIy - 1);
+            if (curIy < yLen - 1) tryStep(cur, curIx, curIy + 1);
         }
 
         return null;
     }
 
-    private Neighbors(pIx: number, pIy: number, pXs: number[], pYs: number[]): Array<{ Ix: number; Iy: number }>
+    private NodeKey(pIx: number, pIy: number, pDir: number, pYLen: number): number
     {
-        const out: Array<{ Ix: number; Iy: number }> = [];
-        if (pIx > 0) out.push({ Ix: pIx - 1, Iy: pIy });
-        if (pIx < pXs.length - 1) out.push({ Ix: pIx + 1, Iy: pIy });
-        if (pIy > 0) out.push({ Ix: pIx, Iy: pIy - 1 });
-        if (pIy < pYs.length - 1) out.push({ Ix: pIx, Iy: pIy + 1 });
-        return out;
+        // Numeric key: (ix * yLen + iy) * 4 + dirIndex — avoids string
+        // allocation in the A* hot path. Directions are multiples of 90.
+        return (pIx * pYLen + pIy) * 4 + (pDir / 90);
     }
 
-    private DirOf(pAx: number, pAy: number, pBx: number, pBy: number): number
+    private Heuristic(pAx: number, pAy: number, pBx: number, pBy: number, pDir: number = -1): number
     {
-        if (Math.abs(pAx - pBx) < EPS)
-            return pBy < pAy ? XRouterDirection.North : XRouterDirection.South;
-        return pBx < pAx ? XRouterDirection.West : XRouterDirection.East;
-    }
+        // Weighted A* (ε = 20%) plus a lower bound on the remaining turns
+        // given the current heading. Real routes accumulate turn and social
+        // penalties the heuristic cannot see, so an unweighted search floods
+        // the grid; the weight trades a bounded optimality loss for an
+        // order-of-magnitude fewer expansions. Route shape is still governed
+        // by the turn and social terms in G.
+        const dx = pBx - pAx;
+        const dy = pBy - pAy;
+        const dist = (Math.abs(dx) + Math.abs(dy)) * 1.5;
 
-    private NodeKey(pIx: number, pIy: number, pDir: number): string
-    {
-        return `${pIx}|${pIy}|${pDir}`;
-    }
+        if (pDir < 0 || dist < EPS)
+            return dist;
 
-    private Heuristic(pAx: number, pAy: number, pBx: number, pBy: number): number
-    {
-        return Math.abs(pAx - pBx) + Math.abs(pAy - pBy);
+        const needX = Math.abs(dx) > EPS;
+        const needY = Math.abs(dy) > EPS;
+        let turns: number;
+        if (pDir === XRouterDirection.East || pDir === XRouterDirection.West)
+        {
+            const forward = pDir === XRouterDirection.East ? dx : -dx;
+            if (!needY)
+                turns = forward > EPS ? 0 : 2;
+            else if (forward > EPS)
+                turns = 1;
+            else if (!needX)
+                turns = 1;
+            else
+                turns = 2;
+        }
+        else
+        {
+            const forward = pDir === XRouterDirection.South ? dy : -dy;
+            if (!needX)
+                turns = forward > EPS ? 0 : 2;
+            else if (forward > EPS)
+                turns = 1;
+            else if (!needY)
+                turns = 1;
+            else
+                turns = 2;
+        }
+        return dist + turns * this.TurnPenalty;
     }
 
     private NearestIndex(pArr: number[], pV: number): number
@@ -573,6 +707,41 @@ export class XRouter
         }
         out.push(pPoints[pPoints.length - 1]);
         return out;
+    }
+
+    /**
+     * Social cost of a single A* step against routes already committed in the
+     * shared context: colinear overlap (strong) and perpendicular crossings
+     * (medium). Zero when no context is attached — legacy behavior preserved.
+     */
+    private StepSocialCost(pAx: number, pAy: number, pBx: number, pBy: number): number
+    {
+        const ctx = this.Context;
+        if (!ctx)
+            return 0;
+        const occ = ctx.Occupancy;
+        if (Math.abs(pAx - pBx) < EPS)
+        {
+            const lo = Math.min(pAy, pBy);
+            const hi = Math.max(pAy, pBy);
+            return this.OverlapPenaltyPerPx * occ.OverlapLength(true, pAx, lo, hi, this.CurrentRefID)
+                + this.CrossPenalty * occ.CrossingCount(true, pAx, lo, hi, this.CurrentRefID);
+        }
+        const lo = Math.min(pAx, pBx);
+        const hi = Math.max(pAx, pBx);
+        return this.OverlapPenaltyPerPx * occ.OverlapLength(false, pAy, lo, hi, this.CurrentRefID)
+            + this.CrossPenalty * occ.CrossingCount(false, pAy, lo, hi, this.CurrentRefID);
+    }
+
+    /** Social cost of an entire path — used to compare direction combinations. */
+    private SocialCost(pPoints: XPoint[]): number
+    {
+        if (!this.Context)
+            return 0;
+        let total = 0;
+        for (let i = 1; i < pPoints.length; i++)
+            total += this.StepSocialCost(pPoints[i - 1].X, pPoints[i - 1].Y, pPoints[i].X, pPoints[i].Y);
+        return total;
     }
 
     private PathCost(pPoints: XPoint[]): number

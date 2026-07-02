@@ -552,16 +552,16 @@ describe("XRouter", () => {
         expect(line.IsValid).toBe(true);
     });
 
-    it("Neighbors respects array boundaries", () => {
+    it("AStar respects grid boundaries (corner-to-corner route on a 2x2 grid)", () => {
         const router = new XRouter();
         const xs = [0, 5];
         const ys = [0, 5];
         // @ts-ignore
-        const center = router["Neighbors"](0, 0, xs, ys);
-        expect(center.length).toBe(2);
-        // @ts-ignore
-        const farCorner = router["Neighbors"](1, 1, xs, ys);
-        expect(farCorner.length).toBe(2);
+        const path = router["AStar"](xs, ys, new XPoint(0, 0), new XPoint(5, 5), XRouterDirection.East,
+            new XRect(0, 0, 0, 0), new XRect(0, 0, 0, 0), []);
+        expect(path).not.toBeNull();
+        expect(path![0].X).toBe(0);
+        expect(path![path!.length - 1].X).toBe(5);
     });
 
     it("Simplify returns short paths unchanged", () => {

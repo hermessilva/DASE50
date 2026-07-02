@@ -3,4 +3,5 @@ export { XRectangle, XLineCap, XLineJoin, XCursor } from "./XRectangle.js";
 export { XLine } from "./XLine.js";
 export { XField } from "./XField.js";
 export { XRouter, XRouterOptions, XRouterResult } from "./XRouter.js";
+export { XRouteContext, XOccupancyMap, XOccupancyInterval } from "./XRouteContext.js";
 export * from "./XRouterTypes.js";
