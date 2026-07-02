@@ -332,7 +332,11 @@ export class XRouter
                 const xs = this.Unique(tx);
                 const ys = this.Unique(ty);
 
-                const path = this.AStar(xs, ys, startExit, endEntry, sd, pLeftRect, pRightRect, pActiveRects);
+                // The route must arrive at the entry stub heading INTO the
+                // anchor (opposite of the side's outward direction), otherwise
+                // the final stub doubles back over the path — a visible hook.
+                const requiredEndDir = XRouter.OppositeDir(td);
+                const path = this.AStar(xs, ys, startExit, endEntry, sd, pLeftRect, pRightRect, pActiveRects, requiredEndDir);
                 if (!path)
                     continue;
 
@@ -425,6 +429,15 @@ export class XRouter
         return new XPoint(pAnchor.X + gap, pAnchor.Y);
     }
 
+    /** Opposite of a 90-degree-based direction (N<->S, E<->W). */
+    private static OppositeDir(pDir: number): number
+    {
+        if (pDir === XRouterDirection.North) return XRouterDirection.South;
+        if (pDir === XRouterDirection.South) return XRouterDirection.North;
+        if (pDir === XRouterDirection.East) return XRouterDirection.West;
+        return XRouterDirection.East;
+    }
+
     private AStar(
         pXs: number[],
         pYs: number[],
@@ -433,7 +446,8 @@ export class XRouter
         pStartDir: number,
         pSrc: XRect,
         pTgt: XRect,
-        pActiveRects?: XRect[]
+        pActiveRects?: XRect[],
+        pEndDir?: number
     ): XPoint[] | null
     {
         const activeRects = pActiveRects ?? this.Rects;
@@ -545,15 +559,19 @@ export class XRouter
             let stepDir: number;
             if (pNIx === pCur.Ix)
             {
+                stepDir = ny < pCur.Y ? XRouterDirection.North : XRouterDirection.South;
+                if (stepDir === XRouter.OppositeDir(pCur.Dir))
+                    return; // immediate 180° reversal — always a hairpin, never useful
                 if (verticalStepBlocked(pNIx, pCur.Y, ny))
                     return;
-                stepDir = ny < pCur.Y ? XRouterDirection.North : XRouterDirection.South;
             }
             else
             {
+                stepDir = nx < pCur.X ? XRouterDirection.West : XRouterDirection.East;
+                if (stepDir === XRouter.OppositeDir(pCur.Dir))
+                    return;
                 if (horizontalStepBlocked(pNIy, pCur.X, nx))
                     return;
-                stepDir = nx < pCur.X ? XRouterDirection.West : XRouterDirection.East;
             }
 
             const turn = pCur.Parent === null ? 0 : (stepDir !== pCur.Dir ? this.TurnPenalty : 0);
@@ -594,7 +612,10 @@ export class XRouter
             const curIx = cur.Ix;
             const curIy = cur.Iy;
 
-            if (curIx === endIx && curIy === endIy)
+            // Goal must be reached with the required arrival heading (when
+            // one is requested) so the entry stub never doubles back.
+            if (curIx === endIx && curIy === endIy
+                && (pEndDir === undefined || cur.Dir === pEndDir || cur.Parent === null))
                 return this.Reconstruct(cur);
 
             if (closed.has(cur.Key))

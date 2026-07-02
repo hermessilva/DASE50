@@ -824,7 +824,14 @@ export class XORMDesign extends XDesign
         const planSides = new Map<IPlan, { TargetSide: XRouterDirection; SourceSide: XRouterDirection }>();
         for (const plan of orderedPlans)
         {
-            const ranked = this.RankEntrySides(plan.SourceBounds, plan.TargetBounds);
+            // Approach point = the actual FK exit on the source border, so the
+            // side ranking sees where the line really comes from.
+            const srcCxPlan = plan.SourceBounds.Left + plan.SourceBounds.Width / 2;
+            const tgtCxPlan = plan.TargetBounds.Left + plan.TargetBounds.Width / 2;
+            const approach = new XPoint(
+                tgtCxPlan >= srcCxPlan ? plan.SourceBounds.Left + plan.SourceBounds.Width : plan.SourceBounds.Left,
+                isNaN(plan.SourceFieldY) ? plan.SourceBounds.Top + plan.SourceBounds.Height / 2 : plan.SourceFieldY);
+            const ranked = this.RankEntrySides(plan.SourceBounds, plan.TargetBounds, approach);
             let tSide = ranked[0];
             for (const side of ranked)
             {
@@ -894,25 +901,58 @@ export class XORMDesign extends XDesign
     }
 
     /**
-     * Entry sides of the target ranked by geometric preference: the side facing
-     * the source first, then the orthogonal side facing it, then the opposites.
-     * Used by the congestion-aware anchor distribution to overflow hub tables.
+     * Entry sides of the target ranked by estimated route cost from the
+     * approach point (the source anchor). Each side's cost is the Manhattan
+     * distance to its entry stub PLUS a wrap penalty when the approach point
+     * is on the wrong half-plane (entering that side would require going
+     * around the table — the source of "hook" routes). A center-to-center
+     * tie between two sides no longer picks the wrapped one.
      */
-    private RankEntrySides(pFrom: XRect, pTo: XRect): XRouterDirection[]
+    private RankEntrySides(pFrom: XRect, pTo: XRect, pApproach?: XPoint): XRouterDirection[]
     {
+        const gap = XORMMetrics.RouterGap;
         const fromCx = pFrom.Left + pFrom.Width / 2;
         const fromCy = pFrom.Top + pFrom.Height / 2;
         const toCx = pTo.Left + pTo.Width / 2;
         const toCy = pTo.Top + pTo.Height / 2;
-        const dx = fromCx - toCx;
-        const dy = fromCy - toCy;
-        const horiz = dx >= 0 ? XRouterDirection.East : XRouterDirection.West;
-        const horizOpp = dx >= 0 ? XRouterDirection.West : XRouterDirection.East;
-        const vert = dy >= 0 ? XRouterDirection.South : XRouterDirection.North;
-        const vertOpp = dy >= 0 ? XRouterDirection.North : XRouterDirection.South;
-        if (Math.abs(dx) >= Math.abs(dy))
-            return [horiz, vert, vertOpp, horizOpp];
-        return [vert, horiz, horizOpp, vertOpp];
+        // FK lines leave the source horizontally at the border facing the target.
+        const approach = pApproach ?? new XPoint(
+            toCx >= fromCx ? pFrom.Left + pFrom.Width : pFrom.Left,
+            fromCy);
+
+        const entryOf = (pSide: XRouterDirection): XPoint =>
+        {
+            switch (pSide)
+            {
+                case XRouterDirection.East: return new XPoint(pTo.Left + pTo.Width + gap, toCy);
+                case XRouterDirection.West: return new XPoint(pTo.Left - gap, toCy);
+                case XRouterDirection.North: return new XPoint(toCx, pTo.Top - gap);
+                default: return new XPoint(toCx, pTo.Top + pTo.Height + gap);
+            }
+        };
+        // Wrap deficit: how far the approach point sits inside the wrong
+        // half-plane for this side. Doubled because the route must travel
+        // past the table and come back.
+        const wrapOf = (pSide: XRouterDirection): number =>
+        {
+            switch (pSide)
+            {
+                case XRouterDirection.East: return Math.max(0, (pTo.Left + pTo.Width + gap) - approach.X) * 2;
+                case XRouterDirection.West: return Math.max(0, approach.X - (pTo.Left - gap)) * 2;
+                case XRouterDirection.North: return Math.max(0, approach.Y - (pTo.Top - gap)) * 2;
+                default: return Math.max(0, (pTo.Top + pTo.Height + gap) - approach.Y) * 2;
+            }
+        };
+
+        const sides = [XRouterDirection.East, XRouterDirection.West, XRouterDirection.North, XRouterDirection.South];
+        const costs = new Map<XRouterDirection, number>();
+        for (const side of sides)
+        {
+            const entry = entryOf(side);
+            costs.set(side, Math.abs(entry.X - approach.X) + Math.abs(entry.Y - approach.Y) + wrapOf(side));
+        }
+        sides.sort((a, b) => costs.get(a)! - costs.get(b)!);
+        return sides;
     }
 
     private AnchorOnSide(pRect: XRect, pSide: XRouterDirection, pT: number): XPoint

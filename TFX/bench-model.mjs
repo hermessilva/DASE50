@@ -43,6 +43,20 @@ for (const ref of design.GetReferences()) {
 }
 console.log(`per-route: worstBends=${worstBends} routesOver4Bends=${over4} worstLenRatio=${worstRatio.toFixed(2)} routesOverRatio1.3=${ratioOver}`);
 
+// Optional: dump route points for refs matching a name filter
+const filter = process.argv[3];
+if (filter) {
+    for (const ref of design.GetReferences()) {
+        const tgt = design.GetTables().find(t => t.ID === ref.Target);
+        const srcTable = design.GetTables().find(t => t.GetFields().some(f => f.ID === ref.Source));
+        const desc = `${srcTable?.Name} -> ${tgt?.Name}`;
+        if (!desc.toLowerCase().includes(filter.toLowerCase())) continue;
+        console.log(`ROUTE ${desc}: ${ref.Points.map(p => `(${p.X.toFixed(0)},${p.Y.toFixed(0)})`).join(" ")}`);
+        if (tgt) console.log(`  tgtBounds: L=${tgt.Bounds.Left} T=${tgt.Bounds.Top} W=${tgt.Bounds.Width}`);
+        if (srcTable) console.log(`  srcBounds: L=${srcTable.Bounds.Left} T=${srcTable.Bounds.Top} W=${srcTable.Bounds.Width}`);
+    }
+}
+
 // Name the offenders
 const tableName = id => design.GetTables().find(t => t.ID === id)?.Name ?? id;
 const refDesc = ref => {

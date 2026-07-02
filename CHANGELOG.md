@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Line router v2: cooperative routing with shared occupancy map, congestion-aware anchors, orthogonal lane nudging, hook/hairpin prevention, safe orthogonal fallback (no table crossings), ~40x faster full reroute on large diagrams.
+
 ### Added
 - Initial release of DASE - Design-Aided Software Engineering
 - ORM Designer for visual database modeling
