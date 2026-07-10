@@ -1,5 +1,5 @@
 import * as http from "http";
-import { randomUUID, randomBytes } from "crypto";
+import { randomUUID } from "crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
@@ -21,7 +21,7 @@ const SESSION_HEADER = "mcp-session-id";
  * Transport: Streamable HTTP, bound to loopback only. Each MCP session gets its own
  * {@link StreamableHTTPServerTransport} and a freshly configured {@link McpServer}.
  *
- * Security (F1): loopback bind + per-session Bearer token + Origin header allowlist
+ * Security (F1): loopback bind + Origin header allowlist
  * (DNS-rebind defense, per the MCP spec). See MCP_INTEGRATION.md §6.
  */
 export class XDaseMcpServer {
@@ -29,16 +29,9 @@ export class XDaseMcpServer {
     private _Transports = new Map<string, StreamableHTTPServerTransport>();
     private readonly _Port: number;
     private readonly _Host = "127.0.0.1";
-    private readonly _Token: string;
 
     constructor(pPort: number) {
         this._Port = pPort;
-        this._Token = randomBytes(24).toString("hex");
-    }
-
-    /** The Bearer token clients must present in the Authorization header. */
-    get Token(): string {
-        return this._Token;
     }
 
     /** The full MCP endpoint URL. */
@@ -102,12 +95,6 @@ export class XDaseMcpServer {
 
         if (!this.IsOriginAllowed(req)) {
             this.WriteError(res, 403, -32000, "Origin not allowed");
-            return;
-        }
-
-        if (!this.IsAuthorized(req)) {
-            res.setHeader("WWW-Authenticate", "Bearer");
-            this.WriteError(res, 401, -32001, "Unauthorized");
             return;
         }
 
@@ -179,13 +166,6 @@ export class XDaseMcpServer {
     }
 
     // ─── Security helpers ───────────────────────────────────────────────────
-
-    private IsAuthorized(req: http.IncomingMessage): boolean {
-        const auth = req.headers["authorization"];
-        if (!auth) return false;
-        const match = /^Bearer\s+(.+)$/i.exec(auth);
-        return !!match && match[1] === this._Token;
-    }
 
     /**
      * Allow only requests without an Origin (native clients) or pointing at our own

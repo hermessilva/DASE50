@@ -326,7 +326,8 @@ export class XAgentBridge {
         pSourceTableId?: string,
         pTargetTableId?: string,
         pSourceIsShadow?: boolean,
-        pTargetIsShadow?: boolean
+        pTargetIsShadow?: boolean,
+        pOneToOne?: boolean
     ): string {
         const bridge = this.GetActiveBridge();
         if (!bridge)
@@ -343,11 +344,13 @@ export class XAgentBridge {
             const targetTable = rt.table!;
 
             const refName = pName || `FK_${sourceTable.Name}_${targetTable.Name}`;
-            const result = bridge.AddReference(sourceTable.ID, targetTable.ID, refName);
+            const result = bridge.AddReference(sourceTable.ID, targetTable.ID, refName, pOneToOne);
 
             if (result.Success) {
                 this.RefreshActive();
-                return `Reference "${refName}" from "${sourceTable.Name}" to "${targetTable.Name}" created successfully.`;
+                return pOneToOne
+                    ? `1:1 reference "${refName}" from "${sourceTable.Name}" (PK) to "${targetTable.Name}" created successfully (inheritance-style PK→PK link, no FK field added).`
+                    : `Reference "${refName}" from "${sourceTable.Name}" to "${targetTable.Name}" created successfully.`;
             }
             else
                 return `Failed to create reference: ${result.Message ?? "Unknown error"}.`;
@@ -903,15 +906,72 @@ export class XAgentBridge {
         return result;
     }
 
-    /** Save the target (or active) document to disk. */
-    SaveActiveDocument(): string {
+    /** Save the target (or active) document to disk. Awaits the write and reports real status. */
+    async SaveActiveDocument(): Promise<string> {
         if (!this._Provider)
             return "No ORM designer provider available.";
         const state = this.GetTargetState();
         if (!state)
             return "No ORM designer is currently open.";
-        void state.Save();
-        return "Active ORM document saved.";
+        if (state.IsUntitled)
+            return "This document is untitled (never saved to disk). Use dase_new_document to create a named .dsorm file, or save it manually in VS Code (Ctrl+S).";
+        try {
+            await state.Save();
+            return `ORM document saved: ${state.Document.uri.fsPath}`;
+        }
+        catch (err) {
+            GetLogService().Error("AgentBridge.SaveActiveDocument failed", err);
+            return `Failed to save ORM document: ${err instanceof Error ? err.message : err}`;
+        }
+    }
+
+    /**
+     * Create a new named `.dsorm` file at the given path (absolute, or relative to the
+     * first workspace folder), write an empty ORM model to it and open it in the designer.
+     */
+    async CreateDocument(pPath: string, pOverwrite?: boolean): Promise<string> {
+        if (!this._Provider)
+            return "No ORM designer provider available.";
+        try {
+            let p = (pPath ?? "").trim();
+            if (!p)
+                return "A file path is required (absolute, or relative to the workspace).";
+            if (!p.toLowerCase().endsWith(".dsorm"))
+                p += ".dsorm";
+
+            let uri: vscode.Uri;
+            const isAbsolute = /^([a-zA-Z]:[\\/]|\/|\\\\)/.test(p);
+            if (isAbsolute)
+                uri = vscode.Uri.file(p);
+            else {
+                const ws = vscode.workspace.workspaceFolders?.[0];
+                if (!ws)
+                    return `Relative path "${p}" given but no workspace folder is open. Provide an absolute path.`;
+                uri = vscode.Uri.joinPath(ws.uri, p);
+            }
+
+            let exists = true;
+            try { await vscode.workspace.fs.stat(uri); }
+            catch { exists = false; }
+            if (exists && !pOverwrite)
+                return `File already exists: ${uri.fsPath}. Pass overwrite=true to replace it, or use dase_open_document to open it.`;
+
+            const parent = vscode.Uri.joinPath(uri, "..");
+            await vscode.workspace.fs.createDirectory(parent);
+
+            const emptyModel = '<?xml version="1.0" encoding="utf-8"?>\n<XORMDocument />';
+            await vscode.workspace.fs.writeFile(uri, Buffer.from(emptyModel, "utf8"));
+
+            const resolved = await this._Provider.OpenDocumentByUri(uri);
+            if (!resolved)
+                return `Created "${uri.fsPath}" but the designer did not open it within the timeout. Open it manually or via dase_open_document.`;
+
+            return `New ORM document created and opened: ${uri.fsPath}`;
+        }
+        catch (err) {
+            GetLogService().Error("AgentBridge.CreateDocument failed", err);
+            return `Failed to create ORM document "${pPath}": ${err instanceof Error ? err.message : err}`;
+        }
     }
 
     // ─── Table mutations (by name) ──────────────────────────────────────────
@@ -1052,6 +1112,39 @@ export class XAgentBridge {
         catch (err) {
             GetLogService().Error("AgentBridge.DeleteReference failed", err);
             return `Error deleting reference "${pName ?? pReferenceId}".`;
+        }
+    }
+
+    /**
+     * Re-point an existing FK reference at a different target table (same gesture as
+     * the designer's "move FK target"). The source field/table is unchanged.
+     */
+    MoveReferenceTarget(
+        pReferenceName?: string,
+        pReferenceId?: string,
+        pTargetTable?: string,
+        pTargetTableId?: string,
+        pTargetIsShadow?: boolean
+    ): string {
+        const bridge = this.GetActiveBridge();
+        if (!bridge)
+            return "No ORM designer is currently open. Please open a .dsorm file first.";
+        try {
+            const r = this.ResolveReference(bridge, pReferenceName, pReferenceId);
+            if (r.error)
+                return r.error;
+            const t = this.ResolveTable(bridge, pTargetTable, pTargetTableId, pTargetIsShadow);
+            if (t.error)
+                return `Target: ${t.error}`;
+            const result = bridge.MoveReferenceTarget(r.ref.ID, t.table!.ID);
+            if (!result.Success)
+                return `Failed to move reference "${r.ref.Name}" to "${t.table!.Name}": ${result.Message ?? "Unknown error"}.`;
+            this.RefreshActive();
+            return `Reference "${r.ref.Name}" now targets "${t.table!.Name}".`;
+        }
+        catch (err) {
+            GetLogService().Error("AgentBridge.MoveReferenceTarget failed", err);
+            return `Error moving reference "${pReferenceName ?? pReferenceId}" to "${pTargetTable ?? pTargetTableId}".`;
         }
     }
 

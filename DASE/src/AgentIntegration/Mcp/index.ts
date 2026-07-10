@@ -18,8 +18,8 @@ let _Server: XDaseMcpServer | null = null;
  *
  * Activation is gated by the `dase.mcp.enabled` setting. When enabled, the server
  * binds to a loopback port (`dase.mcp.port`) and writes an `mcp-endpoint.json`
- * discovery file (URL + Bearer token) into the extension's global storage, so an
- * external MCP client can locate and authenticate to the endpoint.
+ * discovery file (URL) into the extension's global storage, so an
+ * external MCP client can locate the endpoint.
  *
  * Best-effort: any failure degrades silently — MCP is an enhancement, not a
  * requirement for the extension to work.
@@ -65,7 +65,7 @@ async function Reconcile(pContext: vscode.ExtensionContext): Promise<void> {
         await WriteDiscoveryFile(pContext, server);
 
         GetLogService().Info(
-            `DASE MCP server ready — URL: ${server.Url}  (token written to ${DISCOVERY_FILE} in global storage)`
+            `DASE MCP server ready — URL: ${server.Url}  (endpoint written to ${DISCOVERY_FILE} in global storage)`
         );
     }
     catch (err) {
@@ -91,7 +91,7 @@ async function WriteDiscoveryFile(pContext: vscode.ExtensionContext, pServer: XD
     try {
         const uri = vscode.Uri.joinPath(pContext.globalStorageUri, DISCOVERY_FILE);
         await vscode.workspace.fs.createDirectory(pContext.globalStorageUri);
-        const payload = JSON.stringify({ url: pServer.Url, token: pServer.Token }, null, 2);
+        const payload = JSON.stringify({ url: pServer.Url }, null, 2);
         await vscode.workspace.fs.writeFile(uri, Buffer.from(payload, "utf8"));
     }
     catch (err) {

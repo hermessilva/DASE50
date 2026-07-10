@@ -52,7 +52,7 @@ spawning a process per client. stdio would force a dedicated process per connect
 
 ```
 External AI (Cursor / Cline / any MCP client)
-        │  Streamable HTTP  →  http://127.0.0.1:<port>/mcp   (Bearer token)
+        │  Streamable HTTP  →  http://127.0.0.1:<port>/mcp   (loopback only)
         ▼
   XDaseMcpServer  (NEW)  ── hosted in the extension host
         │  registers tools = thin wrappers
@@ -136,7 +136,6 @@ The LM Tools use `confirmationMessages`. MCP has no equivalent built-in confirm.
 
 ### Transport security
 - bind exclusively on `127.0.0.1`;
-- random **Bearer token** per session (written to the Output channel / local settings);
 - validate the `Origin` header (anti-DNS-rebind defense — MCP spec recommendation).
 
 ### Concurrency
@@ -158,8 +157,7 @@ Example client config (e.g. Cline / generic):
 {
   "mcpServers": {
     "dase": {
-      "url": "http://127.0.0.1:39100/mcp",
-      "headers": { "Authorization": "Bearer <session-token>" }
+      "url": "http://127.0.0.1:39100/mcp"
     }
   }
 }
@@ -170,7 +168,7 @@ Example client config (e.g. Cline / generic):
 1. **F1 — Skeleton:** dep `@modelcontextprotocol/sdk`; `XDaseMcpServer` (HTTP loopback) + 1 read tool
    (`get_model`); config `enabled`/`port`; smoke test via **MCP Inspector**.
 2. **F2 — Parity:** port the 13 tools (wrappers → `XAgentBridge`); multi-doc addressing.
-3. **F3 — Security:** Bearer token, `Origin` check, confirm/allowlist for destructive tools.
+3. **F3 — Security:** `Origin` check, confirm/allowlist for destructive tools.
 4. **F4 — Extras:** `delete`/`rename`/`reorder`/`seed`/`shadow`.
 5. **F5 — Tests & docs:** Jest with `XAgentBridge` mocked; setup guide for Cursor/Cline; finalize this doc.
 

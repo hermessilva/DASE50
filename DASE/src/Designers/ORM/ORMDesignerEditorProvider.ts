@@ -1079,6 +1079,28 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         return { Uri: key, Name: name };
     }
 
+    /**
+     * Open a `.dsorm` file by exact URI in the ORM designer (no workspace search),
+     * waiting for its state to register. Used for freshly created files, which may
+     * live outside the workspace and are not yet indexed by findFiles.
+     */
+    async OpenDocumentByUri(pUri: vscode.Uri): Promise<{ Uri: string; Name: string } | null> {
+        let key = this.MatchOpenDocument(pUri.toString());
+        if (!key) {
+            await vscode.commands.executeCommand("vscode.openWith", pUri, XORMDesignerEditorProvider.ViewType);
+            key = await this.WaitForState(pUri.toString(), 5000);
+            if (!key)
+                return null;
+        }
+
+        const state = this._States.get(key);
+        if (!state)
+            return null;
+
+        const name = state.Bridge?.Document?.Name ?? pUri.path.split("/").pop() ?? key;
+        return { Uri: key, Name: name };
+    }
+
     /** Poll until a state is registered for the given URI key, or timeout. */
     private async WaitForState(pKey: string, pTimeoutMs: number): Promise<string | null> {
         const deadline = Date.now() + pTimeoutMs;

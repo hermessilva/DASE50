@@ -14,7 +14,7 @@
 1. [Connection](#1-connection)
 2. [Conventions](#2-conventions)
 3. [Read tools (13)](#3-read-tools-13)
-4. [Write tools (20)](#4-write-tools-20)
+4. [Write tools (22)](#4-write-tools-22)
 5. [Command-trigger tools (7)](#5-command-trigger-tools-7--openworldhint)
 6. [End-to-end examples](#6-end-to-end-examples)
 7. [Error reference](#7-error-reference)
@@ -40,7 +40,7 @@
 | `dase_get_shadow_options` | List external models/tables available to shadow |
 | `dase_get_organization_context` | Get JSON layout context (tables/fields/FKs/canvas) to compute a layout via MCP |
 
-**Write (20)**
+**Write (22)**
 
 | Command | Utility |
 |---------|---------|
@@ -53,7 +53,8 @@
 | `dase_rename_field` | Rename a field |
 | `dase_delete_field` | Delete a field _(destructive)_ |
 | `dase_reorder_field` | Move a field to a new index |
-| `dase_add_reference` | Create an FK reference between tables |
+| `dase_add_reference` | Create an FK reference between tables; `oneToOne=true` = 1:1 PK→PK link (inheritance) |
+| `dase_move_reference_target` | Re-point an existing FK reference at another target table |
 | `dase_delete_reference` | Delete an FK reference _(destructive)_ |
 | `dase_update_property` | Update any element property by ID |
 | `dase_delete_element` | Delete any element by ID _(destructive)_ |
@@ -61,7 +62,8 @@
 | `dase_align_lines` | Re-route/align all FK lines _(idempotent)_ |
 | `dase_save_seed` | Replace a table's seed rows _(destructive)_ |
 | `dase_add_shadow_table` | Add a read-only mirror table from another model |
-| `dase_save_document` | Persist the active document to disk _(idempotent)_ |
+| `dase_save_document` | Persist the active document to disk; reports the real write result _(idempotent)_ |
+| `dase_new_document` | Create a named `.dsorm` at a given path and open it in the designer |
 | `dase_apply_organization` | Apply a table-layout plan you computed via MCP |
 | `dase_revert_organization` | Undo the last applied organization _(idempotent)_ |
 
@@ -104,18 +106,12 @@ Bound to `127.0.0.1` only — not reachable off-host.
 
 ### 1.2 Authentication
 
-Every request MUST carry a Bearer token:
-
-```
-Authorization: Bearer <token>
-```
-
-- The token is generated per server start (random, 48 hex chars).
-- Missing/invalid token → `401` with `WWW-Authenticate: Bearer`.
+No authentication is required. The server is protected by the loopback-only bind
+(§1.1) and the Origin policy (§1.4).
 
 ### 1.3 Discovery file
 
-On start the server writes the URL + token to the extension's **global storage**:
+On start the server writes the URL to the extension's **global storage**:
 
 ```
 <globalStorage>/mcp-endpoint.json
@@ -123,8 +119,7 @@ On start the server writes the URL + token to the extension's **global storage**
 
 ```json
 {
-  "url": "http://127.0.0.1:39100/mcp",
-  "token": "a1b2c3…"
+  "url": "http://127.0.0.1:39100/mcp"
 }
 ```
 
@@ -167,14 +162,13 @@ Content-Type: application/json
 {
   "mcpServers": {
     "dase": {
-      "url": "http://127.0.0.1:39100/mcp",
-      "headers": { "Authorization": "Bearer <token>" }
+      "url": "http://127.0.0.1:39100/mcp"
     }
   }
 }
 ```
 
-**Cursor (`.cursor/mcp.json`):** same shape (`url` + `headers`).
+**Cursor (`.cursor/mcp.json`):** same shape (`url`).
 
 ---
 
@@ -403,7 +397,7 @@ AI computes the plan itself (no VS Code LM). Pair with `dase_apply_organization`
 
 ---
 
-## 4. Write tools (20)
+## 4. Write tools (22)
 
 All mutate the active designer, refresh the canvas, mark dirty, and save.
 
@@ -458,7 +452,18 @@ All mutate the active designer, refresh the canvas, mark dirty, and save.
   - source: `sourceTableId?` (preferred) / `sourceTable?` + `sourceIsShadow?`
   - target: `targetTableId?` (preferred) / `targetTable?` + `targetIsShadow?`
   - `name?: string` (default `FK_<source>_<target>`)
-- **Response:** `Reference "FK_Order_Customer" from "Order" to "Customer" created successfully.`
+  - `oneToOne?: boolean` — **1:1 PK→PK link (inheritance-style)**: the source table's PK field is
+    linked directly to the target table; no FK field is created. The source table must have a PK field.
+- **Response (1:N):** `Reference "FK_Order_Customer" from "Order" to "Customer" created successfully.`
+- **Response (1:1):** `1:1 reference "FK_Car_Vehicle" from "Car" (PK) to "Vehicle" created successfully (inheritance-style PK→PK link, no FK field added).`
+
+#### `dase_move_reference_target`
+Re-point an existing FK reference at a different target table (same as the designer's "move FK
+target" gesture). The source field/table is unchanged.
+- **Params:**
+  - reference: `referenceId?` (preferred) / `referenceName?`
+  - new target: `targetTableId?` (preferred) / `targetTable?` + `targetIsShadow?`
+- **Response:** `Reference "FK_Order_Customer" now targets "Client".`
 
 #### `dase_delete_reference` — `destructiveHint`
 - **Params:** `referenceId?: string` (preferred) / `name?: string`.
@@ -515,8 +520,20 @@ Add a read-only mirror table from another model. Get IDs via `dase_get_shadow_op
 ### Document
 
 #### `dase_save_document` — `idempotentHint`
+Awaits the disk write and reports the real result.
 - **Params:** none.
-- **Response:** `Active ORM document saved.`
+- **Response:** `ORM document saved: <path>` — or an error message when the write fails.
+- **Note:** untitled documents (created via `dase_cmd_new_designer`) cannot be saved this way —
+  use `dase_new_document` to create a named file instead.
+
+#### `dase_new_document`
+Create a new named `.dsorm` file at a defined destination, write an empty ORM model to it and open
+it in the designer. Missing folders are created; the `.dsorm` extension is appended if absent.
+- **Params:**
+  - `path: string` (req) — absolute (`D:/Data/Sales.dsorm`) or workspace-relative (`Models/Sales.dsorm`).
+  - `overwrite?: boolean` (default `false`) — replace an existing file.
+- **Response:** `New ORM document created and opened: <path>` — or an error
+  (`File already exists: … Pass overwrite=true …`).
 
 ### Table organization (MCP-native)
 
@@ -585,11 +602,8 @@ All take **no params** and respond `Command "<title>" triggered.` (or a failure 
 ### 6.1 Full handshake (curl)
 
 ```bash
-TOKEN=$(jq -r .token < mcp-endpoint.json)
-
 # 1) initialize — capture mcp-session-id from response headers
 curl -i -X POST http://127.0.0.1:39100/mcp \
-  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize",
@@ -598,13 +612,13 @@ curl -i -X POST http://127.0.0.1:39100/mcp \
 
 # 2) notifications/initialized  (echo mcp-session-id)
 curl -X POST http://127.0.0.1:39100/mcp \
-  -H "Authorization: Bearer $TOKEN" -H "mcp-session-id: $SID" \
+  -H "mcp-session-id: $SID" \
   -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","method":"notifications/initialized"}'
 
 # 3) list tools
 curl -X POST http://127.0.0.1:39100/mcp \
-  -H "Authorization: Bearer $TOKEN" -H "mcp-session-id: $SID" \
+  -H "mcp-session-id: $SID" \
   -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
 ```
@@ -689,7 +703,6 @@ Transport-level errors use JSON-RPC error objects:
 
 | HTTP | JSON-RPC code | Meaning |
 |------|---------------|---------|
-| 401 | -32001 | Missing/invalid Bearer token |
 | 403 | -32000 | Origin not allowed |
 | 400 | -32000 | Unknown/missing session ID |
 | 404 | -32601 | Path not `/mcp` |

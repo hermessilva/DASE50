@@ -276,7 +276,7 @@ export function RegisterWriteTools(pServer: McpServer): void {
         "dase_add_reference",
         {
             title: "Add FK Reference",
-            description: "Create a foreign-key reference from a source table to a target table. Identify each table by its ID (preferred) or name (+ optional isShadow) — important because shadow tables may share names.",
+            description: "Create a foreign-key reference from a source table to a target table. Identify each table by its ID (preferred) or name (+ optional isShadow) — important because shadow tables may share names. Set oneToOne=true for an inheritance-style 1:1 link: the source table's PK is linked directly to the target (PK→PK) and no FK field is created.",
             inputSchema: {
                 sourceTable: z.string().optional().describe("Source (child) table name."),
                 sourceTableId: z.string().optional().describe("Source table ID — preferred, unambiguous."),
@@ -284,7 +284,8 @@ export function RegisterWriteTools(pServer: McpServer): void {
                 targetTable: z.string().optional().describe("Target (parent) table name."),
                 targetTableId: z.string().optional().describe("Target table ID — preferred, unambiguous."),
                 targetIsShadow: z.boolean().optional().describe("Disambiguate a duplicated target name."),
-                name: z.string().optional().describe("Reference name (default FK_Source_Target).")
+                name: z.string().optional().describe("Reference name (default FK_Source_Target)."),
+                oneToOne: z.boolean().optional().describe("1:1 PK→PK link (inheritance). Source table must have a PK field; no FK field is created.")
             }
         },
         async (pArgs) => Text(bridge.AddReference(
@@ -294,6 +295,29 @@ export function RegisterWriteTools(pServer: McpServer): void {
             pArgs.sourceTableId as string | undefined,
             pArgs.targetTableId as string | undefined,
             pArgs.sourceIsShadow as boolean | undefined,
+            pArgs.targetIsShadow as boolean | undefined,
+            pArgs.oneToOne as boolean | undefined
+        ))
+    );
+
+    regDoc(
+        "dase_move_reference_target",
+        {
+            title: "Move FK Reference Target",
+            description: "Re-point an existing FK reference at a different target table (the source field/table is unchanged). Identify the reference by referenceId (preferred) or name, and the new target by ID (preferred) or name (+ optional isShadow).",
+            inputSchema: {
+                referenceName: z.string().optional().describe("Reference name."),
+                referenceId: z.string().optional().describe("Reference ID — preferred, unambiguous."),
+                targetTable: z.string().optional().describe("New target table name."),
+                targetTableId: z.string().optional().describe("New target table ID — preferred, unambiguous."),
+                targetIsShadow: z.boolean().optional().describe("Disambiguate a duplicated target name.")
+            }
+        },
+        async (pArgs) => Text(bridge.MoveReferenceTarget(
+            pArgs.referenceName as string | undefined,
+            pArgs.referenceId as string | undefined,
+            pArgs.targetTable as string | undefined,
+            pArgs.targetTableId as string | undefined,
             pArgs.targetIsShadow as boolean | undefined
         ))
     );
@@ -433,11 +457,27 @@ export function RegisterWriteTools(pServer: McpServer): void {
         "dase_save_document",
         {
             title: "Save Document",
-            description: "Persist the active ORM document to disk.",
+            description: "Persist the active (or targeted) ORM document to disk. Reports the real write result; untitled documents cannot be saved this way — use dase_new_document.",
             inputSchema: {},
             annotations: { idempotentHint: true }
         },
-        async () => Text(bridge.SaveActiveDocument())
+        async () => Text(await bridge.SaveActiveDocument())
+    );
+
+    reg(
+        "dase_new_document",
+        {
+            title: "New ORM Document",
+            description: "Create a new named .dsorm file at a given path (absolute, or relative to the workspace), write an empty ORM model to it, and open it in the designer. Missing folders are created; the .dsorm extension is appended if absent.",
+            inputSchema: {
+                path: z.string().describe("Destination file path, e.g. 'Models/Sales.dsorm' (workspace-relative) or 'D:/Data/Sales.dsorm' (absolute)."),
+                overwrite: z.boolean().optional().describe("Replace the file if it already exists (default false).")
+            }
+        },
+        async (pArgs) => Text(await bridge.CreateDocument(
+            pArgs.path as string,
+            pArgs.overwrite as boolean | undefined
+        ))
     );
 
     // ── Table organization (computed by the external AI) ─────────────────────

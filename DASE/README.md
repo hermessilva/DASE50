@@ -78,7 +78,7 @@ tune the layout, preview the prompt — and **Revert** in one click if you don't
 
 Beyond Copilot, DASE ships an **embedded MCP server** so **any** MCP-speaking client
 (Cursor, Cline, Claude Desktop, custom agents) can drive the live designer over the open
-[Model Context Protocol](https://modelcontextprotocol.io). It exposes **40 tools** — the full
+[Model Context Protocol](https://modelcontextprotocol.io). It exposes **42 tools** — the full
 DASE surface (read, write, and command triggers) — as thin wrappers over the same engine the
 built-in AI uses.
 
@@ -86,21 +86,20 @@ built-in AI uses.
 
 1. Open Settings and turn on **`DASE › Mcp: Enabled`** (`dase.mcp.enabled`).
 2. The server binds to loopback only — `http://127.0.0.1:39100/mcp` (port configurable via `dase.mcp.port`).
-3. DASE writes an `mcp-endpoint.json` (endpoint URL + per-session **Bearer token**) into the extension's
+3. DASE writes an `mcp-endpoint.json` (endpoint URL) into the extension's
    global storage. Use it to point your client at DASE:
 
 ```jsonc
 {
   "mcpServers": {
     "dase": {
-      "url": "http://127.0.0.1:39100/mcp",
-      "headers": { "Authorization": "Bearer <token-from-mcp-endpoint.json>" }
+      "url": "http://127.0.0.1:39100/mcp"
     }
   }
 }
 ```
 
-**Security by default:** loopback-only bind, per-session random Bearer token, and an `Origin`
+**Security by default:** loopback-only bind and an `Origin`
 allowlist (anti DNS-rebind, per the MCP spec). Disabled until you opt in.
 
 > A sample of the exposed tools: `dase_get_model`, `dase_list_tables`, `dase_get_table`,

@@ -5,6 +5,19 @@ All notable changes to the **DASE — Design-Aided Software Engineering** extens
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.41878] - 2026-07-10
+
+### Added
+
+- **MCP: 1:1 references (inheritance).** `dase_add_reference` accepts `oneToOne=true`, linking the source table's PK directly to the target (PK→PK, no FK field) — the MCP equivalent of Ctrl+dragging an anchor in the designer.
+- **MCP: `dase_new_document`.** Create a named `.dsorm` file at a defined destination (absolute or workspace-relative path), with optional overwrite; missing folders are created and the document opens in the designer.
+- **MCP: `dase_move_reference_target`.** Re-point an existing FK reference at a different target table, matching the designer's "move FK target" gesture.
+
+### Changed
+
+- **MCP server no longer requires authentication.** The per-session Bearer token was removed; clients connect with the endpoint URL alone. Security remains loopback-only bind plus the `Origin` allowlist (anti DNS-rebind), and the server stays off by default.
+- **MCP: `dase_save_document` reports the real result.** The save is now awaited and the response carries the saved path or the actual error; untitled documents get a message pointing to `dase_new_document`.
+
 ## [1.0.41876] - 2026-07-02
 
 ### Changed
@@ -34,5 +47,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Properties & Issues panels** — inspect and edit element properties and view validation issues.
 - **Detach designer** — open the designer in a separate window.
 
+[1.0.41878]: https://github.com/hermessilva/DASE50/releases
 [1.0.41876]: https://github.com/hermessilva/DASE50/releases
 [1.0.0]: https://github.com/hermessilva/DASE50/releases
