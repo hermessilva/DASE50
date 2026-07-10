@@ -1,4 +1,5 @@
 import * as http from "http";
+import type { AddressInfo } from "net";
 import { randomUUID } from "crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -27,7 +28,9 @@ const SESSION_HEADER = "mcp-session-id";
 export class XDaseMcpServer {
     private _Http: http.Server | null = null;
     private _Transports = new Map<string, StreamableHTTPServerTransport>();
-    private readonly _Port: number;
+    // Porta solicitada. Quando 0 (efêmera), o SO escolhe uma porta livre e a real
+    // só é conhecida após o bind — por isso `_Port` é reatribuído no listen.
+    private _Port: number;
     private readonly _Host = "127.0.0.1";
 
     constructor(pPort: number) {
@@ -63,6 +66,10 @@ export class XDaseMcpServer {
 
             server.listen(this._Port, this._Host, () => {
                 this._Http = server;
+                // Porta efêmera (0): captura a porta real atribuída pelo SO.
+                const addr = server.address();
+                if (addr && typeof addr === "object")
+                    this._Port = (addr as AddressInfo).port;
                 GetLogService().Info(`DASE MCP server listening at ${this.Url}`);
                 resolve();
             });

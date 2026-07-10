@@ -2,7 +2,7 @@
     "name": "dase",
     "displayName": "DASE - Design-Aided Software Engineering",
     "description": "Visual design environment for multi-tier, multi-platform web applications",
-    "version": "1.0.41878",
+    "version": "1.0.41879",
     "publisher": "HermesSilva",
     "license": "MIT",
     "icon": "media/icon.png",
@@ -161,8 +161,8 @@
                 },
                 "dase.mcp.port": {
                     "type": "number",
-                    "default": 39100,
-                    "markdownDescription": "Loopback TCP port for the MCP server (only used when `#dase.mcp.enabled#` is on). The endpoint URL is written to `mcp-endpoint.json` in the extension's global storage."
+                    "default": 0,
+                    "markdownDescription": "Loopback TCP port for the MCP server (only used when `#dase.mcp.enabled#` is on). Leave at `0` to let the OS pick a free port automatically — this lets several VS Code windows run the server at once without colliding. Set a fixed port only if an external client needs a stable URL. The actual endpoint URL is written to `mcp-endpoint.json` in the extension's global storage."
                 }
             }
         },

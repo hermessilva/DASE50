@@ -85,15 +85,17 @@ built-in AI uses.
 **Enable it:**
 
 1. Open Settings and turn on **`DASE › Mcp: Enabled`** (`dase.mcp.enabled`).
-2. The server binds to loopback only — `http://127.0.0.1:39100/mcp` (port configurable via `dase.mcp.port`).
+2. The server binds to loopback only, on an **OS-assigned free port** by default
+   (`dase.mcp.port = 0`) — so several VS Code windows can run it at once without
+   colliding. Set a fixed port only if a client needs a stable URL.
 3. DASE writes an `mcp-endpoint.json` (endpoint URL) into the extension's
-   global storage. Use it to point your client at DASE:
+   global storage. Read the URL from there — it carries the actual port:
 
 ```jsonc
 {
   "mcpServers": {
     "dase": {
-      "url": "http://127.0.0.1:39100/mcp"
+      "url": "http://127.0.0.1:<port>/mcp"
     }
   }
 }

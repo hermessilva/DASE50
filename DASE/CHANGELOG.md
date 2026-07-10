@@ -5,6 +5,18 @@ All notable changes to the **DASE — Design-Aided Software Engineering** extens
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.41879] - 2026-07-10
+
+### Fixed
+
+- **MCP server no longer collides across VS Code windows.** The embedded server used a
+  fixed loopback port (`39100`) and a single shared `mcp-endpoint.json`, so a second
+  window failed with `EADDRINUSE` and windows overwrote each other's discovery file. The
+  default port is now `0` (OS-assigned), giving each window its own free port, and each
+  window writes a per-window discovery file (`mcp-endpoint.<hash>.json`) tagged with its
+  `workspacePath` and `pid`. Stale files from crashed windows are purged by liveness
+  check. The shared `mcp-endpoint.json` is still written for external clients.
+
 ## [1.0.41878] - 2026-07-10
 
 ### Added
