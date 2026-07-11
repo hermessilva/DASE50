@@ -5,6 +5,21 @@ All notable changes to the **DASE — Design-Aided Software Engineering** extens
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.41883] - 2026-07-11
+
+### Changed
+
+- **MCP fully decoupled — DASE now exposes only an agent bridge.** The extension no longer
+  loads, installs, or configures any MCP code (the `@tootega/dase-mcp` dependency and the
+  lazy-loading glue are gone). Instead, DASE hosts a minimal loopback **agent bridge**
+  (plain JSON over HTTP, `POST /bridge`) exposing the full `XAgentBridge` surface plus a
+  whitelisted command trigger. The standalone [DASE-MCP](https://github.com/HermesSilva/DASE-MCP)
+  server (v2) connects to this bridge and translates MCP tool calls into bridge calls.
+- **Settings renamed:** `dase.mcp.enabled` / `dase.mcp.port` →
+  `dase.agentBridge.enabled` / `dase.agentBridge.port`. The bridge is now **enabled by
+  default** (loopback-only + Origin allowlist); discovery files are written as
+  `bridge-endpoint*.json` (formerly `mcp-endpoint*.json`).
+
 ## [1.0.41882] - 2026-07-11
 
 ### Changed

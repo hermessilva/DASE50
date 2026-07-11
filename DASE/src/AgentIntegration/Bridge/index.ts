@@ -1,47 +1,43 @@
 import * as vscode from "vscode";
 import { createHash } from "crypto";
-import type { IDaseMcpHost, XDaseMcpServer } from "@tootega/dase-mcp";
-import { XAgentBridge } from "../AgentBridge";
+import { XAgentBridgeServer, BRIDGE_PROTOCOL } from "./XAgentBridgeServer";
 import { GetLogService } from "../../Services/LogService";
 
-// NOTE: the MCP server implementation lives in the @tootega/dase-mcp package
-// (workspace folder MCP/), which also ships the standalone Claude Code plugin
-// proxy. The package (and the @modelcontextprotocol/sdk + zod it pulls in) is
-// imported lazily via dynamic import() inside Reconcile — never at module load.
-// This keeps extension activation working even if the MCP SDK is not packaged in
-// the .vsix; MCP simply stays unavailable until enabled and the SDK is present.
+// NOTE: this is DASE's only agent-integration surface: a plain loopback HTTP
+// bridge (see XAgentBridgeServer). DASE does NOT load, install, or configure any
+// MCP server — the standalone DASE-MCP product discovers this endpoint through
+// the files written below and translates MCP tool calls into bridge calls.
 
-const CONFIG_SECTION = "dase.mcp";
+const CONFIG_SECTION = "dase.agentBridge";
 // Porta 0 = efêmera: o SO escolhe uma porta livre a cada janela do VS Code, então
 // múltiplas instâncias nunca colidem (EADDRINUSE). A porta real vai no discovery.
 const DEFAULT_PORT = 0;
-// Arquivo de descoberta legado (compartilhado): último a escrever vence. Mantido
-// para clientes MCP externos (Cursor, Claude Desktop…) que só conhecem este nome.
-const DISCOVERY_FILE = "mcp-endpoint.json";
+// Arquivo de descoberta compartilhado: último a escrever vence. Para clientes que
+// só conhecem este nome fixo.
+const DISCOVERY_FILE = "bridge-endpoint.json";
 // Prefixo do discovery POR JANELA. Cada janela grava
-// `mcp-endpoint.<hash-do-workspace>.json` com url + workspacePath + pid, para que
-// um cliente (ex.: Cockpit, plugin dase-mcp do Claude Code) case o endpoint com a
-// própria janela.
-const DISCOVERY_PREFIX = "mcp-endpoint.";
+// `bridge-endpoint.<hash-do-workspace>.json` com url + workspacePath + pid, para
+// que um cliente (ex.: DASE-MCP) case o endpoint com a própria janela.
+const DISCOVERY_PREFIX = "bridge-endpoint.";
 const DISCOVERY_SUFFIX = ".json";
 
-let _Server: XDaseMcpServer | null = null;
+let _Server: XAgentBridgeServer | null = null;
 // Nome do arquivo de descoberta desta janela (definido no WriteDiscoveryFile),
 // para limpar exatamente o nosso ao desligar/parar.
 let _WindowDiscoveryFile: string | null = null;
 
 /**
- * Register and (optionally) start the embedded DASE MCP server.
+ * Register and (optionally) start the DASE agent bridge server.
  *
- * Activation is gated by the `dase.mcp.enabled` setting. When enabled, the server
- * binds to a loopback port (`dase.mcp.port`) and writes an `mcp-endpoint.json`
- * discovery file (URL) into the extension's global storage, so an
- * external MCP client can locate the endpoint.
+ * Activation is gated by the `dase.agentBridge.enabled` setting. When enabled, the
+ * server binds to a loopback port (`dase.agentBridge.port`) and writes a
+ * `bridge-endpoint.json` discovery file (URL) into the extension's global storage,
+ * so an external agent (e.g. the standalone DASE-MCP server) can locate it.
  *
- * Best-effort: any failure degrades silently — MCP is an enhancement, not a
+ * Best-effort: any failure degrades silently — the bridge is an enhancement, not a
  * requirement for the extension to work.
  */
-export function RegisterDaseMcpServer(pContext: vscode.ExtensionContext): void {
+export function RegisterAgentBridgeServer(pContext: vscode.ExtensionContext): void {
     const log = GetLogService();
 
     pContext.subscriptions.push({ dispose: () => { void StopServer(); } });
@@ -55,22 +51,12 @@ export function RegisterDaseMcpServer(pContext: vscode.ExtensionContext): void {
 
     void Reconcile(pContext);
 
-    log.Info("DASE MCP integration registered");
-}
-
-/** Build the host adapter the embedded server uses to reach DASE internals. */
-function MakeHost(): IDaseMcpHost {
-    return {
-        Bridge: XAgentBridge.GetInstance(),
-        Log: GetLogService(),
-        ExecuteCommand: (pCommand: string) =>
-            Promise.resolve(vscode.commands.executeCommand(pCommand))
-    };
+    log.Info("DASE agent bridge integration registered");
 }
 
 async function Reconcile(pContext: vscode.ExtensionContext): Promise<void> {
     const cfg = vscode.workspace.getConfiguration(CONFIG_SECTION);
-    const enabled = cfg.get<boolean>("enabled", false);
+    const enabled = cfg.get<boolean>("enabled", true);
 
     if (!enabled) {
         await StopServer();
@@ -84,21 +70,19 @@ async function Reconcile(pContext: vscode.ExtensionContext): Promise<void> {
     const port = cfg.get<number>("port", DEFAULT_PORT);
 
     try {
-        // Lazy-load the package (and the MCP SDK) only when actually enabling.
-        const mod = await import("@tootega/dase-mcp");
-        const server = new mod.XDaseMcpServer(port, MakeHost());
+        const server = new XAgentBridgeServer(port);
         await server.Start();
         _Server = server;
         await WriteDiscoveryFile(pContext, server);
 
         GetLogService().Info(
-            `DASE MCP server ready — URL: ${server.Url}  (endpoint written to ${DISCOVERY_FILE} in global storage)`
+            `DASE agent bridge ready — URL: ${server.Url}  (endpoint written to ${DISCOVERY_FILE} in global storage)`
         );
     }
     catch (err) {
-        GetLogService().Error("Failed to start DASE MCP server", err);
+        GetLogService().Error("Failed to start DASE agent bridge", err);
         vscode.window.showWarningMessage(
-            `DASE MCP server could not start on port ${port}. Check the DASE output log.`
+            `DASE agent bridge could not start on port ${port}. Check the DASE output log.`
         );
         _Server = null;
     }
@@ -130,7 +114,7 @@ function WindowDiscoveryFileName(pWorkspacePath: string): string {
     return `${DISCOVERY_PREFIX}${hash}${DISCOVERY_SUFFIX}`;
 }
 
-async function WriteDiscoveryFile(pContext: vscode.ExtensionContext, pServer: XDaseMcpServer): Promise<void> {
+async function WriteDiscoveryFile(pContext: vscode.ExtensionContext, pServer: XAgentBridgeServer): Promise<void> {
     try {
         await vscode.workspace.fs.createDirectory(pContext.globalStorageUri);
         // Remove arquivos por janela de instâncias que já morreram (crash sem
@@ -139,30 +123,30 @@ async function WriteDiscoveryFile(pContext: vscode.ExtensionContext, pServer: XD
 
         const workspacePath = WorkspacePath();
         const payload = JSON.stringify(
-            { url: pServer.Url, workspacePath, pid: process.pid },
+            { url: pServer.Url, protocol: BRIDGE_PROTOCOL, workspacePath, pid: process.pid },
             null,
             2
         );
         const buf = Buffer.from(payload, "utf8");
 
-        // (a) arquivo por janela — o Cockpit casa pelo workspacePath.
+        // (a) arquivo por janela — clientes casam pelo workspacePath.
         _WindowDiscoveryFile = WindowDiscoveryFileName(workspacePath);
         const windowUri = vscode.Uri.joinPath(pContext.globalStorageUri, _WindowDiscoveryFile);
         await vscode.workspace.fs.writeFile(windowUri, buf);
 
-        // (b) arquivo legado compartilhado — p/ clientes externos que só sabem
-        // o nome fixo. Último a escrever vence (limitação conhecida).
-        const legacyUri = vscode.Uri.joinPath(pContext.globalStorageUri, DISCOVERY_FILE);
-        await vscode.workspace.fs.writeFile(legacyUri, buf);
+        // (b) arquivo compartilhado — p/ clientes que só sabem o nome fixo.
+        // Último a escrever vence (limitação conhecida).
+        const sharedUri = vscode.Uri.joinPath(pContext.globalStorageUri, DISCOVERY_FILE);
+        await vscode.workspace.fs.writeFile(sharedUri, buf);
     }
     catch (err) {
-        GetLogService().Warn(`Could not write MCP discovery file: ${err}`);
+        GetLogService().Warn(`Could not write agent bridge discovery file: ${err}`);
     }
 }
 
 async function ClearDiscoveryFile(pContext: vscode.ExtensionContext): Promise<void> {
-    // Remove o arquivo por janela desta instância. NÃO removemos o legado: ele
-    // pode pertencer a outra janela que ainda está no ar.
+    // Remove o arquivo por janela desta instância. NÃO removemos o compartilhado:
+    // ele pode pertencer a outra janela que ainda está no ar.
     const names = new Set<string>();
     if (_WindowDiscoveryFile) names.add(_WindowDiscoveryFile);
     names.add(WindowDiscoveryFileName(WorkspacePath()));
@@ -177,15 +161,15 @@ async function ClearDiscoveryFile(pContext: vscode.ExtensionContext): Promise<vo
 }
 
 /**
- * Remove arquivos `mcp-endpoint.<hash>.json` cujo `pid` não está mais vivo — sobras
- * de janelas que fecharam sem limpar. Best-effort: nunca lança.
+ * Remove arquivos `bridge-endpoint.<hash>.json` cujo `pid` não está mais vivo —
+ * sobras de janelas que fecharam sem limpar. Best-effort: nunca lança.
  */
 async function PurgeDeadWindowFiles(pContext: vscode.ExtensionContext): Promise<void> {
     try {
         const entries = await vscode.workspace.fs.readDirectory(pContext.globalStorageUri);
         for (const [name, type] of entries) {
             if (type !== vscode.FileType.File) continue;
-            if (name === DISCOVERY_FILE) continue; // legado não tem pid confiável
+            if (name === DISCOVERY_FILE) continue; // compartilhado não tem pid confiável
             if (!name.startsWith(DISCOVERY_PREFIX) || !name.endsWith(DISCOVERY_SUFFIX)) continue;
             const uri = vscode.Uri.joinPath(pContext.globalStorageUri, name);
             let pid: number | undefined;

@@ -2,7 +2,7 @@
     "name": "dase",
     "displayName": "DASE - Design-Aided Software Engineering",
     "description": "Visual design environment for multi-tier, multi-platform web applications",
-    "version": "1.0.41882",
+    "version": "1.0.41883",
     "publisher": "HermesSilva",
     "license": "MIT",
     "icon": "media/icon.png",
@@ -154,15 +154,15 @@
         "configuration": {
             "title": "DASE",
             "properties": {
-                "dase.mcp.enabled": {
+                "dase.agentBridge.enabled": {
                     "type": "boolean",
-                    "default": false,
-                    "markdownDescription": "Enable the embedded **Model Context Protocol (MCP)** server, letting external AI clients (Cursor, Cline, Claude Desktop, or any MCP client) read and edit the active ORM model. Binds to loopback only."
+                    "default": true,
+                    "markdownDescription": "Enable the **agent bridge**: a loopback-only HTTP endpoint that lets external agents (e.g. the standalone DASE-MCP server) read and edit the active ORM model. DASE itself does not load or configure any MCP server — this is just the entry point."
                 },
-                "dase.mcp.port": {
+                "dase.agentBridge.port": {
                     "type": "number",
                     "default": 0,
-                    "markdownDescription": "Loopback TCP port for the MCP server (only used when `#dase.mcp.enabled#` is on). Leave at `0` to let the OS pick a free port automatically — this lets several VS Code windows run the server at once without colliding. Set a fixed port only if an external client needs a stable URL. The actual endpoint URL is written to `mcp-endpoint.json` in the extension's global storage."
+                    "markdownDescription": "Loopback TCP port for the agent bridge (only used when `#dase.agentBridge.enabled#` is on). Leave at `0` to let the OS pick a free port automatically — this lets several VS Code windows run the bridge at once without colliding. Set a fixed port only if an external client needs a stable URL. The actual endpoint URL is written to `bridge-endpoint.json` in the extension's global storage."
                 }
             }
         },
@@ -611,7 +611,6 @@
     },
     "dependencies": {
         "@dbml/core": "^6.4.0",
-        "@tootega/dase-mcp": "file:../MCP",
         "@tootega/tfx": "file:tootega-tfx-1.0.0.tgz",
         "@types/dagre": "^0.7.54",
         "dagre": "^0.8.5"

@@ -83,7 +83,9 @@ DASE surface (read, write, and command triggers), thin wrappers over the same en
 built-in AI uses.
 
 The MCP integration is a **separate product**: [**DASE-MCP**](https://github.com/HermesSilva/DASE-MCP)
-(`@tootega/dase-mcp`). This extension no longer bundles the MCP server code.
+(`@tootega/dase-mcp`). This extension contains **no MCP code at all** — it only exposes a
+loopback **agent bridge** (plain JSON over HTTP) that the standalone DASE-MCP server connects
+to. DASE never loads, installs, or configures an MCP server.
 
 **Claude Code (recommended):** install the plugin — it finds the right VS Code window
 automatically (multi-window safe) and reconnects after restarts:
@@ -93,22 +95,13 @@ automatically (multi-window safe) and reconnects after restarts:
 /plugin install dase-mcp
 ```
 
-**Other MCP clients:** turn on **`DASE › Mcp: Enabled`** (`dase.mcp.enabled`). The endpoint
-binds to loopback only, on an OS-assigned free port (`dase.mcp.port = 0`), and the URL is
-written to `mcp-endpoint.json` in the extension's global storage:
+**Other MCP clients:** run the same standalone server over stdio
+(`npx @tootega/dase-mcp` / the bundled `dase-mcp.cjs`); it discovers the bridge endpoint
+written to `bridge-endpoint.json` in the extension's global storage.
 
-```jsonc
-{
-  "mcpServers": {
-    "dase": {
-      "url": "http://127.0.0.1:<port>/mcp"
-    }
-  }
-}
-```
-
-**Security by default:** loopback-only bind and an `Origin`
-allowlist (anti DNS-rebind, per the MCP spec). Disabled until you opt in.
+**The bridge:** enabled by default (`dase.agentBridge.enabled`), loopback only, on an
+OS-assigned free port (`dase.agentBridge.port = 0`), with an `Origin` allowlist
+(anti DNS-rebind). Turn the setting off to close the entry point entirely.
 
 > A sample of the exposed tools: `dase_get_model`, `dase_list_tables`, `dase_get_table`,
 > `dase_validate`, `dase_export_dbml`, `dase_add_table`, `dase_add_field`, `dase_add_reference`,

@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { XAgentBridge } from "./AgentBridge";
 import { RegisterDASEChatParticipant } from "./DASEChatParticipant";
 import { RegisterDASETools } from "./DASETools";
-import { RegisterDaseMcpServer } from "./Mcp";
+import { RegisterAgentBridgeServer } from "./Bridge";
 import { GetLogService } from "../Services/LogService";
 import type { XORMDesignerEditorProvider } from "../Designers/ORM/ORMDesignerEditorProvider";
 
@@ -46,8 +46,9 @@ export function RegisterAgentIntegration(
             log.Info("Language Model Tools API not available — DASE tools not registered");
         }
 
-        // Register embedded MCP server (gated by `dase.mcp.enabled` setting)
-        RegisterDaseMcpServer(pContext);
+        // Register the loopback agent bridge (gated by `dase.agentBridge.enabled`);
+        // external agents (e.g. the standalone DASE-MCP server) connect here.
+        RegisterAgentBridgeServer(pContext);
 
         log.Info("DASE Agent Integration initialized");
     }
