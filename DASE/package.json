@@ -2,7 +2,7 @@
     "name": "dase",
     "displayName": "DASE - Design-Aided Software Engineering",
     "description": "Visual design environment for multi-tier, multi-platform web applications",
-    "version": "1.0.41879",
+    "version": "1.0.41880",
     "publisher": "HermesSilva",
     "license": "MIT",
     "icon": "media/icon.png",
@@ -611,11 +611,10 @@
     },
     "dependencies": {
         "@dbml/core": "^6.4.0",
-        "@modelcontextprotocol/sdk": "^1.29.0",
+        "@tootega/dase-mcp": "file:../MCP",
         "@tootega/tfx": "file:tootega-tfx-1.0.0.tgz",
         "@types/dagre": "^0.7.54",
-        "dagre": "^0.8.5",
-        "zod": "^3.25.76"
+        "dagre": "^0.8.5"
     },
     "bundledDependencies": [
         "@tootega/tfx",

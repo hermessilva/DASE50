@@ -76,20 +76,26 @@ tune the layout, preview the prompt — and **Revert** in one click if you don't
 
 ## Model Context Protocol (MCP) — standard, client-agnostic AI
 
-Beyond Copilot, DASE ships an **embedded MCP server** so **any** MCP-speaking client
-(Cursor, Cline, Claude Desktop, custom agents) can drive the live designer over the open
-[Model Context Protocol](https://modelcontextprotocol.io). It exposes **42 tools** — the full
-DASE surface (read, write, and command triggers) — as thin wrappers over the same engine the
+Beyond Copilot, any MCP-speaking client (Claude Code, Cursor, Cline, Claude Desktop, custom
+agents) can drive the live designer over the open
+[Model Context Protocol](https://modelcontextprotocol.io) — **42 tools** covering the full
+DASE surface (read, write, and command triggers), thin wrappers over the same engine the
 built-in AI uses.
 
-**Enable it:**
+The MCP integration is a **separate product**: [**DASE-MCP**](https://github.com/HermesSilva/DASE-MCP)
+(`@tootega/dase-mcp`). This extension no longer bundles the MCP server code.
 
-1. Open Settings and turn on **`DASE › Mcp: Enabled`** (`dase.mcp.enabled`).
-2. The server binds to loopback only, on an **OS-assigned free port** by default
-   (`dase.mcp.port = 0`) — so several VS Code windows can run it at once without
-   colliding. Set a fixed port only if a client needs a stable URL.
-3. DASE writes an `mcp-endpoint.json` (endpoint URL) into the extension's
-   global storage. Read the URL from there — it carries the actual port:
+**Claude Code (recommended):** install the plugin — it finds the right VS Code window
+automatically (multi-window safe) and reconnects after restarts:
+
+```
+/plugin marketplace add HermesSilva/DASE-MCP
+/plugin install dase-mcp
+```
+
+**Other MCP clients:** turn on **`DASE › Mcp: Enabled`** (`dase.mcp.enabled`). The endpoint
+binds to loopback only, on an OS-assigned free port (`dase.mcp.port = 0`), and the URL is
+written to `mcp-endpoint.json` in the extension's global storage:
 
 ```jsonc
 {
@@ -107,6 +113,7 @@ allowlist (anti DNS-rebind, per the MCP spec). Disabled until you opt in.
 > A sample of the exposed tools: `dase_get_model`, `dase_list_tables`, `dase_get_table`,
 > `dase_validate`, `dase_export_dbml`, `dase_add_table`, `dase_add_field`, `dase_add_reference`,
 > `dase_move_table`, `dase_set_color`, `dase_update_property`, `dase_apply_organization`, and more.
+> Full API reference: [DASE-MCP/docs](https://github.com/HermesSilva/DASE-MCP/tree/master/docs).
 
 ## Quick Start
 

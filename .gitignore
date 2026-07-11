@@ -433,3 +433,6 @@ coverage/
 /DASE/test-results.json
 /DASE/vsix-temp
 /temp
+
+# DASE-MCP: produto separado com repo git proprio (github.com/HermesSilva/DASE-MCP)
+/MCP/

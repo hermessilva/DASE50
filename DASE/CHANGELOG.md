@@ -5,6 +5,21 @@ All notable changes to the **DASE — Design-Aided Software Engineering** extens
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.41880] - 2026-07-11
+
+### Changed
+
+- **MCP server extracted into a standalone product.** The embedded MCP server, its 42 tools,
+  and the protocol documentation moved out of this extension into the
+  [DASE-MCP](https://github.com/HermesSilva/DASE-MCP) repository (`@tootega/dase-mcp`).
+  The extension no longer bundles the MCP server code or its dependencies
+  (`@modelcontextprotocol/sdk`, `zod`); it consumes the library externally, and the
+  `dase.mcp.*` settings keep working where the library is available.
+- **New: Claude Code plugin.** External clients now have a first-class install path:
+  `/plugin marketplace add HermesSilva/DASE-MCP` + `/plugin install dase-mcp`. The plugin
+  discovers the live designer window automatically (multi-window safe) and reconnects
+  after VS Code restarts — no manual endpoint configuration.
+
 ## [1.0.41879] - 2026-07-10
 
 ### Fixed

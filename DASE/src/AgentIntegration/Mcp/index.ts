@@ -1,9 +1,12 @@
 import * as vscode from "vscode";
 import { createHash } from "crypto";
-import type { XDaseMcpServer } from "./XDaseMcpServer";
+import type { IDaseMcpHost, XDaseMcpServer } from "@tootega/dase-mcp";
+import { XAgentBridge } from "../AgentBridge";
 import { GetLogService } from "../../Services/LogService";
 
-// NOTE: XDaseMcpServer (and the @modelcontextprotocol/sdk + zod it pulls in) is
+// NOTE: the MCP server implementation lives in the @tootega/dase-mcp package
+// (workspace folder MCP/), which also ships the standalone Claude Code plugin
+// proxy. The package (and the @modelcontextprotocol/sdk + zod it pulls in) is
 // imported lazily via dynamic import() inside Reconcile — never at module load.
 // This keeps extension activation working even if the MCP SDK is not packaged in
 // the .vsix; MCP simply stays unavailable until enabled and the SDK is present.
@@ -17,7 +20,8 @@ const DEFAULT_PORT = 0;
 const DISCOVERY_FILE = "mcp-endpoint.json";
 // Prefixo do discovery POR JANELA. Cada janela grava
 // `mcp-endpoint.<hash-do-workspace>.json` com url + workspacePath + pid, para que
-// um cliente (ex.: Cockpit) case o endpoint com a própria janela.
+// um cliente (ex.: Cockpit, plugin dase-mcp do Claude Code) case o endpoint com a
+// própria janela.
 const DISCOVERY_PREFIX = "mcp-endpoint.";
 const DISCOVERY_SUFFIX = ".json";
 
@@ -54,6 +58,16 @@ export function RegisterDaseMcpServer(pContext: vscode.ExtensionContext): void {
     log.Info("DASE MCP integration registered");
 }
 
+/** Build the host adapter the embedded server uses to reach DASE internals. */
+function MakeHost(): IDaseMcpHost {
+    return {
+        Bridge: XAgentBridge.GetInstance(),
+        Log: GetLogService(),
+        ExecuteCommand: (pCommand: string) =>
+            Promise.resolve(vscode.commands.executeCommand(pCommand))
+    };
+}
+
 async function Reconcile(pContext: vscode.ExtensionContext): Promise<void> {
     const cfg = vscode.workspace.getConfiguration(CONFIG_SECTION);
     const enabled = cfg.get<boolean>("enabled", false);
@@ -70,9 +84,9 @@ async function Reconcile(pContext: vscode.ExtensionContext): Promise<void> {
     const port = cfg.get<number>("port", DEFAULT_PORT);
 
     try {
-        // Lazy-load the server module (and the MCP SDK) only when actually enabling.
-        const mod = await import("./XDaseMcpServer");
-        const server = new mod.XDaseMcpServer(port);
+        // Lazy-load the package (and the MCP SDK) only when actually enabling.
+        const mod = await import("@tootega/dase-mcp");
+        const server = new mod.XDaseMcpServer(port, MakeHost());
         await server.Start();
         _Server = server;
         await WriteDiscoveryFile(pContext, server);
