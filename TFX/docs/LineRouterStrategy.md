@@ -1,6 +1,7 @@
 # Estratégia Completa — Roteador de Linhas ORM (XRouter v2)
 
 Data: 2026-07-02 — **IMPLEMENTADO** (etapas 1–6; etapa 7 opcional pendente)
+Revisão v2.1: 2026-07-11 — âncoras por projeção + tightening pós-A\* (ver §7)
 Escopo: `TFX/src/Design/XRouter.ts`, `TFX/src/Design/XRouteContext.ts` (novo),
 `TFX/src/Designers/ORM/XORMDesign.ts`, `DASE/src/Services/TFXBridge.ts` (simplify),
 `DASE/media/OrmDesigner.js` (render).
@@ -179,3 +180,60 @@ Cada etapa isolada e testável; etapas 1–3 já eliminam o amontoado visível n
 - **Snapshot de métricas** no SYSx.dsorm: crossings/bends/length registrados; regressão falha se piorar > 10%.
 - **Benchmark**: 100×300 < 50ms (CI com margem 3×).
 - Testes existentes (`XDesign.test.ts`, `XORMDesignCoverage.test.ts`) atualizados — DeOverlapSegments removido.
+
+---
+
+## 7. Revisão v2.1 (2026-07-11) — jogs residuais e entrada torta
+
+Sintomas observados no SYSx real após a v2:
+- **Z de escada antes da seta** (down→right→down→right onde down→right basta).
+- **Jog no meio da descida** quando a tabela alvo está logo abaixo: a âncora
+  uniforme `t=(i+1)/(n+1)` cai no meio da borda, longe do X da descida natural.
+
+Causas e correções:
+
+| Causa | Correção | Local |
+|---|---|---|
+| Âncora no lado alvo distribuída uniforme, ignorando de onde a linha vem | **Âncoras por projeção**: coordenada desejada = projeção da aproximação (Y do field-row FK para lados E/W; X do stub de saída da origem para N/S), com resolução 1D de espaçamento mínimo (forward/backward sweep, pitch encolhe se o lado lota). Ordenação por coordenada desejada preserva chegada = partida (sem cruzamentos entre irmãos) | `XORMDesign.ComputeAnchorDistribution` + `ResolveAnchorCoords` |
+| A\* ponderado (ε=50%) + closed-set estrito aceita o 1º caminho que toca o goal — curvas extras que o TurnPenalty não recupera | **`TightenPath`**: pós-otimização local por rota — cada segmento interior é deslizado sobre a linha do vizinho (2 candidatos); aceita se custo geométrico+social cai e nenhum obstáculo é cruzado (segmento movido exige clearance 4px para nunca colar em borda de tabela). Remove Z de escada (−2 curvas) e encurta U (detour). Fixpoint ≤ 6 passadas | `XRouter.TightenPath` / `TightenSegmentsFree`, aplicado em `RouteWithTracks` após `Simplify` |
+
+Resultado medido (grade 10×10, 300 refs realistas, seed 7):
+
+| Métrica | v2 | v2.1 |
+|---|---|---|
+| Bends | 1132 | **956** (−15.5%) |
+| Crossings | 2490 | **2253** (−9.5%) |
+| Overlaps | 549 | **504** (−8%) |
+| Comprimento total | 233329 | **218893** (−6%) |
+| Tempo | 141ms | 140ms |
+
+Testes novos em `XRouterV2.test.ts` ("route shape quality"): tabela logo abaixo
+entra reta (≤2 bends); alvo abaixo-direita entra em L limpo (≤2 bends); âncora
+solitária alinha com a coordenada de aproximação (stub X exato).
+
+### 7.1 Hotfix RF5 (2026-07-11) — linha saindo por baixo da tabela
+
+Sintoma reportado: rota descendo por DENTRO do corpo da tabela fonte e emergindo
+pela borda inferior. Causa: o slide do `TightenPath` movia um segmento e o
+`Simplify` fundia uma corrida colinear com REVERSÃO num stub minúsculo (8px) ou
+invertido — a linha ficava colada/cruzando a própria tabela. Buraco correlato no
+nudging: só o segmento movido era validado; os vizinhos ESTICADOS podiam cruzar
+tabela, e o joint do stub podia ser arrastado até a âncora.
+
+Correções (defesa em 3 camadas):
+
+1. `XRouter.TightenPath`: guards medidos no caminho SIMPLIFICADO — stubs
+   primeiro/último ≥ Gap e heading preservado (sem inversão pós-merge).
+2. `XORMDesign.NudgeSegments.isFree`: valida também os 2 vizinhos esticados
+   (clearance 0 — stub toca a própria borda por definição) e rejeita shift que
+   deixe stub adjacente < RouterGap.
+3. **Enforcement RF5**: `HasValidSourceExit` (p0 na borda E/W no field-row,
+   1º segmento H para fora ≥12px, nenhum segmento posterior corta o interior da
+   fonte) aplicado em `RouteReference` (pós-busca) e em `EnforceSourceExits`
+   (pós-nudge). Violação → `OrthogonalFallbackRoute` determinístico. Garante o
+   invariante independentemente do que busca/pós-passes produzirem.
+
+Property test permanente: "RF5 source-exit invariant" — 300 cenas aleatórias
+sem sobreposição; stub lateral no field-row, para fora, nunca reentra a fonte.
+Nota: cenas com tabelas SOBREPOSTAS podem violar por construção (âncora do alvo
+dentro da fonte) — caso inválido no editor real.

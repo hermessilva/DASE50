@@ -3,6 +3,7 @@ import { XRect, XPoint } from "../src/Core/XGeometry.js";
 import { XOccupancyMap, XRouteContext } from "../src/Design/XRouteContext.js";
 import { XORMDesign } from "../src/Designers/ORM/XORMDesign.js";
 import { XORMTable } from "../src/Designers/ORM/XORMTable.js";
+import { XORMMetrics } from "../src/Designers/ORM/XORMMetrics.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -274,6 +275,178 @@ describe("XORMDesign cooperative routing", () =>
         const after = untouched.Points.map(p => `${p.X},${p.Y}`).join(";");
         expect(after).toBe(before);
     });
+});
+
+// ---------------------------------------------------------------------------
+// Route shape quality (anchor projection + jog tightening)
+// ---------------------------------------------------------------------------
+
+describe("route shape quality", () =>
+{
+    function bendsOf(pPoints: XPoint[]): number
+    {
+        let bends = 0;
+        for (let i = 2; i < pPoints.length; i++)
+        {
+            const h1 = Math.abs(pPoints[i - 2].Y - pPoints[i - 1].Y) < 0.5;
+            const h2 = Math.abs(pPoints[i - 1].Y - pPoints[i].Y) < 0.5;
+            if (h1 !== h2)
+                bends++;
+        }
+        return bends;
+    }
+
+    it("table directly below enters straight — no mid-descent jog", () =>
+    {
+        // Image-3 pattern: source above, target below with a large X overlap.
+        // The line exits West at the FK row, descends once and enters the
+        // target top — 2 bends, never down→right→down.
+        const design = new XORMDesign();
+        const src = design.CreateTable({ Name: "MenuRecente", X: 300, Y: 100, Width: 200, Height: 100 });
+        src.CreateField({ Name: "UsuarioID" });
+        const tgt = design.CreateTable({ Name: "Usuario", X: 220, Y: 400, Width: 200, Height: 100 });
+        tgt.CreateField({ Name: "ID" });
+        connect(design, src, tgt);
+
+        design.RouteAllLines();
+
+        const ref = design.GetReferences()[0];
+        expectOrthogonal(ref.Points);
+        expect(bendsOf(ref.Points)).toBeLessThanOrEqual(2);
+    });
+
+    it("target below-right enters as a clean L — no staircase before the arrow", () =>
+    {
+        // Image-1 pattern: source top-left, target bottom-right; the route
+        // must descend and enter with a single corner near the target.
+        const design = new XORMDesign();
+        const src = design.CreateTable({ Name: "Politica", X: 100, Y: 50, Width: 220, Height: 120 });
+        src.CreateField({ Name: "AcaoSensivelID" });
+        const tgt = design.CreateTable({ Name: "AcaoSensivel", X: 420, Y: 400, Width: 200, Height: 80 });
+        tgt.CreateField({ Name: "ID" });
+        connect(design, src, tgt);
+
+        design.RouteAllLines();
+
+        const ref = design.GetReferences()[0];
+        expectOrthogonal(ref.Points);
+        expect(bendsOf(ref.Points)).toBeLessThanOrEqual(2);
+    });
+
+    it("lone incoming anchor aligns with the approach coordinate", () =>
+    {
+        // Anchor projection: a single incoming line lands where the route
+        // naturally arrives (source exit-stub X), not at the border middle.
+        const design = new XORMDesign();
+        const src = design.CreateTable({ Name: "A", X: 300, Y: 100, Width: 200, Height: 100 });
+        src.CreateField({ Name: "FK" });
+        const tgt = design.CreateTable({ Name: "B", X: 100, Y: 400, Width: 300, Height: 100 });
+        tgt.CreateField({ Name: "ID" });
+        connect(design, src, tgt);
+
+        design.RouteAllLines();
+
+        const ref = design.GetReferences()[0];
+        const entry = ref.Points[ref.Points.length - 1];
+        // Source exits West (target center is left of source center):
+        // stub X = src.Left - gap = 300 - 40 = 260, inside the target top span.
+        expect(Math.abs(entry.X - 260)).toBeLessThanOrEqual(0.5);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// RF5 invariant — the source stub always exits E/W at the FK field row
+// ---------------------------------------------------------------------------
+
+describe("RF5 source-exit invariant", () =>
+{
+    it("300 random non-overlapping scenes: stub exits sideways at the field row and never re-enters the source", () =>
+    {
+        const violations: string[] = [];
+        for (let seedBase = 1; seedBase <= 300; seedBase++)
+        {
+            let seed = seedBase;
+            const next = (): number => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed; };
+
+            const design = new XORMDesign();
+            const tables: XORMTable[] = [];
+            const cols = 3 + (next() % 3);
+            const rows = 2 + (next() % 3);
+            for (let r = 0; r < rows; r++)
+            {
+                for (let c = 0; c < cols; c++)
+                {
+                    if (next() % 5 === 0)
+                        continue; // holes make corridors irregular
+                    const t = design.CreateTable({
+                        Name: `T${r}_${c}`,
+                        X: c * 340 + (next() % 30) - 15,
+                        Y: r * 260 + (next() % 30) - 15,
+                        Width: 160 + (next() % 120),
+                        Height: 100
+                    });
+                    const fc = 1 + (next() % 7);
+                    for (let f = 0; f < fc; f++)
+                        t.CreateField({ Name: `F${f}` });
+                    tables.push(t);
+                }
+            }
+            if (tables.length < 2)
+                continue;
+            const refCount = 6 + (next() % 16);
+            for (let r = 0; r < refCount; r++)
+            {
+                const a = tables[next() % tables.length];
+                const b = tables[next() % tables.length];
+                if (a === b)
+                    continue;
+                const fields = a.GetFields();
+                design.CreateReference({ SourceFieldID: fields[next() % fields.length].ID, TargetTableID: b.ID });
+            }
+
+            design.RouteAllLines();
+
+            for (const ref of design.GetReferences())
+            {
+                const pts = ref.Points;
+                if (!pts || pts.length < 2)
+                    continue;
+                const srcField = design.FindFieldByID(ref.Source);
+                const srcTable = srcField?.ParentNode as XORMTable;
+                if (!srcTable)
+                    continue;
+                const vb = XORMMetrics.GetVisualBounds(srcTable);
+                const idx = srcTable.GetFields().findIndex(f => f.ID === srcField!.ID);
+                const fieldY = XORMMetrics.GetFieldRowY(srcTable, idx);
+                const p0 = pts[0];
+                const p1 = pts[1];
+
+                const onWest = Math.abs(p0.X - vb.Left) < 0.75;
+                const onEast = Math.abs(p0.X - vb.Right) < 0.75;
+                const atRow = Math.abs(p0.Y - fieldY) < 0.75;
+                const firstH = Math.abs(p1.Y - p0.Y) < 0.75;
+                const outward = onEast ? p1.X > p0.X + 8 : (onWest ? p1.X < p0.X - 8 : false);
+
+                if (!(onWest || onEast) || !atRow || !firstH || !outward)
+                {
+                    violations.push(`seed=${seedBase} STUB pts=${pts.map(p => `(${p.X},${p.Y})`).join(" ")}`);
+                    continue;
+                }
+                for (let i = 1; i < pts.length - 1; i++)
+                {
+                    const a2 = pts[i];
+                    const b2 = pts[i + 1];
+                    const loX = Math.min(a2.X, b2.X);
+                    const hiX = Math.max(a2.X, b2.X);
+                    const loY = Math.min(a2.Y, b2.Y);
+                    const hiY = Math.max(a2.Y, b2.Y);
+                    if (hiX > vb.Left + 0.75 && loX < vb.Right - 0.75 && hiY > vb.Top + 0.75 && loY < vb.Bottom - 0.75)
+                        violations.push(`seed=${seedBase} CUT seg${i} pts=${pts.map(p => `(${p.X},${p.Y})`).join(" ")}`);
+                }
+            }
+        }
+        expect(violations, violations.slice(0, 10).join("\n")).toHaveLength(0);
+    }, 180000);
 });
 
 // ---------------------------------------------------------------------------

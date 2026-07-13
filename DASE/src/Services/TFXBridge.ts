@@ -877,10 +877,19 @@ export class XTFXBridge {
         return this._Controller?.AddReference(addRefData) || { Success: false };
     }
 
-    AddField(pTableID: string, pName: string, _pDataType: string): XIOperationResult {
+    AddField(pTableID: string, pName: string, pDataType: string): XIOperationResult {
+        if (pDataType) {
+            const allTypes = this.GetAllDataTypes();
+            if (allTypes.length > 0 && !allTypes.includes(pDataType))
+                return {
+                    Success: false,
+                    Message: `Invalid data type "${pDataType}". Valid types: ${allTypes.join(", ")}.`
+                };
+        }
         const addFieldData: XIAddFieldData = {
             TableID: pTableID,
-            Name: pName
+            Name: pName,
+            DataType: pDataType || undefined
         };
         return this._Controller?.AddField(addFieldData) || { Success: false };
     }

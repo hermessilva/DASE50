@@ -341,7 +341,8 @@ export class XRouter
                     continue;
 
                 const full: XPoint[] = [startAnchor, ...path, endAnchor];
-                const simplified = this.Simplify(full);
+                const simplified = this.TightenPath(
+                    this.Simplify(full), pLeftRect, pRightRect, pActiveRects);
                 const cost = this.PathCost(simplified) + this.SocialCost(simplified);
                 if (cost < bestCost)
                 {
@@ -710,6 +711,151 @@ export class XRouter
             n = n.Parent;
         }
         return out;
+    }
+
+    /**
+     * Local post-optimization over a simplified path. The weighted A* (see
+     * Heuristic) trades global optimality for speed and can leave a gratuitous
+     * jog near the goal (down→right→down where down→right suffices). Each
+     * interior segment is slid onto the line of one of its neighbouring
+     * joints; the slide is kept when it lowers the combined geometric+social
+     * cost without crossing any obstacle. Removes staircase Zs (2 fewer
+     * bends) and shrinks U detours (shorter length) in a few cheap passes.
+     */
+    private TightenPath(
+        pPoints: XPoint[],
+        pLeftRect: XRect,
+        pRightRect: XRect,
+        pActiveRects: XRect[]
+    ): XPoint[]
+    {
+        let pts = pPoints;
+        if (pts.length < 4)
+            return pts;
+
+        const blockRects: XRect[] = [pLeftRect, pRightRect];
+        if (this.CheckCollision)
+        {
+            for (const r of pActiveRects)
+                blockRects.push(r);
+        }
+
+        const maxPasses = 6;
+        for (let pass = 0; pass < maxPasses; pass++)
+        {
+            let improved = false;
+            for (let k = 1; k <= pts.length - 3; k++)
+            {
+                const a = pts[k];
+                const b = pts[k + 1];
+                const vertical = Math.abs(a.X - b.X) < EPS;
+                const horizontal = Math.abs(a.Y - b.Y) < EPS;
+                if (vertical === horizontal)
+                    continue; // zero-length or diagonal — leave untouched
+                const prev = pts[k - 1];
+                const next = pts[k + 2];
+                const current = vertical ? a.X : a.Y;
+                const candidates = vertical ? [prev.X, next.X] : [prev.Y, next.Y];
+                const currentCost = this.PathCost(pts) + this.SocialCost(pts);
+
+                let bestPts: XPoint[] | null = null;
+                let bestCost = currentCost - 0.5;
+                for (const cand of candidates)
+                {
+                    if (Math.abs(cand - current) < EPS)
+                        continue;
+                    const trial = pts.slice();
+                    trial[k] = vertical ? new XPoint(cand, a.Y) : new XPoint(a.X, cand);
+                    trial[k + 1] = vertical ? new XPoint(cand, b.Y) : new XPoint(b.X, cand);
+                    if (!this.TightenSegmentsFree(trial, k, blockRects))
+                        continue;
+                    const simplified = this.Simplify(trial);
+                    // The exit/entry stubs must keep at least one gap of
+                    // length AFTER simplification: a slide can make Simplify
+                    // merge a reversing colinear run into a tiny (or inverted)
+                    // first/last segment, and the line then appears to leave
+                    // the table from the wrong side or under its body.
+                    // Measured on the simplified path, not the raw trial.
+                    const first = Math.abs(simplified[1].X - simplified[0].X)
+                        + Math.abs(simplified[1].Y - simplified[0].Y);
+                    const lastIdx = simplified.length - 1;
+                    const last = Math.abs(simplified[lastIdx].X - simplified[lastIdx - 1].X)
+                        + Math.abs(simplified[lastIdx].Y - simplified[lastIdx - 1].Y);
+                    if (first < this.Gap - EPS || last < this.Gap - EPS)
+                        continue;
+                    // Stub headings must survive: a merged reversal can leave a
+                    // long first segment pointing back across the table.
+                    const dx0 = Math.sign(pts[1].X - pts[0].X);
+                    const dy0 = Math.sign(pts[1].Y - pts[0].Y);
+                    if (Math.sign(simplified[1].X - simplified[0].X) !== dx0
+                        || Math.sign(simplified[1].Y - simplified[0].Y) !== dy0)
+                        continue;
+                    const dxN = Math.sign(pts[pts.length - 1].X - pts[pts.length - 2].X);
+                    const dyN = Math.sign(pts[pts.length - 1].Y - pts[pts.length - 2].Y);
+                    if (Math.sign(simplified[lastIdx].X - simplified[lastIdx - 1].X) !== dxN
+                        || Math.sign(simplified[lastIdx].Y - simplified[lastIdx - 1].Y) !== dyN)
+                        continue;
+                    const cost = this.PathCost(simplified) + this.SocialCost(simplified);
+                    if (cost < bestCost)
+                    {
+                        bestCost = cost;
+                        bestPts = simplified;
+                    }
+                }
+                if (bestPts)
+                {
+                    pts = bestPts;
+                    improved = true;
+                    if (pts.length < 4)
+                        break;
+                    k = 0; // rescan the mutated path from the start
+                }
+            }
+            if (!improved)
+                break;
+        }
+        return pts;
+    }
+
+    /**
+     * Validates the three segments affected by a TightenPath slide (previous,
+     * moved, next) against the obstacle set. The moved segment keeps a small
+     * clearance so a slide never lands a line exactly on a table border; the
+     * neighbours use strict interior tests, matching the A* edge semantics
+     * (stubs legitimately touch their own table border).
+     */
+    private TightenSegmentsFree(pPts: XPoint[], pK: number, pBlockRects: XRect[]): boolean
+    {
+        for (let s = pK - 1; s <= pK + 1; s++)
+        {
+            const p = pPts[s];
+            const q = pPts[s + 1];
+            const vertical = Math.abs(p.X - q.X) < EPS;
+            const horizontal = Math.abs(p.Y - q.Y) < EPS;
+            if (vertical && horizontal)
+                continue; // collapsed to zero length — removed by Simplify
+            if (!vertical && !horizontal)
+                return false;
+            const clearance = s === pK ? 4 : 0;
+            const fixed = vertical ? p.X : p.Y;
+            const lo = vertical ? Math.min(p.Y, q.Y) : Math.min(p.X, q.X);
+            const hi = vertical ? Math.max(p.Y, q.Y) : Math.max(p.X, q.X);
+            for (const r of pBlockRects)
+            {
+                const left = r.Left - clearance;
+                const right = r.Right + clearance;
+                const top = r.Top - clearance;
+                const bottom = r.Bottom + clearance;
+                if (vertical)
+                {
+                    if (fixed > left + EPS && fixed < right - EPS && hi > top + EPS && lo < bottom - EPS)
+                        return false;
+                }
+                else if (fixed > top + EPS && fixed < bottom - EPS && hi > left + EPS && lo < right - EPS)
+                    return false;
+            }
+        }
+        return true;
     }
 
     private Simplify(pPoints: XPoint[]): XPoint[]

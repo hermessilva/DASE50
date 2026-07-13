@@ -559,6 +559,57 @@ export class XORMDesign extends XDesign
         }
 
         this.NudgeSegments(references, context);
+        this.EnforceSourceExits(references, anchors);
+    }
+
+    /**
+     * Post-pass safety net: any reference whose points no longer honour the
+     * RF5 source-exit invariant (see HasValidSourceExit) is replaced by the
+     * deterministic orthogonal fallback. Guarantees a line can never leave
+     * its source table from the top/bottom or through the table body, no
+     * matter what the search or the nudging produced.
+     */
+    private EnforceSourceExits(
+        pRefs: XORMReference[],
+        pAnchors: Map<string, { TargetAnchor: XPoint; TargetSide: XRouterDirection; SourceAnchor: XPoint; SourceSide: XRouterDirection } | undefined>
+    ): void
+    {
+        for (const ref of pRefs)
+        {
+            if (!ref.Points || ref.Points.length < 2)
+                continue;
+
+            let sourceField = ref.GetSourceElement<XORMField>();
+            if (!sourceField && ref.Source)
+                sourceField = this.FindFieldByID(ref.Source);
+            let sourceTable: XORMTable | null = null;
+            let fieldY = NaN;
+            if (sourceField)
+            {
+                if (!(sourceField.ParentNode instanceof XORMTable))
+                    continue;
+                sourceTable = sourceField.ParentNode;
+                const idx = sourceTable.GetFields().findIndex(f => f.ID === sourceField!.ID);
+                if (idx >= 0)
+                    fieldY = XORMMetrics.GetFieldRowY(sourceTable, idx);
+            }
+            else
+                sourceTable = this.FindTableByID(ref.Source);
+            if (!sourceTable)
+                continue;
+
+            let targetTable = ref.GetTargetElement<XORMTable>();
+            if (!targetTable && ref.Target)
+                targetTable = this.FindTableByID(ref.Target);
+            if (!targetTable)
+                continue;
+
+            const sourceBounds = this.GetVisualBounds(sourceTable);
+            if (XORMDesign.HasValidSourceExit(ref.Points, sourceBounds, fieldY))
+                continue;
+            ref.Points = this.OrthogonalFallbackRoute(
+                sourceBounds, this.GetVisualBounds(targetTable), fieldY, pAnchors.get(ref.ID));
+        }
     }
 
     private CreateRouteContext(pTables: XORMTable[]): XRouteContext
@@ -667,12 +718,51 @@ export class XORMDesign extends XDesign
             pSeg.Fixed = pTarget;
         };
 
-        /** Position is acceptable when it does not cut through any table. */
+        /**
+         * Position is acceptable when the moved segment does not cut through
+         * any table, the two neighbour segments it stretches stay clear as
+         * well, and the shift never collapses an anchor stub below one gap
+         * (a swallowed stub makes the line appear to leave the table body).
+         */
         const isFree = (pSeg: ISeg, pTarget: number): boolean =>
         {
+            const pts = pSeg.Ref.Points;
+            const prev = pts[pSeg.I - 1];
+            const next = pts[pSeg.I + 2];
+            const gap = XORMMetrics.RouterGap;
+            if (pSeg.Vertical)
+            {
+                if (pSeg.I === 1 && Math.abs(pTarget - prev.X) < gap)
+                    return false;
+                if (pSeg.I === pts.length - 3 && Math.abs(pTarget - next.X) < gap)
+                    return false;
+            }
+            else
+            {
+                if (pSeg.I === 1 && Math.abs(pTarget - prev.Y) < gap)
+                    return false;
+                if (pSeg.I === pts.length - 3 && Math.abs(pTarget - next.Y) < gap)
+                    return false;
+            }
             if (!pContext)
                 return true;
-            return pContext.IsSegmentFree(pSeg.Vertical, pTarget, pSeg.Lo, pSeg.Hi, clearance);
+            if (!pContext.IsSegmentFree(pSeg.Vertical, pTarget, pSeg.Lo, pSeg.Hi, clearance))
+                return false;
+            // Stretched neighbours: moving a vertical segment stretches the
+            // horizontal joints at both ends (and vice versa). Clearance 0:
+            // anchor stubs legitimately touch their own table border, but a
+            // stretch that crosses a table interior is rejected.
+            if (pSeg.Vertical)
+            {
+                const y1 = pts[pSeg.I].Y;
+                const y2 = pts[pSeg.I + 1].Y;
+                return pContext.IsSegmentFree(false, y1, Math.min(prev.X, pTarget), Math.max(prev.X, pTarget), 0)
+                    && pContext.IsSegmentFree(false, y2, Math.min(pTarget, next.X), Math.max(pTarget, next.X), 0);
+            }
+            const x1 = pts[pSeg.I].X;
+            const x2 = pts[pSeg.I + 1].X;
+            return pContext.IsSegmentFree(true, x1, Math.min(prev.Y, pTarget), Math.max(prev.Y, pTarget), 0)
+                && pContext.IsSegmentFree(true, x2, Math.min(pTarget, next.Y), Math.max(pTarget, next.Y), 0);
         };
 
         const process = (pGroup: ISeg[]): void =>
@@ -861,25 +951,44 @@ export class XORMDesign extends XDesign
         {
             const tSide = planSides.get(group[0])!.TargetSide;
             const tBounds = group[0].TargetBounds;
-            // Sort by where each line LEAVES its source so arrival order matches
-            // departure order (prevents the connecting lines from crossing).
-            // For E/W target sides the relevant departure coordinate is the source
-            // FK field-row Y (falling back to the source center Y).
-            const srcKey = (p: IPlan): number =>
+            // Desired coordinate = projection of where the line actually comes
+            // from onto the entry side: the source FK field-row Y for E/W
+            // sides, the source exit-stub X for N/S sides. A lone incoming
+            // route then enters straight (no jog to the middle of the border);
+            // sorting by it keeps arrival order matching departure order so
+            // sibling lines do not cross.
+            const desiredOf = (p: IPlan): number =>
             {
                 if (tSide === XRouterDirection.East || tSide === XRouterDirection.West)
                     return isNaN(p.SourceFieldY)
                         ? p.SourceBounds.Top + p.SourceBounds.Height / 2
                         : p.SourceFieldY;
-                return p.SourceBounds.Left + p.SourceBounds.Width / 2;
+                const srcCx = p.SourceBounds.Left + p.SourceBounds.Width / 2;
+                const tgtCx = p.TargetBounds.Left + p.TargetBounds.Width / 2;
+                return tgtCx >= srcCx
+                    ? p.SourceBounds.Right + XORMMetrics.RouterGap
+                    : p.SourceBounds.Left - XORMMetrics.RouterGap;
             };
-            group.sort((a, b) => srcKey(a) - srcKey(b));
-
-            const n = group.length;
-            for (let i = 0; i < n; i++)
+            group.sort((a, b) =>
             {
-                const t = (i + 1) / (n + 1);
-                const tAnchor = this.AnchorOnSide(tBounds, tSide, t);
+                const d = desiredOf(a) - desiredOf(b);
+                if (Math.abs(d) > 0.5)
+                    return d;
+                return a.Ref.ID < b.Ref.ID ? -1 : 1;
+            });
+
+            const margin = XORMMetrics.RouterGap / 2;
+            const inset = Math.min(margin, Math.min(tBounds.Width, tBounds.Height) / 4);
+            const horizontalSide = tSide === XRouterDirection.North || tSide === XRouterDirection.South;
+            const lo = (horizontalSide ? tBounds.Left : tBounds.Top) + inset;
+            const hi = (horizontalSide ? tBounds.Right : tBounds.Bottom) - inset;
+            const coords = XORMDesign.ResolveAnchorCoords(group.map(desiredOf), lo, hi, minAnchorSpacing);
+
+            for (let i = 0; i < group.length; i++)
+            {
+                const tAnchor = horizontalSide
+                    ? new XPoint(coords[i], tSide === XRouterDirection.North ? tBounds.Top : tBounds.Bottom)
+                    : new XPoint(tSide === XRouterDirection.West ? tBounds.Left : tBounds.Right, coords[i]);
                 const plan = group[i];
                 const sides = planSides.get(plan)!;
                 const sAnchor = this.SourceAnchor(plan.SourceBounds, sides.SourceSide, plan.SourceFieldY);
@@ -893,6 +1002,34 @@ export class XORMDesign extends XDesign
         }
 
         return result;
+    }
+
+    /**
+     * Places anchors as close as possible to their desired coordinates while
+     * keeping a minimum spacing and staying within [pLo, pHi]. Forward pass
+     * pushes overlapping anchors ahead; backward pass restores spacing when
+     * the chain was squashed against the upper bound. When the span cannot
+     * fit all anchors at the requested spacing, the pitch shrinks evenly.
+     */
+    private static ResolveAnchorCoords(pDesired: number[], pLo: number, pHi: number, pSpacing: number): number[]
+    {
+        const clamp = (pV: number): number => Math.min(pHi, Math.max(pLo, pV));
+        const n = pDesired.length;
+        if (n === 1)
+            return [clamp(pDesired[0])];
+
+        const span = Math.max(0, pHi - pLo);
+        const pitch = Math.min(pSpacing, span / (n - 1));
+        const out = new Array<number>(n);
+        out[0] = clamp(pDesired[0]);
+        for (let i = 1; i < n; i++)
+            out[i] = clamp(Math.max(pDesired[i], out[i - 1] + pitch));
+        for (let i = n - 2; i >= 0; i--)
+        {
+            if (out[i] > out[i + 1] - pitch)
+                out[i] = out[i + 1] - pitch;
+        }
+        return out;
     }
 
     private PickEntrySide(pFrom: XRect, pTo: XRect): XRouterDirection
@@ -953,23 +1090,6 @@ export class XORMDesign extends XDesign
         }
         sides.sort((a, b) => costs.get(a)! - costs.get(b)!);
         return sides;
-    }
-
-    private AnchorOnSide(pRect: XRect, pSide: XRouterDirection, pT: number): XPoint
-    {
-        const margin = XORMMetrics.RouterGap / 2;
-        const inset = Math.min(margin, Math.min(pRect.Width, pRect.Height) / 4);
-        switch (pSide)
-        {
-            case XRouterDirection.East:
-                return new XPoint(pRect.Left + pRect.Width, pRect.Top + inset + (pRect.Height - 2 * inset) * pT);
-            case XRouterDirection.West:
-                return new XPoint(pRect.Left, pRect.Top + inset + (pRect.Height - 2 * inset) * pT);
-            case XRouterDirection.North:
-                return new XPoint(pRect.Left + inset + (pRect.Width - 2 * inset) * pT, pRect.Top);
-            default: // South
-                return new XPoint(pRect.Left + inset + (pRect.Width - 2 * inset) * pT, pRect.Top + pRect.Height);
-        }
     }
 
     private SourceAnchor(pBounds: XRect, pSide: XRouterDirection, pFieldY: number): XPoint
@@ -1124,7 +1244,8 @@ export class XORMDesign extends XDesign
         router.Context = null;
         router.CurrentRefID = "";
 
-        if (result.IsValid && result.Points.length > 0)
+        if (result.IsValid && result.Points.length > 0
+            && XORMDesign.HasValidSourceExit(result.Points, sourceBounds, fieldY))
         {
             pRef.Points = result.Points;
             return;
@@ -1133,6 +1254,47 @@ export class XORMDesign extends XDesign
         // Final guard: orthogonal L/Z fallback between the chosen anchors so
         // the reference always renders — never a diagonal line.
         pRef.Points = this.OrthogonalFallbackRoute(sourceBounds, targetBounds, fieldY, pAnchor);
+    }
+
+    /**
+     * Hard RF5 invariant for a routed reference: the line must START on the
+     * source table's LEFT or RIGHT border at the FK field row, leave
+     * horizontally and outward with a visible stub, and no later segment may
+     * cut back through the source table body (a line emerging from under the
+     * table). Any route that violates this is discarded in favour of the
+     * deterministic orthogonal fallback.
+     */
+    private static HasValidSourceExit(pPoints: XPoint[], pSourceBounds: XRect, pFieldY: number): boolean
+    {
+        if (pPoints.length < 2)
+            return false;
+        const tol = 0.75;
+        const p0 = pPoints[0];
+        const p1 = pPoints[1];
+        const onWest = Math.abs(p0.X - pSourceBounds.Left) < tol;
+        const onEast = Math.abs(p0.X - pSourceBounds.Right) < tol;
+        if (!onWest && !onEast)
+            return false;
+        if (!isNaN(pFieldY) && Math.abs(p0.Y - pFieldY) > tol)
+            return false;
+        if (Math.abs(p1.Y - p0.Y) > tol)
+            return false;
+        const outward = onEast ? p1.X - p0.X : p0.X - p1.X;
+        if (outward < 12)
+            return false;
+        for (let i = 1; i < pPoints.length - 1; i++)
+        {
+            const a = pPoints[i];
+            const b = pPoints[i + 1];
+            const loX = Math.min(a.X, b.X);
+            const hiX = Math.max(a.X, b.X);
+            const loY = Math.min(a.Y, b.Y);
+            const hiY = Math.max(a.Y, b.Y);
+            if (hiX > pSourceBounds.Left + tol && loX < pSourceBounds.Right - tol
+                && hiY > pSourceBounds.Top + tol && loY < pSourceBounds.Bottom - tol)
+                return false;
+        }
+        return true;
     }
 
     /**

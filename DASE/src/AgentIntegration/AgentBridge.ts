@@ -59,6 +59,29 @@ export class XAgentBridge {
         return this._Provider.GetActiveState();
     }
 
+    /**
+     * Persist the target document through VS Code, not behind its back.
+     *
+     * In a CustomEditor the dirty flag belongs to VS Code: it is set when the provider
+     * fires `onDidChangeCustomDocument` and only cleared when VS Code itself performs the
+     * save. Calling `XORMDesignerState.Save` directly writes the file but leaves the tab
+     * marked as modified. `workspace.save` routes into `saveCustomDocument`, which calls
+     * `XORMDesignerState.Save` — file written once, marker cleared.
+     */
+    private async SaveTargetDocument(): Promise<boolean> {
+        const state = this.GetTargetState();
+        if (!state)
+            return false;
+        if (state.IsUntitled)
+            return false;
+        const saved = await vscode.workspace.save(state.Document.uri);
+        if (saved)
+            return true;
+        // No editor registered for the URI (document not open): write directly.
+        await state.Save();
+        return true;
+    }
+
     /** Resolve the target webview panel (set document or active editor). */
     private GetTargetPanel() {
         if (!this._Provider)
@@ -781,7 +804,7 @@ export class XAgentBridge {
             if (state && panel) {
                 state.IsDirty = true;
                 panel.webview.postMessage({ Type: "LoadModel", Payload: state.GetModelData() });
-                void state.Save();
+                void this.SaveTargetDocument();
             }
         }
         catch (err) {
@@ -916,7 +939,7 @@ export class XAgentBridge {
         if (state.IsUntitled)
             return "This document is untitled (never saved to disk). Use dase_new_document to create a named .dsorm file, or save it manually in VS Code (Ctrl+S).";
         try {
-            await state.Save();
+            await this.SaveTargetDocument();
             return `ORM document saved: ${state.Document.uri.fsPath}`;
         }
         catch (err) {
@@ -1361,7 +1384,7 @@ export class XAgentBridge {
             if (!result.success)
                 return `Failed to apply organization: ${result.message}`;
 
-            void this.GetTargetState()?.Save();
+            void this.SaveTargetDocument();
             return `Organization applied: ${result.tablesOrganized} table(s) across ${result.groupCount} group(s). Use dase_revert_organization to undo.`;
         }
         catch (err) {
@@ -1375,7 +1398,7 @@ export class XAgentBridge {
         const result = this.RevertOrganization();
         if (!result.success)
             return `Revert failed: ${result.message}`;
-        void this.GetTargetState()?.Save();
+        void this.SaveTargetDocument();
         return `Reverted ${result.tablesOrganized} table(s) to their previous positions and colors.`;
     }
 }

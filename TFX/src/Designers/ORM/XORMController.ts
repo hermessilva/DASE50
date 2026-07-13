@@ -47,6 +47,7 @@ export interface XIAddFieldData
 {
     TableID: string;
     Name?: string;
+    DataType?: string;
 }
 
 export interface XIUpdatePropertyData
@@ -186,7 +187,8 @@ export class XORMController
             return { Success: false, Message: "Table not found." };
 
         const field = table.CreateField({
-            Name: pData.Name
+            Name: pData.Name,
+            DataType: pData.DataType
         });
 
         return { Success: true, ElementID: field.ID };
