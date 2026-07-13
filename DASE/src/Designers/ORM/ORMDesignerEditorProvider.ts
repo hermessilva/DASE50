@@ -1228,15 +1228,19 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
                 <button id="table-search-next" class="table-search-btn" title="Pr&#xf3;ximo (Enter)">&#x25bc;</button>
                 <button id="table-search-close" class="table-search-btn" title="Fechar (Esc)">&#x2715;</button>
             </div>
-            <svg id="canvas" xmlns="http://www.w3.org/2000/svg">
-                <defs>
-                    <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
-                        <polygon points="0 0, 8 3, 0 6" fill="context-stroke" fill-opacity="0.9"/>
-                    </marker>
-                </defs>
-                <g id="relations-layer"></g>
-                <g id="tables-layer"></g>
-            </svg>
+            <div id="canvas-viewport">
+                <div id="canvas-sizer">
+                    <svg id="canvas" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+                                <polygon points="0 0, 8 3, 0 6" fill="context-stroke" fill-opacity="0.9"/>
+                            </marker>
+                        </defs>
+                        <g id="relations-layer"></g>
+                        <g id="tables-layer"></g>
+                    </svg>
+                </div>
+            </div>
         </div>
     </div>
     <div id="context-menu" class="context-menu">

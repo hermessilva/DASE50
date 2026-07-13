@@ -75,6 +75,47 @@ body {
     user-select: none;
 }
 
+/* Scrollable viewport: native scrollbars pan the canvas. Flex + margin:auto on
+   the sizer centres the canvas when it is smaller than the viewport (zoom < 1). */
+#canvas-viewport {
+    position: absolute;
+    inset: 0;
+    overflow: auto;
+    display: flex;
+}
+
+#canvas-viewport::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
+
+#canvas-viewport::-webkit-scrollbar-track,
+#canvas-viewport::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+#canvas-viewport::-webkit-scrollbar-thumb {
+    background: var(--vscode-scrollbarSlider-background, rgba(121, 121, 121, 0.4));
+}
+
+#canvas-viewport::-webkit-scrollbar-thumb:hover {
+    background: var(--vscode-scrollbarSlider-hoverBackground, rgba(100, 100, 100, 0.7));
+}
+
+#canvas-viewport::-webkit-scrollbar-thumb:active {
+    background: var(--vscode-scrollbarSlider-activeBackground, rgba(191, 191, 191, 0.4));
+}
+
+/* Sized by JS to canvas-size × zoom; defines the scrollable extent. */
+#canvas-sizer {
+    position: relative;
+    flex-shrink: 0;
+    margin: auto;
+    width: 3000px;
+    height: 2000px;
+    overflow: hidden;
+}
+
 #canvas-container.space-pan {
     cursor: grab;
 }
@@ -105,6 +146,7 @@ body {
 }
 
 #canvas {
+    display: block;
     width: 3000px;
     height: 2000px;
     transform-origin: 0 0;

@@ -5,6 +5,25 @@ All notable changes to the **DASE — Design-Aided Software Engineering** extens
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.41888] - 2026-07-13
+
+### Added
+
+- **Native scrollbars in the ORM designer.** The canvas is now hosted in a scrollable
+  viewport (`#canvas-viewport` → `#canvas-sizer` → SVG): the scrollbars reflect the
+  current position inside the 3000×2000 drawing area and grow/shrink with the zoom
+  level. Plain wheel and Shift+wheel now use the browser's native scrolling; Ctrl+wheel
+  keeps zooming at the cursor; Space+drag and middle-button drag still pan (driving the
+  scroll position). When zoomed below 100 % the canvas is centred in the viewport.
+
+### Fixed
+
+- **Space+drag pan no longer fights the native scroll.** With the viewport scrollable,
+  holding Space fired the browser's default page-down scroll on every key auto-repeat,
+  making the canvas jump while panning. Space is now swallowed on every keydown while
+  the canvas has focus (inputs are unaffected), and the hand tool also works when the
+  focus sits on the scrollable viewport itself.
+
 ## [1.0.41883] - 2026-07-11
 
 ### Changed

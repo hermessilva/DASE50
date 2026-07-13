@@ -79,12 +79,12 @@
     let _MoveTargetState = null; // { RefID } while user is picking a new target table
     let _Issues = [];
 
-    // ── Viewport state (zoom + pan) ─────────────────────────────────────────
+    // ── Viewport state (zoom + native scroll) ────────────────────────────────
+    const CANVAS_WIDTH = 3000;  // keep in sync with #canvas in OrmDesigner.css
+    const CANVAS_HEIGHT = 2000;
     let _Zoom = 1.0;
-    let _PanX = 0;
-    let _PanY = 0;
     let _SpaceDown = false;
-    let _SpacePan = null; // { startClientX, startClientY, startPanX, startPanY }
+    let _SpacePan = null; // { startClientX, startClientY, startScrollX, startScrollY }
 
     // Seed editor state
     let _SeedEditor = null; // { TableID, Columns, Rows, OriginalRows, SelectedRows: Set<number> }
@@ -143,6 +143,8 @@
     const _TablesLayer = document.getElementById("tables-layer");
     const _RelationsLayer = document.getElementById("relations-layer");
     const _CanvasContainer = document.getElementById("canvas-container");
+    const _CanvasViewport = document.getElementById("canvas-viewport");
+    const _CanvasSizer = document.getElementById("canvas-sizer");
     const _ContextMenu = document.getElementById("context-menu");
     const _TableContextMenu = document.getElementById("table-context-menu");
     const _FieldContextMenu = document.getElementById("field-context-menu");
@@ -504,61 +506,64 @@
 
     /** Convert client (screen) coordinates to canvas (SVG world) coordinates. */
     function ClientToCanvas(pClientX, pClientY) {
-        const r = _CanvasContainer.getBoundingClientRect();
+        // getBoundingClientRect reflects the scale transform, so r.left/r.top is
+        // the on-screen position of the canvas origin regardless of scroll.
+        const r = _Canvas.getBoundingClientRect();
         return {
-            x: (pClientX - r.left - _PanX) / _Zoom,
-            y: (pClientY - r.top  - _PanY) / _Zoom
+            x: (pClientX - r.left) / _Zoom,
+            y: (pClientY - r.top)  / _Zoom
         };
     }
 
-    /** Apply current _Pan + _Zoom to the canvas element. */
+    /** Apply current _Zoom: scale the canvas and resize the scrollable sizer. */
     function ApplyViewport() {
-        _Canvas.style.transform = `translate(${_PanX}px,${_PanY}px) scale(${_Zoom})`;
+        _CanvasSizer.style.width  = (CANVAS_WIDTH  * _Zoom) + "px";
+        _CanvasSizer.style.height = (CANVAS_HEIGHT * _Zoom) + "px";
+        _Canvas.style.transform = `scale(${_Zoom})`;
         const indicator = document.getElementById("zoom-indicator");
         if (indicator) indicator.textContent = Math.round(_Zoom * 100) + "%";
     }
 
     /** Zoom centred on a client-coordinate point, scaling by pFactor. */
     function ZoomAtPoint(pClientX, pClientY, pFactor) {
-        const r   = _CanvasContainer.getBoundingClientRect();
-        const wx  = (pClientX - r.left - _PanX) / _Zoom;
-        const wy  = (pClientY - r.top  - _PanY) / _Zoom;
+        const cr = _Canvas.getBoundingClientRect();
+        const wx = (pClientX - cr.left) / _Zoom;
+        const wy = (pClientY - cr.top)  / _Zoom;
         _Zoom = Math.max(0.1, Math.min(4.0, _Zoom * pFactor));
-        _PanX = pClientX - r.left - wx * _Zoom;
-        _PanY = pClientY - r.top  - wy * _Zoom;
         ApplyViewport();
+        // Scroll so the world point stays under the cursor (browser clamps).
+        const vr = _CanvasViewport.getBoundingClientRect();
+        _CanvasViewport.scrollLeft = wx * _Zoom - (pClientX - vr.left);
+        _CanvasViewport.scrollTop  = wy * _Zoom - (pClientY - vr.top);
     }
 
 
     function SetupZoomPan() {
         const ZOOM_FACTOR = 1.1;
-        const PAN_STEP    = 40;
 
-        // ── Ctrl+Wheel → zoom; plain Wheel → pan ─────────────────────────
+        // ── Ctrl+Wheel → zoom; plain / Shift+Wheel → native scrollbars ────
         _CanvasContainer.addEventListener("wheel", function (e) {
+            if (!e.ctrlKey) return; // let the browser scroll the viewport
             e.preventDefault();
-
-            if (e.ctrlKey) {
-                const factor = e.deltaY < 0 ? ZOOM_FACTOR : 1 / ZOOM_FACTOR;
-                ZoomAtPoint(e.clientX, e.clientY, factor);
-                return;
-            }
-
-            // Plain scroll → pan
-            const dx = e.shiftKey ? -(e.deltaY || PAN_STEP) : -(e.deltaX || 0);
-            const dy = e.shiftKey ? 0 : -(e.deltaY || PAN_STEP);
-            _PanX += dx;
-            _PanY += dy;
-            ApplyViewport();
+            const factor = e.deltaY < 0 ? ZOOM_FACTOR : 1 / ZOOM_FACTOR;
+            ZoomAtPoint(e.clientX, e.clientY, factor);
         }, { passive: false });
 
         // ── Space-bar held → hand-tool pan (Photoshop style) ─────────────
         document.addEventListener("keydown", function (e) {
-            if (e.code === "Space" && !e.repeat &&
-                !e.ctrlKey && document.activeElement === document.body) {
+            const active = document.activeElement;
+            const focusOnCanvas = active === document.body ||
+                                  active === _CanvasViewport ||
+                                  active === _CanvasContainer;
+            if (e.code === "Space" && !e.ctrlKey && focusOnCanvas) {
+                // The viewport scrolls natively now: default Space = page-down.
+                // Block it on EVERY keydown (auto-repeat included), otherwise
+                // holding Space scrolls the viewport while panning.
                 e.preventDefault();
-                _SpaceDown = true;
-                _CanvasContainer.classList.add("space-pan");
+                if (!e.repeat) {
+                    _SpaceDown = true;
+                    _CanvasContainer.classList.add("space-pan");
+                }
             }
 
             // Ctrl+0 → reset zoom to 100 % (no zoom), keeping the current view centre
@@ -605,17 +610,16 @@
             _SpacePan = {
                 startClientX: e.clientX,
                 startClientY: e.clientY,
-                startPanX:   _PanX,
-                startPanY:   _PanY
+                startScrollX: _CanvasViewport.scrollLeft,
+                startScrollY: _CanvasViewport.scrollTop
             };
             _CanvasContainer.classList.add("space-pan-dragging");
         });
 
         document.addEventListener("mousemove", function (e) {
             if (!_SpacePan) return;
-            _PanX = _SpacePan.startPanX + (e.clientX - _SpacePan.startClientX);
-            _PanY = _SpacePan.startPanY + (e.clientY - _SpacePan.startClientY);
-            ApplyViewport();
+            _CanvasViewport.scrollLeft = _SpacePan.startScrollX - (e.clientX - _SpacePan.startClientX);
+            _CanvasViewport.scrollTop  = _SpacePan.startScrollY - (e.clientY - _SpacePan.startClientY);
         });
 
         document.addEventListener("mouseup", function () {
@@ -629,13 +633,12 @@
         _CanvasContainer.addEventListener("mousedown", function (e) {
             if (e.button !== 1) return;
             e.preventDefault();
-            const start = { x: e.clientX, y: e.clientY, px: _PanX, py: _PanY };
+            const start = { x: e.clientX, y: e.clientY, sx: _CanvasViewport.scrollLeft, sy: _CanvasViewport.scrollTop };
             _CanvasContainer.style.cursor = "grabbing";
 
             const onMove = function (me) {
-                _PanX = start.px + (me.clientX - start.x);
-                _PanY = start.py + (me.clientY - start.y);
-                ApplyViewport();
+                _CanvasViewport.scrollLeft = start.sx - (me.clientX - start.x);
+                _CanvasViewport.scrollTop  = start.sy - (me.clientY - start.y);
             };
             const onUp = function () {
                 _CanvasContainer.style.cursor = "";
@@ -645,6 +648,9 @@
             document.addEventListener("mousemove", onMove);
             document.addEventListener("mouseup", onUp);
         });
+
+        // Size the sizer on startup so the scrollbars reflect the canvas extent.
+        ApplyViewport();
     }
 
     function SetupCanvasEvents() {
@@ -2077,10 +2083,8 @@
         const b = GetTableBBox(t);
         const cx = b.x + b.w / 2;
         const cy = b.y + b.h / 2;
-        const r = _CanvasContainer.getBoundingClientRect();
-        _PanX = r.width / 2 - cx * _Zoom;
-        _PanY = r.height / 2 - cy * _Zoom;
-        ApplyViewport();
+        _CanvasViewport.scrollLeft = cx * _Zoom - _CanvasViewport.clientWidth / 2;
+        _CanvasViewport.scrollTop  = cy * _Zoom - _CanvasViewport.clientHeight / 2;
     }
 
     function RenderRelations() {
@@ -2290,14 +2294,14 @@
             return;
 
         let g, screenX, screenY, inputWidth, currentName;
-        const cRect = _CanvasContainer.getBoundingClientRect();
+        const cRect = _Canvas.getBoundingClientRect();
 
         if (table) {
             g = _TablesLayer.querySelector('[data-id="' + pElementID + '"]');
             if (!g) return;
-            // Canvas → screen using current viewport transform
-            screenX  = table.X * _Zoom + _PanX + cRect.left;
-            screenY  = table.Y * _Zoom + _PanY + cRect.top;
+            // Canvas → screen: canvas rect already carries scroll + zoom
+            screenX  = table.X * _Zoom + cRect.left;
+            screenY  = table.Y * _Zoom + cRect.top;
             inputWidth = (table.Width || 200) * _Zoom;
             currentName = table.Name || "";
         }
