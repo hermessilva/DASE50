@@ -5,6 +5,17 @@ All notable changes to the **DASE — Design-Aided Software Engineering** extens
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.41889] - 2026-07-14
+
+### Fixed
+
+- **Tables are no longer clipped at the edge of the drawing area.** The auto-size
+  logic grew the SVG canvas with the content but left the new scrollable sizer at
+  its fixed 3000×2000 extent, so anything beyond that limit was cut off. Canvas and
+  sizer now share the same dynamic extent, the growth margin around the outermost
+  table went from 200 px to 400 px, and the area also expands live while a table is
+  being dragged past the edge (not just after the model reloads).
+
 ## [1.0.41888] - 2026-07-13
 
 ### Added

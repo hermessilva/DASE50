@@ -80,8 +80,10 @@
     let _Issues = [];
 
     // ── Viewport state (zoom + native scroll) ────────────────────────────────
-    const CANVAS_WIDTH = 3000;  // keep in sync with #canvas in OrmDesigner.css
-    const CANVAS_HEIGHT = 2000;
+    // Drawing-area extent; grows with the content (AutoSizeCanvas). The CSS
+    // #canvas size is only the pre-model fallback.
+    let _CanvasW = 3000;
+    let _CanvasH = 2000;
     let _Zoom = 1.0;
     let _SpaceDown = false;
     let _SpacePan = null; // { startClientX, startClientY, startScrollX, startScrollY }
@@ -517,8 +519,8 @@
 
     /** Apply current _Zoom: scale the canvas and resize the scrollable sizer. */
     function ApplyViewport() {
-        _CanvasSizer.style.width  = (CANVAS_WIDTH  * _Zoom) + "px";
-        _CanvasSizer.style.height = (CANVAS_HEIGHT * _Zoom) + "px";
+        _CanvasSizer.style.width  = (_CanvasW * _Zoom) + "px";
+        _CanvasSizer.style.height = (_CanvasH * _Zoom) + "px";
         _Canvas.style.transform = `scale(${_Zoom})`;
         const indicator = document.getElementById("zoom-indicator");
         if (indicator) indicator.textContent = Math.round(_Zoom * 100) + "%";
@@ -893,22 +895,26 @@
             t.Width = ComputeTableWidth(t);
     }
 
+    // Grow the drawing area to wrap the content with a comfortable margin.
+    // Canvas AND sizer must stay in sync: the sizer clips (overflow:hidden) and
+    // defines the scrollable extent, so a canvas larger than the sizer gets cut.
     function AutoSizeCanvas() {
-        if (!_Model.Tables || _Model.Tables.length === 0) return;
         let maxX = 0;
         let maxY = 0;
-        for (const t of _Model.Tables) {
-            const w = t.Width || 200;
-            const fieldCount = (t.Fields || []).length;
-            const h = fieldCount > 0 ? 28 + fieldCount * 16 + 12 : 28;
-            if (t.X + w > maxX) maxX = t.X + w;
-            if (t.Y + h > maxY) maxY = t.Y + h;
+        for (const t of (_Model.Tables || [])) {
+            const b = GetTableBBox(t);
+            if (b.x + b.w > maxX) maxX = b.x + b.w;
+            if (b.y + b.h > maxY) maxY = b.y + b.h;
         }
-        const pad = 200;
-        const targetW = Math.max(1600, Math.ceil((maxX + pad) / 100) * 100);
-        const targetH = Math.max(1000, Math.ceil((maxY + pad) / 100) * 100);
-        _Canvas.style.width = targetW + "px";
+        const pad = 400;
+        const targetW = Math.max(3000, Math.ceil((maxX + pad) / 100) * 100);
+        const targetH = Math.max(2000, Math.ceil((maxY + pad) / 100) * 100);
+        if (targetW === _CanvasW && targetH === _CanvasH) return;
+        _CanvasW = targetW;
+        _CanvasH = targetH;
+        _Canvas.style.width  = targetW + "px";
         _Canvas.style.height = targetH + "px";
+        ApplyViewport();
     }
 
     function RenderTables() {
@@ -1234,6 +1240,7 @@
                         rafPending = false;
                         UpdateRelationsForDrag(moverIDs, lastDX, lastDY);
                         DrawGroupBBox();
+                        AutoSizeCanvas(); // grow the area when dragging past the edge
                     });
                 }
             };
